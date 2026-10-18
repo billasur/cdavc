@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import ast
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -25,28 +27,54 @@ class Supervisor:
         self.provider = provider
         self.timeout_seconds = timeout_seconds
         self.graph = TaskGraph.from_dict(json.loads(self.graph_path.read_text()))
+        self.execution_root = self.root
 
     def run(self) -> dict[str, Any]:
         completed: set[str] = set()
         results: dict[str, Any] = {}
-        while len(completed) < len(self.graph.tasks):
-            runnable = [task for task in self.graph.runnable_tasks(completed) if task.id not in results]
-            if not runnable:
-                raise RuntimeError("no runnable tasks remain; graph state is inconsistent")
-            task = runnable[0]
-            result = self._run_task(task)
-            results[task.id] = result
-            if result["status"] == "COMPLETED":
-                completed.add(task.id)
-            else:
-                break
+        with tempfile.TemporaryDirectory(prefix="cdavc-") as workspace:
+            self.execution_root = Path(workspace) / self.root.name
+            shutil.copytree(
+                self.root,
+                self.execution_root,
+                symlinks=True,
+                ignore=shutil.ignore_patterns(".git", ".venv", ".cache", "__pycache__", "execution_log.json", "execution_report.md"),
+            )
+            while len(completed) < len(self.graph.tasks):
+                runnable = [task for task in self.graph.runnable_tasks(completed) if task.id not in results]
+                if not runnable:
+                    raise RuntimeError("no runnable tasks remain; graph state is inconsistent")
+                task = runnable[0]
+                result = self._run_task(task)
+                results[task.id] = result
+                if result["status"] == "COMPLETED":
+                    self._sync_task_files(task)
+                    completed.add(task.id)
+                else:
+                    break
+        self.execution_root = self.root
         output = {"project_id": self.graph.project_id, "tasks": results}
         (self.root / "execution_log.json").write_text(json.dumps(output, indent=2) + "\n")
         (self.root / "execution_report.md").write_text(render_report(output))
         return output
 
     def _run_task(self, task: Task) -> dict[str, Any]:
-        original = {path: _read_optional(self.root / path) for path in task.implementation_files}
+        missing_tests = [path for path in task.test_files if not (self.execution_root / path).is_file()]
+        if not task.test_files:
+            return {
+                "status": "FAILED",
+                "attempts": 0,
+                "attempt_log": [],
+                "failure": f"{task.id}: at least one declared test file is required",
+            }
+        if missing_tests:
+            return {
+                "status": "FAILED",
+                "attempts": 0,
+                "attempt_log": [],
+                "failure": f"{task.id}: declared test file does not exist: {missing_tests[0]}",
+            }
+        original = {path: _read_optional(self.execution_root / path) for path in task.implementation_files}
         attempts: list[dict[str, Any]] = []
         previous_failure = ""
         for attempt in range(1, task.max_retries + 2):
@@ -89,15 +117,16 @@ class Supervisor:
         for relative, content in files.items():
             if not isinstance(relative, str) or not isinstance(content, str):
                 raise ValueError("provider file paths and contents must be strings")
-            target = (self.root / relative).resolve()
-            if self.root not in target.parents:
+            workspace_root = self.execution_root.resolve()
+            target = (workspace_root / relative).resolve()
+            if workspace_root not in target.parents:
                 raise ValueError("provider attempted a path outside the project")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
 
     def _verify(self, task: Task) -> None:
         for relative in task.implementation_files:
-            source = (self.root / relative).read_text()
+            source = (self.execution_root / relative).read_text()
             try:
                 tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
             except SyntaxError as exc:
@@ -115,22 +144,33 @@ class Supervisor:
         if command[0] in {"python", "python3"}:
             command = (sys.executable, *command[1:])
         env = dict(os.environ)
-        env["PYTHONPATH"] = str(self.root / "src") + os.pathsep + env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = str(self.execution_root / "src") + os.pathsep + env.get("PYTHONPATH", "")
         try:
-            result = subprocess.run(command, cwd=self.root, env=env, capture_output=True, text=True, timeout=self.timeout_seconds)
+            result = subprocess.run(command, cwd=self.execution_root, env=env, capture_output=True, text=True, timeout=self.timeout_seconds)
         except subprocess.TimeoutExpired as exc:
             raise VerificationFailure(f"{label} timed out after {self.timeout_seconds}s") from exc
         if result.returncode:
-            output = (result.stdout + "\n" + result.stderr).replace(str(self.root), "$PROJECT_ROOT").strip()[-2000:]
+            output = (result.stdout + "\n" + result.stderr).replace(str(self.execution_root), "$WORKSPACE").replace(str(self.root), "$PROJECT_ROOT").strip()[-2000:]
             raise VerificationFailure(f"{label} failed:\n{output}")
 
     def _restore(self, original: dict[str, str | None]) -> None:
         for relative, content in original.items():
-            target = self.root / relative
+            target = self.execution_root / relative
             if content is None:
                 target.unlink(missing_ok=True)
             else:
                 target.write_text(content)
+
+    def _sync_task_files(self, task: Task) -> None:
+        for relative in task.implementation_files:
+            source = self.execution_root / relative
+            destination = self.root / relative
+            if not source.is_file():
+                raise VerificationFailure(f"verified implementation file is missing: {relative}")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            temporary = destination.with_name(destination.name + ".cdavc-tmp")
+            shutil.copyfile(source, temporary)
+            temporary.replace(destination)
 
 
 def _read_optional(path: Path) -> str | None:

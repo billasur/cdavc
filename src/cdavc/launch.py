@@ -29,14 +29,14 @@ def build_launch_command(
     memory_bytes: int | None = None,
     executable: str | None = None,
 ) -> list[str]:
-    if not model_path.is_absolute() or not model_path.is_file():
+    if not model_path.is_absolute() or not (model_path.is_file() or model_path.is_dir()):
         raise ValueError("model path must be an existing absolute file or directory")
-    model_bytes = model_path.stat().st_size if model_path.is_file() else 0
+    model_bytes = _model_size(model_path)
     profile = choose_runtime_profile(HardwareBudget(memory_bytes or detect_memory_bytes(), model_bytes))
     if backend == "llama":
         return build_llama_server_command(model_path, port=port, context=profile.context_tokens, mtp="MTP" in model_path.name, profile=profile, executable=executable or "llama-server")
     if backend == "mlx":
-        return build_mlx_server_command(model_path, port=port, profile=profile)
+        return build_mlx_server_command(model_path, port=port, profile=profile, executable=executable or "mlx_lm.server")
     raise ValueError("backend must be 'llama' or 'mlx'")
 
 
@@ -54,6 +54,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.run:
         return subprocess.run(command).returncode
     return 0
+
+
+def _model_size(path: Path) -> int:
+    if path.is_file():
+        return path.stat().st_size
+    return sum(child.stat().st_size for child in path.rglob("*") if child.is_file())
 
 
 if __name__ == "__main__":

@@ -16,6 +16,11 @@ It is suitable for a local instruct/coder endpoint, including a future Bonsai
 The local Hugging Face cache is supported through the runtime discovery helpers;
 the cache itself is never copied or committed.
 
+**Trust boundary:** v0 is for trusted local repositories, task graphs and model
+endpoints. Declared test commands execute as the current user with its network,
+environment and filesystem permissions. The temporary workspace protects the
+active source tree from failed candidates; it is not a security sandbox.
+
 ## Requirements
 
 - Python 3.11.x (pinned in `.python-version` and Dockerfile)

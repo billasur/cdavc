@@ -1,0 +1,16 @@
+.env
+.env.*
+.git
+.gitignore
+.venv
+__pycache__
+.pytest_cache
+.cache
+models
+*.gguf
+*.safetensors
+execution_log.json
+execution_report.md
+build
+dist
+*.egg-info

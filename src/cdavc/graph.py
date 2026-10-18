@@ -20,7 +20,7 @@ class Task:
     test_files: tuple[str, ...]
     symbols: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
-    test_command: tuple[str, ...] = ("python", "-m", "pytest")
+    test_command: tuple[str, ...] = ("python", "-m", "unittest", "discover", "-s", "tests")
     negative_test_command: tuple[str, ...] | None = None
     max_retries: int = 2
 
@@ -56,7 +56,7 @@ class TaskGraph:
             test_files = _safe_paths(raw.get("test_files", []), f"{task_id}.test_files")
             symbols = _string_tuple(raw.get("symbols", []), f"{task_id}.symbols")
             invariants = _string_tuple(raw.get("invariants", []), f"{task_id}.invariants")
-            test_command = _command_tuple(raw.get("test_command", ["python", "-m", "pytest"]), f"{task_id}.test_command")
+            test_command = _command_tuple(raw.get("test_command", ["python", "-m", "unittest", "discover", "-s", "tests"]), f"{task_id}.test_command")
             negative = raw.get("negative_test_command")
             negative_command = None if negative is None else _command_tuple(negative, f"{task_id}.negative_test_command")
             max_retries = raw.get("max_retries", 2)

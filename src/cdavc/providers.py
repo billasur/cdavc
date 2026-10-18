@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import inspect
+import socket
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Protocol, runtime_checkable
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
@@ -58,11 +61,15 @@ class OpenAICompatibleProvider:
         model: str = "gpt-4o-mini",
         api_key: str | None = None,
         opener: Callable[[Request], Any] = urlopen,
+        timeout: float = 30.0,
     ) -> None:
+        if timeout <= 0:
+            raise ValueError("provider timeout must be greater than zero")
         self.endpoint = endpoint
         self.model = model
         self.api_key = api_key
         self._opener = opener
+        self.timeout = timeout
 
     @property
     def available(self) -> bool:
@@ -79,8 +86,24 @@ class OpenAICompatibleProvider:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         request = Request(self.endpoint, data=payload, headers=headers, method="POST")
-        with self._opener(request) as response:
-            raw = response.read()
+        try:
+            try:
+                opener_parameters = inspect.signature(self._opener).parameters.values()
+            except (TypeError, ValueError):
+                opener_parameters = ()
+            accepts_timeout = any(
+                parameter.name == "timeout"
+                or parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in opener_parameters
+            )
+            if accepts_timeout:
+                response_context = self._opener(request, timeout=self.timeout)
+            else:
+                response_context = self._opener(request)
+            with response_context as response:
+                raw = response.read()
+        except (OSError, URLError, TimeoutError, socket.timeout) as exc:
+            raise ProviderUnavailableError(f"provider request failed: {exc}") from exc
 
         try:
             body = json.loads(raw.decode("utf-8"))
