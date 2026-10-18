@@ -121,7 +121,7 @@ class Supervisor:
         except subprocess.TimeoutExpired as exc:
             raise VerificationFailure(f"{label} timed out after {self.timeout_seconds}s") from exc
         if result.returncode:
-            output = (result.stdout + "\n" + result.stderr).strip()[-2000:]
+            output = (result.stdout + "\n" + result.stderr).replace(str(self.root), "$PROJECT_ROOT").strip()[-2000:]
             raise VerificationFailure(f"{label} failed:\n{output}")
 
     def _restore(self, original: dict[str, str | None]) -> None:
