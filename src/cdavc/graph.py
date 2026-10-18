@@ -33,7 +33,7 @@ class TaskGraph:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "TaskGraph":
-        if not isinstance(payload, dict) or not isinstance(payload.get("project_id"), str):
+        if not isinstance(payload, dict) or not isinstance(payload.get("project_id"), str) or not payload["project_id"]:
             raise GraphError("project_id must be a string")
         raw_tasks = payload.get("tasks")
         if not isinstance(raw_tasks, list) or not raw_tasks:
@@ -60,7 +60,7 @@ class TaskGraph:
             negative = raw.get("negative_test_command")
             negative_command = None if negative is None else _command_tuple(negative, f"{task_id}.negative_test_command")
             max_retries = raw.get("max_retries", 2)
-            if not isinstance(max_retries, int) or max_retries < 0 or max_retries > 5:
+            if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0 or max_retries > 5:
                 raise GraphError(f"{task_id}: max_retries must be between 0 and 5")
             tasks.append(Task(task_id, title, dependencies, implementation_files, test_files, symbols, invariants, test_command, negative_command, max_retries))
 
