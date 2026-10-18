@@ -23,6 +23,16 @@ class LaunchTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_launch_command("unknown", model, port=8080, memory_bytes=16 * 1024**3)
 
+    def test_mlx_accepts_a_model_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "mlx-model"
+            model.mkdir()
+            (model / "weights.safetensors").write_bytes(b"weights")
+            command = build_launch_command("mlx", model, port=8080, memory_bytes=16 * 1024**3)
+
+            self.assertIn("--model", command)
+            self.assertIn(str(model), command)
+
 
 if __name__ == "__main__":
     unittest.main()

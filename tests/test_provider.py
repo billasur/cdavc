@@ -1,4 +1,5 @@
 import json
+import socket
 import unittest
 from urllib.request import Request
 
@@ -88,6 +89,38 @@ class ProviderTests(unittest.TestCase):
         provider = OpenAICompatibleProvider("https://example.test", opener=opener)
 
         with self.assertRaises(ValueError):
+            provider.complete([])
+
+    def test_openai_compatible_provider_passes_configured_timeout_to_opener(self):
+        captured = {}
+
+        def opener(request, *, timeout):
+            captured["timeout"] = timeout
+
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    return b'{"choices": [{"message": {"content": "ok"}}]}'
+
+            return Response()
+
+        provider = OpenAICompatibleProvider("https://example.test", timeout=2.5, opener=opener)
+
+        self.assertEqual(provider.complete([]), "ok")
+        self.assertEqual(captured["timeout"], 2.5)
+
+    def test_openai_compatible_provider_normalizes_timeout_error(self):
+        def opener(request, *, timeout):
+            raise socket.timeout("timed out")
+
+        provider = OpenAICompatibleProvider("https://example.test", opener=opener)
+
+        with self.assertRaisesRegex(ProviderUnavailableError, "timed out"):
             provider.complete([])
 
 
