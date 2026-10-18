@@ -1,8 +1,11 @@
-.PHONY: test run-demo package-test docker-test
+.PHONY: check-python test run-demo package-test docker-test
 
 PYTHON ?= python3
 
-test:
+check-python:
+	$(PYTHON) -c 'import sys; assert sys.version_info >= (3, 11), "CD-AVC requires Python 3.11+"'
+
+test: check-python
 	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
 
 run-demo:
@@ -11,7 +14,7 @@ run-demo:
 		--mock-response examples/demo/responses/bad.json \
 		--mock-response examples/demo/responses/good.json
 
-package-test:
+package-test: check-python
 	$(PYTHON) -c 'import shutil; shutil.rmtree("/tmp/cdavc-package-test", ignore_errors=True)'
 	$(PYTHON) -m pip install --no-deps --target /tmp/cdavc-package-test .
 	PYTHONPATH=/tmp/cdavc-package-test $(PYTHON) -m cdavc --help
