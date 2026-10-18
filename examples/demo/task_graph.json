@@ -1,0 +1,16 @@
+{
+  "project_id": "cdavc-demo",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Implement a one-step integer increment",
+      "dependencies": [],
+      "implementation_files": ["src/answer.py"],
+      "test_files": ["tests/test_answer.py"],
+      "symbols": ["answer"],
+      "invariants": ["answer(41) is 42"],
+      "test_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+      "max_retries": 1
+    }
+  ]
+}

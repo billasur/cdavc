@@ -1,0 +1,1 @@
+{"files": {"src/answer.py": "def answer(value: int) -> int:\n    return 0\n"}}

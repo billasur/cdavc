@@ -1,0 +1,2 @@
+# CD-AVC v1 has no third-party runtime dependencies.
+# The build-system pin is recorded in pyproject.toml for reproducible packaging.
