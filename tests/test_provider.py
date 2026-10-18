@@ -11,6 +11,32 @@ from cdavc.providers import (
 
 
 class ProviderTests(unittest.TestCase):
+    def test_provider_rejects_non_positive_timeout(self):
+        with self.assertRaises(ValueError):
+            OpenAICompatibleProvider("https://example.test", timeout=0)
+
+    def test_provider_rejects_empty_endpoint(self):
+        with self.assertRaises(ProviderUnavailableError):
+            OpenAICompatibleProvider("").complete([])
+
+    def test_provider_supports_non_introspectable_request_opener(self):
+        class Opener:
+            __signature__ = object()
+
+            def __call__(self, request):
+                class Response:
+                    def __enter__(self):
+                        return self
+
+                    def __exit__(self, *args):
+                        return False
+
+                    def read(self):
+                        return b'{"choices": [{"message": {"content": "ok"}}]}'
+
+                return Response()
+
+        self.assertEqual(OpenAICompatibleProvider("https://example.test", opener=Opener()).complete([]), "ok")
     def test_mock_provider_returns_scripted_responses_in_order(self):
         provider = MockProvider(["first", "second"])
 
@@ -90,6 +116,23 @@ class ProviderTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             provider.complete([])
+
+    def test_openai_compatible_provider_rejects_non_string_content(self):
+        def opener(request):
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    return b'{"choices": [{"message": {"content": null}}]}'
+
+            return Response()
+
+        with self.assertRaises(ValueError):
+            OpenAICompatibleProvider("https://example.test", opener=opener).complete([])
 
     def test_openai_compatible_provider_passes_configured_timeout_to_opener(self):
         captured = {}

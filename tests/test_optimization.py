@@ -27,6 +27,9 @@ class OptimizationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             choose_runtime_profile(HardwareBudget(total_memory_bytes=4, model_bytes=8))
 
+        with self.assertRaises(ValueError):
+            choose_runtime_profile(HardwareBudget(total_memory_bytes=16, model_bytes=1, reserve_bytes=0))
+
 
 if __name__ == "__main__":
     unittest.main()

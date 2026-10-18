@@ -1,4 +1,4 @@
-.PHONY: check-python test run-demo package-test docker-test
+.PHONY: check-python test coverage run-demo package-test docker-test
 
 PYTHON ?= python3
 
@@ -7,6 +7,10 @@ check-python:
 
 test: check-python
 	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests -v
+
+coverage: check-python
+	PYTHONPATH=src $(PYTHON) -m coverage run --source=src/cdavc -m unittest discover -s tests
+	$(PYTHON) -m coverage report -m
 
 run-demo:
 	PYTHONPATH=src $(PYTHON) -m cdavc.cli examples/demo/task_graph.json \

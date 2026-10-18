@@ -1,8 +1,10 @@
 import tempfile
 import unittest
+import contextlib
+import io
 from pathlib import Path
 
-from cdavc.launch import build_launch_command
+from cdavc.launch import build_launch_command, main
 
 
 class LaunchTests(unittest.TestCase):
@@ -32,6 +34,40 @@ class LaunchTests(unittest.TestCase):
 
             self.assertIn("--model", command)
             self.assertIn(str(model), command)
+
+    def test_main_prints_command_without_starting_server(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "model.gguf"
+            model.write_bytes(b"model")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                status = main(["--backend", "llama", "--model", str(model), "--memory-bytes", str(16 * 1024**3)])
+
+            self.assertEqual(status, 0)
+            self.assertIn("llama-server", stdout.getvalue())
+
+    def test_main_detects_memory_when_not_explicitly_configured(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "model.gguf"
+            model.write_bytes(b"model")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                status = main(["--backend", "llama", "--model", str(model)])
+
+            self.assertEqual(status, 0)
+            self.assertIn("--cache-type-k", stdout.getvalue())
+
+    def test_main_run_uses_explicit_executable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / "model.gguf"
+            model.write_bytes(b"model")
+            status = main([
+                "--backend", "llama", "--model", str(model),
+                "--memory-bytes", str(16 * 1024**3),
+                "--executable", "/usr/bin/true", "--run",
+            ])
+
+            self.assertEqual(status, 0)
 
 
 if __name__ == "__main__":

@@ -72,6 +72,49 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
             self.assertIn("declared test file does not exist", result["tasks"]["TASK-001"]["failure"])
 
+    def test_supervisor_rejects_task_without_declared_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["test_files"] = []
+            graph_path.write_text(json.dumps(payload))
+
+            result = Supervisor(graph_path, MockProvider([])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
+            self.assertIn("at least one declared test file", result["tasks"]["TASK-001"]["failure"])
+
+    def test_supervisor_rejects_syntax_error_and_restores_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["max_retries"] = 0
+            graph_path.write_text(json.dumps(payload))
+            original = (root / "src" / "answer.py").read_text()
+            response = json.dumps({"files": {"src/answer.py": "def answer(:\n    pass\n"}})
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
+            self.assertIn("AST gate failed", result["tasks"]["TASK-001"]["failure"])
+            self.assertEqual((root / "src" / "answer.py").read_text(), original)
+
+    def test_supervisor_rejects_missing_required_symbol(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["max_retries"] = 0
+            graph_path.write_text(json.dumps(payload))
+            response = json.dumps({"files": {"src/answer.py": "def other(value: int) -> int:\n    return value + 1\n"}})
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
+            self.assertIn("missing symbols", result["tasks"]["TASK-001"]["failure"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,8 @@
+[run]
+source = src/cdavc
+omit =
+    src/cdavc/__main__.py
+
+[report]
+exclude_lines =
+    if __name__ == .__main__.:

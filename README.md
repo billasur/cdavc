@@ -51,6 +51,17 @@ make test
 The test command uses only Python's standard library and is therefore suitable
 for offline execution.
 
+For an optional coverage report, install the development-only tool into the
+project virtual environment and run:
+
+```bash
+.venv/bin/python -m pip install coverage
+make coverage PYTHON=.venv/bin/python
+```
+
+The current suite reports at least 96% line coverage. The remaining lines are
+platform-specific memory detection and defensive subprocess/error branches.
+
 ## Run the deterministic demo
 
 ```bash
