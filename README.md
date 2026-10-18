@@ -27,6 +27,21 @@ active source tree from failed candidates; it is not a security sandbox.
 - Docker for the clean Linux test path
 - No network access or API key is required for v1
 
+## Install
+
+For a local checkout with Python 3.11 or 3.12:
+
+```bash
+python3.11 -m venv .venv
+.venv/bin/python -m pip install --no-deps .
+.venv/bin/cdavc --help
+```
+
+The package has no runtime dependencies. The build backend may need access to
+the pinned setuptools build dependency when building from a completely empty
+environment; the offline judge path uses the Docker image and does not install
+third-party runtime packages.
+
 ## Run tests
 
 ```bash
@@ -66,7 +81,7 @@ The Docker command runs the same offline test suite with networking disabled.
 The adapter accepts an OpenAI-compatible chat-completions endpoint:
 
 ```bash
-PYTHONPATH=src python3 -m cdavc.cli path/to/task_graph.json \
+cdavc path/to/task_graph.json \
   --provider openai \
   --endpoint http://127.0.0.1:8080/v1/chat/completions \
   --model local-model
@@ -91,7 +106,7 @@ and separate MLX cache/prefill controls.
 Print the selected command before launching it:
 
 ```bash
-PYTHONPATH=src python3 -m cdavc.launch \
+cdavc-launch \
   --backend llama \
   --model /absolute/path/to/model.gguf \
   --memory-bytes $((16 * 1024 * 1024 * 1024))
