@@ -1,0 +1,1 @@
+"""Small provider adapter package."""

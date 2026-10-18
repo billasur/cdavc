@@ -1,0 +1,95 @@
+import json
+import unittest
+from urllib.request import Request
+
+from cdavc.providers import (
+    MockProvider,
+    OpenAICompatibleProvider,
+    ProviderUnavailableError,
+)
+
+
+class ProviderTests(unittest.TestCase):
+    def test_mock_provider_returns_scripted_responses_in_order(self):
+        provider = MockProvider(["first", "second"])
+
+        self.assertEqual(provider.complete([{"role": "user", "content": "hi"}]), "first")
+        self.assertEqual(provider.complete([{"role": "user", "content": "again"}]), "second")
+
+    def test_mock_provider_raises_when_script_is_exhausted(self):
+        provider = MockProvider([])
+
+        with self.assertRaises(ProviderUnavailableError):
+            provider.complete([])
+
+    def test_unavailable_mock_provider_raises_without_consuming_script(self):
+        provider = MockProvider(["later"], available=False)
+
+        with self.assertRaises(ProviderUnavailableError):
+            provider.complete([])
+        provider.available = True
+        self.assertEqual(provider.complete([]), "later")
+
+    def test_openai_compatible_provider_builds_request_and_parses_response(self):
+        captured = {}
+
+        def opener(request: Request):
+            captured["request"] = request
+
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    return json.dumps(
+                        {"choices": [{"message": {"content": "hello"}}]}
+                    ).encode()
+
+            return Response()
+
+        provider = OpenAICompatibleProvider(
+            "https://example.test/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+            opener=opener,
+        )
+
+        self.assertEqual(
+            provider.complete([{"role": "user", "content": "hi"}]), "hello"
+        )
+        request = captured["request"]
+        self.assertEqual(request.full_url, "https://example.test/v1/chat/completions")
+        self.assertEqual(request.get_header("Authorization"), "Bearer secret")
+        self.assertEqual(
+            json.loads(request.data),
+            {
+                "model": "test-model",
+                "messages": [{"role": "user", "content": "hi"}],
+            },
+        )
+
+    def test_openai_compatible_provider_rejects_malformed_response(self):
+        def opener(request):
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    return b'{"choices": []}'
+
+            return Response()
+
+        provider = OpenAICompatibleProvider("https://example.test", opener=opener)
+
+        with self.assertRaises(ValueError):
+            provider.complete([])
+
+
+if __name__ == "__main__":
+    unittest.main()
