@@ -76,6 +76,27 @@ For Bonsai GGUF files, use the PrismML llama.cpp fork. The stock Homebrew
 does not understand its custom GGML tensor type. See `docs/V2.md` for the
 measured compatibility result and fallback guidance.
 
+## Hardware-aware local launch
+
+The next v2 slice applies the practical parts of Magnitude's approach without
+copying its engine: conservative memory budgeting, quantized KV cache, bounded
+prefill, limited concurrency, continuous batching, MTP flags for MTP artifacts,
+and separate MLX cache/prefill controls.
+
+Print the selected command before launching it:
+
+```bash
+PYTHONPATH=src python3 -m cdavc.launch \
+  --backend llama \
+  --model /absolute/path/to/model.gguf \
+  --memory-bytes $((16 * 1024 * 1024 * 1024))
+```
+
+Use `--run` only after checking the printed command. For Bonsai, pass the
+PrismML-compatible server executable with `--executable`; the default
+Homebrew/stock llama.cpp binary is not compatible with the cached custom Bonsai
+formats.
+
 ## Deliberate limitations
 
 This version does not claim to provide a security sandbox, generic memory-leak
