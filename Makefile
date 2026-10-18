@@ -1,6 +1,6 @@
 .PHONY: check-python test coverage run-demo package-test docker-test
 
-PYTHON ?= python3
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 DOCKER ?= $(shell if command -v docker >/dev/null 2>&1; then command -v docker; elif test -x /Applications/Docker.app/Contents/Resources/bin/docker; then printf '%s' /Applications/Docker.app/Contents/Resources/bin/docker; else printf '%s' docker; fi)
 DOCKER_BIN_DIR := $(dir $(DOCKER))
 
