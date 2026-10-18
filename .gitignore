@@ -15,3 +15,4 @@ models/
 execution_log.json
 execution_report.md
 .env
+.opencode/
