@@ -59,6 +59,25 @@ explanation in [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md). A real cached
 Qwen local-model smoke run is recorded in
 [`docs/REAL_JOB_SMOKE.md`](docs/REAL_JOB_SMOKE.md).
 
+## Showcase site
+
+The static motion/3-D pipeline showcase lives in `showcase/`. Preview it
+locally with:
+
+```bash
+python3 -m http.server 4173 --directory showcase
+```
+
+Deploy it from the repository root with the Vercel CLI:
+
+```bash
+vercel deploy --cwd showcase
+```
+
+The showcase uses measured smoke evidence from the repository and does not
+claim a benchmark improvement. The local model and verification process remain
+local; Vercel hosts only the explanatory visual demo.
+
 ## Run tests
 
 ```bash
