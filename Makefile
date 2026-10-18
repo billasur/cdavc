@@ -1,6 +1,8 @@
 .PHONY: check-python test coverage run-demo package-test docker-test
 
 PYTHON ?= python3
+DOCKER ?= $(shell if command -v docker >/dev/null 2>&1; then command -v docker; elif test -x /Applications/Docker.app/Contents/Resources/bin/docker; then printf '%s' /Applications/Docker.app/Contents/Resources/bin/docker; else printf '%s' docker; fi)
+DOCKER_BIN_DIR := $(dir $(DOCKER))
 
 check-python:
 	$(PYTHON) -c 'import sys; assert sys.version_info >= (3, 11), "CD-AVC requires Python 3.11+"'
@@ -24,5 +26,5 @@ package-test: check-python
 	PYTHONPATH=/tmp/cdavc-package-test $(PYTHON) -m cdavc --help
 
 docker-test:
-	docker build --tag cdavc:test .
-	docker run --rm --network none cdavc:test
+	PATH="$(DOCKER_BIN_DIR):$(PATH)" $(DOCKER) build --tag cdavc:test .
+	PATH="$(DOCKER_BIN_DIR):$(PATH)" $(DOCKER) run --rm --network none cdavc:test
