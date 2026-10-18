@@ -61,8 +61,9 @@ Qwen local-model smoke run is recorded in
 
 ## Showcase site
 
-The static motion/3-D pipeline showcase lives in `showcase/`. Preview it
-locally with:
+The scroll-controlled 3-D live demo lives in `showcase/`. It visualizes the
+pain of unverified local patches, then walks through the contract, model,
+verification gates and synchronized result. Preview it locally with:
 
 ```bash
 python3 -m http.server 4173 --directory showcase
