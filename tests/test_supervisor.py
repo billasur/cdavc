@@ -58,6 +58,16 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
             self.assertIn("allowed implementation", result["tasks"]["TASK-001"]["failure"])
 
+    def test_supervisor_accepts_json_code_fence_from_local_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            response = "```json\n{" + '"files": {"src/answer.py": "def answer(value: int) -> int:\\n    return value + 1\\n"}' + "}\n```"
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "COMPLETED")
+
     def test_supervisor_rejects_missing_declared_test_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

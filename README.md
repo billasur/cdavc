@@ -47,6 +47,12 @@ It covers the mock activation path, task graphs, local endpoints, optimized
 llama/MLX launch, Bonsai compatibility, reports, recovery and clean-Linux
 verification.
 
+The high-level architecture is shown in
+[`docs/cdavc-system-design.svg`](docs/cdavc-system-design.svg), with an
+explanation in [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md). A real cached
+Qwen local-model smoke run is recorded in
+[`docs/REAL_JOB_SMOKE.md`](docs/REAL_JOB_SMOKE.md).
+
 ## Run tests
 
 ```bash

@@ -99,13 +99,15 @@ class Supervisor:
             f"Allowed implementation files: {', '.join(task.implementation_files)}\n"
             f"Required symbols: {', '.join(task.symbols) or '(none)'}\n"
             f"Invariants: {', '.join(task.invariants) or '(see tests)'}\n"
-            "Return only JSON in the form {\"files\": {\"path\": \"complete file contents\"}}. "
-            "Never modify test files.\n" + failure
+            f"The only allowed file key is exactly: {', '.join(task.implementation_files)}\n"
+            "Use repository-relative paths only; do not prefix them with 'path/' or the project directory. "
+            "Return only JSON in the form {\"files\": {\"src/example.py\": \"complete file contents\"}}. "
+            "Never modify test files and do not wrap the JSON in markdown.\n" + failure
         )
 
     def _apply_response(self, task: Task, response: str) -> None:
         try:
-            payload = json.loads(response)
+            payload = json.loads(_strip_json_fence(response))
             files = payload["files"]
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise ValueError("provider response must be JSON with a files object") from exc
@@ -175,6 +177,15 @@ class Supervisor:
 
 def _read_optional(path: Path) -> str | None:
     return path.read_text() if path.exists() else None
+
+
+def _strip_json_fence(response: str) -> str:
+    text = response.strip()
+    if text.startswith("```") and text.endswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3:
+            return "\n".join(lines[1:-1]).strip()
+    return text
 
 
 def render_report(result: dict[str, Any]) -> str:
