@@ -42,6 +42,11 @@ the pinned setuptools build dependency when building from a completely empty
 environment; the offline judge path uses the Docker image and does not install
 third-party runtime packages.
 
+For the complete first-run flow, read [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
+It covers the mock activation path, task graphs, local endpoints, optimized
+llama/MLX launch, Bonsai compatibility, reports, recovery and clean-Linux
+verification.
+
 ## Run tests
 
 ```bash
