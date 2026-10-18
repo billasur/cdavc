@@ -45,11 +45,17 @@ def choose_runtime_profile(budget: HardwareBudget) -> RuntimeProfile:
     if available <= 0:
         raise ValueError("model and reserve exceed total memory")
 
+    max_sequences = 2 if budget.model_bytes <= 4 * 1024**3 else 1
     context = next(
-        (candidate for candidate in (32768, 16384, 8192, 4096) if candidate * budget.kv_bytes_per_token <= available),
+        (
+            candidate
+            for candidate in (32768, 16384, 8192, 4096)
+            if candidate * budget.kv_bytes_per_token * max_sequences <= available
+        ),
         2048,
     )
-    max_sequences = 2 if budget.model_bytes <= 4 * 1024**3 and context >= 8192 else 1
+    if context < 8192:
+        max_sequences = 1
     prefill_tokens = 512 if budget.model_bytes <= 4 * 1024**3 else 256
     return RuntimeProfile(
         context_tokens=context,
