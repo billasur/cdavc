@@ -2,6 +2,7 @@
 .env.*
 .git
 .gitignore
+.opencode
 .venv
 __pycache__
 .pytest_cache
