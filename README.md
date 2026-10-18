@@ -42,6 +42,12 @@ the pinned setuptools build dependency when building from a completely empty
 environment; the offline judge path uses the Docker image and does not install
 third-party runtime packages.
 
+The pinned build dependency is listed in `requirements.lock`:
+
+```bash
+.venv/bin/python -m pip install -r requirements.lock
+```
+
 For the complete first-run flow, read [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
 It covers the mock activation path, task graphs, local endpoints, optimized
 llama/MLX launch, Bonsai compatibility, reports, recovery and clean-Linux
@@ -97,6 +103,27 @@ make docker-test
 ```
 
 The Docker command runs the same offline test suite with networking disabled.
+
+## Clean Linux command sequence
+
+From a fresh checkout on a Linux machine with Python 3.11+:
+
+```bash
+git clone git@github.com:billasur/cdavc.git
+cd cdavc
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.lock
+.venv/bin/python -m pip install --no-deps .
+make test PYTHON=.venv/bin/python
+make run-demo PYTHON=.venv/bin/python
+```
+
+The Docker-only clean rebuild is:
+
+```bash
+docker build --tag cdavc:test .
+docker run --rm --network none cdavc:test
+```
 
 ## Optional local model endpoint
 

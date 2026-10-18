@@ -1,2 +1,3 @@
-# CD-AVC v1 has no third-party runtime dependencies.
-# The build-system pin is recorded in pyproject.toml for reproducible packaging.
+# Resolved build dependency set for the dependency-free runtime.
+# Install this file only when preparing a source-build environment.
+setuptools==75.8.0
