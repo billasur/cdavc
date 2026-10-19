@@ -643,9 +643,7 @@ class BenchmarkRunner:
         for relative, content in normalized_files.items():
             if not isinstance(relative, str) or not isinstance(content, str):
                 raise _GateFailure("provider file paths and contents must be strings")
-            target = (workspace_root / relative).resolve()
-            if workspace_root not in target.parents:
-                raise _GateFailure("provider attempted a path outside the workspace")
+            target = _canonical_target(workspace_root, relative)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
 
@@ -1505,6 +1503,34 @@ def _assert_test_hashes(workspace: Path, hashes: Mapping[str, str]) -> None:
         path = workspace / relative
         if not path.is_file() or _sha256(path) != expected:
             raise _GateFailure("locked test hash changed")
+
+
+def _canonical_target(root: Path, relative: str) -> Path:
+    """Resolve a provider-supplied path inside ``root`` or refuse to write it.
+
+    ``Path.resolve`` alone is not enough: a workspace can contain a symlink at
+    an implementation path, in which case writing to the resolved target edits
+    a file outside the worktree and outside the test-hash lock.  The lexical
+    path and every component are therefore checked before any bytes are
+    written.
+    """
+
+    if not relative or Path(relative).is_absolute():
+        raise _GateFailure("provider attempted a path outside the workspace")
+    parts = Path(relative).parts
+    if any(part in ("", ".", "..") for part in parts):
+        raise _GateFailure("provider attempted a path outside the workspace")
+    probe = root
+    for part in parts:
+        probe = probe / part
+        if probe.is_symlink():
+            raise _GateFailure("provider attempted to write through a symlink")
+    try:
+        resolved = (root / Path(relative)).resolve()
+        resolved.relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        raise _GateFailure("provider attempted a path outside the workspace") from None
+    return resolved
 
 
 def _read_optional(path: Path) -> str | None:

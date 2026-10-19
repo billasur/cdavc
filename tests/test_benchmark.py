@@ -9,9 +9,12 @@ from unittest.mock import patch
 
 from cdavc.benchmark import (
     ARMS,
+    STDLIB_ONLY_HINT,
     BenchmarkError,
     BenchmarkRunner,
     BenchmarkTask,
+    _canonical_target,
+    _sample_seed,
     paired_pass_rate_difference,
     render_report,
 )
@@ -539,6 +542,107 @@ class BenchmarkTests(unittest.TestCase):
             self.assertIn("boundary probe failed", cage["failure"])
             self.assertIn("IndexError", cage["failure"])
             self.assertNotIn("targeted test", cage["failure"])
+
+    def test_sample_seed_differs_per_draw_and_stays_reproducible(self):
+        self.assertEqual(_sample_seed(20261019, 1), 20261019)
+        seeds = [_sample_seed(20261019, draw) for draw in range(1, 5)]
+        self.assertEqual(len(set(seeds)), 4)
+        self.assertEqual(seeds, [_sample_seed(20261019, draw) for draw in range(1, 5)])
+        for seed in seeds[1:]:
+            self.assertLess(seed, 2**31 - 1)
+            self.assertGreaterEqual(seed, 0)
+
+    def test_every_arm_prompt_requires_the_standard_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task()
+            runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task])
+            for arm in ARMS:
+                self.assertIn(STDLIB_ONLY_HINT, runner._prompt(task, arm, ""))
+
+    def test_cage_rejects_third_party_import_at_the_ast_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0, regression_command=None)
+            candidate = self._response("import numpy\n\ndef answer() -> int:\n    return int(numpy.int64(42))\n")
+            labels = []
+            original = BenchmarkRunner._run_command
+
+            def spy(runner, command, workspace, label, *, include_output=False):
+                labels.append(label)
+                return original(runner, command, workspace, label, include_output=include_output)
+
+            runner = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            )
+            with patch.object(BenchmarkRunner, "_run_command", spy):
+                records = runner.run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn("non-stdlib module 'numpy'", cage["failure"])
+            self.assertNotIn("targeted test", labels)
+
+    def test_json_reask_recovers_a_malformed_reply_without_spending_a_sample(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0)
+            good = self._response("def answer() -> int:\n    return 42\n")
+            prose = ProviderCompletion(text="Sure! Here is the function you asked for.")
+
+            def provider_factory(_arm, _task):
+                return MockProvider([prose, good])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            for record in records:
+                self.assertTrue(record["pass"], record["failure"])
+                self.assertEqual(record["json_reasks"], 1)
+                self.assertEqual(record["samples_drawn"], 1)
+                self.assertEqual(record["attempts"], 1)
+
+    def test_failed_json_reask_is_one_rejected_sample_not_two(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0, regression_command=None)
+            prose = ProviderCompletion(text="Still not JSON.")
+
+            records = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([prose, prose]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertEqual(cage["json_reasks"], 1)
+            self.assertEqual(cage["samples_drawn"], 1)
+            self.assertIn("not a JSON files object", cage["failure"])
+
+    def test_patch_writer_refuses_escapes_and_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "src").mkdir()
+            (root / "src" / "answer.py").write_text("def answer() -> int:\n    return 0\n")
+            outside = root.parent / "outside.py"
+            outside.write_text("secret")
+            (root / "src" / "link.py").symlink_to(outside)
+
+            self.assertEqual(_canonical_target(root, "src/answer.py"), root / "src" / "answer.py")
+            self.assertEqual(_canonical_target(root, "./src/answer.py"), root / "src" / "answer.py")
+            for relative in ("../outside.py", "/etc/passwd", "src/../../outside.py", "src/../outside.py"):
+                with self.assertRaises(Exception):
+                    _canonical_target(root, relative)
+            with self.assertRaises(Exception) as caught:
+                _canonical_target(root, "src/link.py")
+            self.assertIn("symlink", str(caught.exception))
+            self.assertEqual(outside.read_text(), "secret")
 
 
 if __name__ == "__main__":
