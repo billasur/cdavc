@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h52_ipv4",
+  "title": "Strict IPv4 parsing",
+  "description": "Implement parse_ipv4(text). Return a tuple of four ints for a valid dotted-quad IPv4 address, else None. Exactly four decimal fields separated by single dots; each 0-255; only ASCII digits; no signs, spaces or empty fields; leading zeros are rejected unless the field is exactly '0'.",
+  "source": "CD-AVC-heldout-agent5-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent5/task_h52_ipv4/solution.py"
+  ],
+  "symbols": [
+    "parse_ipv4"
+  ],
+  "invariants": [
+    "Leading zeros like '01' are invalid.",
+    "No whitespace, signs or non-ASCII digits.",
+    "Returns None, never raises."
+  ],
+  "max_retries": 2
+}

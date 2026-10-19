@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h53_csvline",
+  "title": "Parse one CSV line",
+  "description": "Implement parse_csv_line(line). Split one CSV record into a list of strings. Fields are separated by commas. A field may be wrapped in double quotes, in which case commas are literal and a doubled quote (\"\") means one literal quote. A quote inside an unquoted field is kept as-is. Whitespace is preserved. An empty line yields ['']. A trailing comma yields a trailing empty field. Raise ValueError for an unterminated quoted field or for characters between a closing quote and the next comma or end of line.",
+  "source": "CD-AVC-heldout-agent5-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent5/task_h53_csvline/solution.py"
+  ],
+  "symbols": [
+    "parse_csv_line"
+  ],
+  "invariants": [
+    "Doubled quotes inside quoted fields become one quote.",
+    "Whitespace is never stripped.",
+    "Malformed quoting raises ValueError."
+  ],
+  "max_retries": 2
+}

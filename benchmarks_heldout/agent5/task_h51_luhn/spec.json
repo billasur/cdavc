@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h51_luhn",
+  "title": "Luhn card number check",
+  "description": "Implement luhn_valid(text). Return True if text is a valid Luhn number. Spaces and hyphens may separate digits and are ignored. Any other non-digit character makes it invalid. After stripping separators there must be at least 2 digits. Return False (never raise) for invalid string input. An all-zero string of 2+ digits is valid.",
+  "source": "CD-AVC-heldout-agent5-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent5/task_h51_luhn/solution.py"
+  ],
+  "symbols": [
+    "luhn_valid"
+  ],
+  "invariants": [
+    "Only spaces and hyphens are ignored.",
+    "Fewer than 2 digits is invalid.",
+    "Never raises for string input."
+  ],
+  "max_retries": 2
+}

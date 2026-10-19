@@ -1,0 +1,63 @@
+"""Hidden evaluator for task_h52_ipv4 (held-out writer 5: text formats/validation)."""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+CHECKS = [
+    lambda m: _eq(m.parse_ipv4("0.0.0.0"), (0, 0, 0, 0)),
+    lambda m: _eq(m.parse_ipv4("255.255.255.255"), (255, 255, 255, 255)),
+    lambda m: _eq(m.parse_ipv4("256.1.1.1"), None),
+    lambda m: _eq(m.parse_ipv4("01.2.3.4"), None),
+    lambda m: _eq(m.parse_ipv4("1.2.3"), None),
+    lambda m: _eq(m.parse_ipv4("1.2.3.4.5"), None),
+    lambda m: _eq(m.parse_ipv4("1..3.4"), None),
+    lambda m: _eq(m.parse_ipv4(" 1.2.3.4"), None),
+    lambda m: _eq(m.parse_ipv4("1.2.3.4\n"), None),
+    lambda m: _eq(m.parse_ipv4("+1.2.3.4"), None),
+    lambda m: _eq(m.parse_ipv4("-1.2.3.4"), None),
+    lambda m: _eq(m.parse_ipv4("1.2.3.\u0664"), None),
+    lambda m: _eq(m.parse_ipv4(""), None),
+    lambda m: _eq(m.parse_ipv4("1.2.3.4."), None),
+    lambda m: _eq(m.parse_ipv4("00.0.0.0"), None),
+    lambda m: _eq(m.parse_ipv4("1.0x1.3.4"), None),
+
+]
+
+
+def _eq(actual, expected):
+    assert actual == expected, f"expected {expected!r}, got {actual!r}"
+    return True
+
+
+def _raises(error, function, *args):
+    try:
+        function(*args)
+    except error:
+        return True
+    raise AssertionError(f"expected {error.__name__}")
+
+
+def _load():
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "solution.py"
+    spec = importlib.util.spec_from_file_location("candidate", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> int:
+    try:
+        m = _load()
+        for check in CHECKS:
+            check(m)
+    except Exception as exc:  # noqa: BLE001 - evaluator output is the retry signal
+        print(f"hidden test failed: {exc!r}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

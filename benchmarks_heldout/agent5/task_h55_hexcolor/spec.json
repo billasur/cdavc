@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h55_hexcolor",
+  "title": "Normalize hex colors",
+  "description": "Implement normalize_hex_color(text). Accept '#RGB', '#RRGGBB' or '#RRGGBBAA' (the leading '#' is required; hex digits in either case). Return the canonical lowercase '#rrggbbaa'-free form: 3-digit input expands each digit ('#abc' -> '#aabbcc'), 6-digit stays 6-digit, and 8-digit input whose alpha is 'ff' drops the alpha, otherwise keeps it. Surrounding whitespace is allowed and stripped. Raise ValueError for any other length, missing '#', or non-hex characters.",
+  "source": "CD-AVC-heldout-agent5-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent5/task_h55_hexcolor/solution.py"
+  ],
+  "symbols": [
+    "normalize_hex_color"
+  ],
+  "invariants": [
+    "Output is always lowercase.",
+    "Alpha 'ff' (any case) is dropped; other alpha is kept.",
+    "Invalid input raises ValueError."
+  ],
+  "max_retries": 2
+}

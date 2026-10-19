@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h54_semver",
+  "title": "Semantic version ordering",
+  "description": "Implement compare_semver(a, b). Return -1, 0 or 1 comparing two semantic versions 'MAJOR.MINOR.PATCH' with optional '-prerelease' and optional '+build'. Build metadata is ignored. A version with a prerelease is lower than the same version without one. Prerelease identifiers are dot-separated and compared left to right: numeric identifiers compare as integers, alphanumeric ones compare by ASCII order, numeric identifiers are lower than alphanumeric ones, and a shorter identifier list is lower when all earlier ones are equal. Raise ValueError for an invalid version: core must be three numeric fields without leading zeros, numeric prerelease identifiers must not have leading zeros, and identifiers must be non-empty and use only [0-9A-Za-z-].",
+  "source": "CD-AVC-heldout-agent5-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent5/task_h54_semver/solution.py"
+  ],
+  "symbols": [
+    "compare_semver"
+  ],
+  "invariants": [
+    "Build metadata never affects ordering.",
+    "Numeric prerelease identifiers compare as integers.",
+    "Invalid versions raise ValueError."
+  ],
+  "max_retries": 2
+}
