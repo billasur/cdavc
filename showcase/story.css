@@ -1,7 +1,7 @@
 :root {
   --bg: #060908;
   --bg-deep: #030504;
-  --panel: rgba(10, 16, 13, 0.78);
+  --panel: rgba(10, 16, 13, 0.82);
   --panel-solid: #0d1511;
   --panel-border: rgba(216, 255, 100, 0.18);
   --text: #f4f7f4;
@@ -16,7 +16,7 @@
   --fail-glow: rgba(255, 71, 71, 0.32);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --page-gutter: clamp(20px, 4vw, 72px);
+  --page-gutter: clamp(18px, 4vw, 72px);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
@@ -35,15 +35,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Ambient Grain Overlay */
+/* Ambient Grain Layer */
 .grain-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
   pointer-events: none;
-  background-image: radial-gradient(rgba(216, 255, 100, 0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
-  opacity: 0.6;
+  background-image: radial-gradient(rgba(216, 255, 100, 0.035) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.55;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -68,24 +68,24 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: clamp(14px, 2vw, 28px);
-  padding: 8px 14px 8px 18px;
+  gap: clamp(12px, 2vw, 24px);
+  padding: 7px 14px 7px 18px;
   border-radius: 9999px;
-  background: rgba(8, 14, 11, 0.85);
+  background: rgba(8, 14, 11, 0.88);
   backdrop-filter: blur(24px) saturate(190%);
   -webkit-backdrop-filter: blur(24px) saturate(190%);
   border: 1px solid var(--panel-border);
   box-shadow: 
-    0 16px 36px rgba(0, 0, 0, 0.6),
+    0 16px 36px rgba(0, 0, 0, 0.65),
     inset 0 1px 1px rgba(255, 255, 255, 0.12);
   transition: border-color 0.4s var(--ease), box-shadow 0.4s var(--ease);
 }
 
 .nav-island:hover {
-  border-color: rgba(216, 255, 100, 0.32);
+  border-color: rgba(216, 255, 100, 0.35);
   box-shadow: 
-    0 20px 44px rgba(0, 0, 0, 0.7),
-    0 0 24px rgba(216, 255, 100, 0.08),
+    0 20px 44px rgba(0, 0, 0, 0.75),
+    0 0 24px rgba(216, 255, 100, 0.1),
     inset 0 1px 1px rgba(255, 255, 255, 0.18);
 }
 
@@ -193,11 +193,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   gap: 8px;
 }
 
-/* Button-in-Button Architecture for CTAs */
+/* Button-in-Button Architecture */
 .btn-drift {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   padding: 5px 12px 5px 6px;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.06);
@@ -218,8 +218,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  font-size: 11px;
   transition: transform 0.3s var(--ease), background 0.3s var(--ease);
+}
+
+.drift-svg {
+  display: block;
 }
 
 .btn-drift:hover {
@@ -235,9 +238,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   color: #060908;
 }
 
-.btn-drift:active {
-  transform: scale(0.97);
-}
+.btn-drift:active { transform: scale(0.97); }
 
 .btn-drift.is-breached {
   border-color: var(--fail);
@@ -282,7 +283,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 12px 5px 14px;
+  padding: 5px 10px 5px 12px;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -301,7 +302,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
   color: var(--accent);
   transition: transform 0.3s var(--ease), background 0.3s var(--ease);
 }
@@ -352,12 +352,12 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   z-index: 2;
   pointer-events: none;
   background:
-    radial-gradient(90% 70% at 65% 45%, rgba(6, 9, 8, 0) 30%, rgba(3, 5, 4, 0.72) 100%),
+    radial-gradient(90% 70% at 65% 45%, rgba(6, 9, 8, 0) 32%, rgba(3, 5, 4, 0.72) 100%),
     linear-gradient(90deg, 
       rgba(6, 9, 8, 0.98) 0%, 
       rgba(6, 9, 8, 0.94) 30%, 
-      rgba(6, 9, 8, 0.75) 42%, 
-      rgba(6, 9, 8, 0.28) 55%, 
+      rgba(6, 9, 8, 0.72) 42%, 
+      rgba(6, 9, 8, 0.25) 55%, 
       rgba(6, 9, 8, 0) 68%, 
       rgba(6, 9, 8, 0.45) 86%, 
       rgba(6, 9, 8, 0.95) 100%);
@@ -375,7 +375,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 .story-meta {
   position: absolute;
-  top: 96px;
+  top: 92px;
   right: var(--page-gutter);
   left: var(--page-gutter);
   display: flex;
@@ -402,11 +402,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .meta-chamber {
   color: var(--muted);
   font-size: 9px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   padding: 4px 12px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .meta-stage {
@@ -417,7 +417,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* Breach Alert Banner */
 .breach-banner {
   position: absolute;
-  top: 90px;
+  top: 86px;
   left: 50%;
   transform: translateX(-50%) translateY(-30px);
   opacity: 0;
@@ -437,7 +437,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   gap: 16px;
   padding: 12px 22px;
   border-radius: 16px;
-  background: rgba(22, 10, 10, 0.94);
+  background: rgba(22, 10, 10, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 71, 71, 0.5);
   box-shadow: 
@@ -445,7 +445,16 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
     inset 0 1px 1px rgba(255, 120, 120, 0.25);
 }
 
-.breach-icon { font-size: 22px; animation: pulse-glow 1s infinite; }
+.breach-icon {
+  display: flex;
+  align-items: center;
+  color: var(--fail);
+}
+
+.breach-svg {
+  display: block;
+}
+
 .breach-text strong {
   display: block;
   font-size: 11px;
@@ -474,14 +483,14 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   white-space: nowrap;
 }
 
-/* Raycast 3D Telemetry Inspector Card */
+/* Raycast Telemetry Inspector Card */
 .telemetry-inspector {
   position: absolute;
   bottom: 34px;
   right: var(--page-gutter);
   width: 320px;
   border-radius: 16px;
-  background: rgba(8, 14, 11, 0.82);
+  background: rgba(8, 14, 11, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--panel-border);
@@ -574,7 +583,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 
 /* ------------------------------------------------------------------ *
- * Narrative Copy Stage
+ * Narrative Copy Stage & Scramble-in Typography
  * ------------------------------------------------------------------ */
 .story-copy {
   position: absolute;
@@ -642,10 +651,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .story-panel h2 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(40px, 4.4vw, 70px);
+  font-size: clamp(38px, 4.3vw, 68px);
   font-weight: 550;
   letter-spacing: -0.06em;
   line-height: 0.98;
+  font-feature-settings: "tnum" 1;
 }
 
 .story-body {
@@ -668,8 +678,8 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .story-facts li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
+  gap: 7px;
+  padding: 6px 12px;
   border: 1px solid rgba(216, 255, 100, 0.18);
   border-radius: 9999px;
   background: rgba(14, 22, 17, 0.65);
@@ -688,7 +698,10 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   transform: translateY(-1px);
 }
 
-.fact-icon { font-size: 11px; }
+.fact-svg {
+  display: block;
+  color: var(--accent);
+}
 
 /* ------------------------------------------------------------------ *
  * Vertical Navigation Rail
@@ -774,9 +787,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   transform: translate(50%, -50%) scale(1.4);
 }
 
-.story-rail button:hover {
-  color: var(--accent);
-}
+.story-rail button:hover { color: var(--accent); }
 
 .story-disclaimer {
   position: absolute;
@@ -791,7 +802,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 
 /* ------------------------------------------------------------------ *
- * Closing Section: Double-Bezel Bento Grid
+ * Closing Section: Report30 Bento Grid
  * ------------------------------------------------------------------ */
 .closing {
   position: relative;
@@ -950,13 +961,8 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   gap: 32px;
 }
 
-.receipt-info {
-  max-width: 620px;
-}
-
-.receipt-info p {
-  margin-bottom: 0;
-}
+.receipt-info { max-width: 620px; }
+.receipt-info p { margin-bottom: 0; }
 
 .closing-btn {
   display: inline-flex;
@@ -982,7 +988,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  color: #060908;
   transition: transform 0.3s var(--ease);
 }
 
@@ -991,9 +997,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   box-shadow: 0 14px 36px rgba(216, 255, 100, 0.5);
 }
 
-.closing-btn:hover .btn-icon-wrap {
-  transform: translate(2px, -2px);
-}
+.closing-btn:hover .btn-icon-wrap { transform: translate(2px, -2px); }
 
 .closing-note {
   margin-top: 64px;
@@ -1027,9 +1031,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   text-underline-offset: 4px;
 }
 
-.site-footer a:hover {
-  color: var(--accent);
-}
+.site-footer a:hover { color: var(--accent); }
 
 /* ------------------------------------------------------------------ *
  * Static Diagram Fallback
@@ -1068,37 +1070,71 @@ body.no-webgl .static-visual { display: flex; z-index: 0; opacity: 1; }
 .static-verified { stroke: var(--accent); stroke-width: 2.5; }
 
 /* ------------------------------------------------------------------ *
- * Responsive Breakpoints
+ * Mobile & Tablet Optimization (Zero Overlaps, Centered Hero Area)
  * ------------------------------------------------------------------ */
 @media (max-width: 1180px) {
   .site-nav { top: 12px; }
   .nav-telemetry { display: none; }
   .telemetry-inspector { display: none; }
   
-  .story-copy {
-    top: auto;
-    bottom: 84px;
+  /* Dedicated non-overlapping rows for Meta & Step Dots */
+  .story-meta {
+    top: 76px;
     left: var(--page-gutter);
     right: var(--page-gutter);
-    width: auto;
-    transform: none;
+    width: calc(100% - 2 * var(--page-gutter));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  .story-panels { min-height: 270px; }
-  .story-panel h1,
-  .story-panel h2 { font-size: clamp(36px, 8vw, 56px); }
 
   .story-rail {
-    top: 72px;
+    top: 104px;
     left: var(--page-gutter);
     right: auto;
     transform: none;
     padding: 0;
+    z-index: 25;
   }
-  .story-rail ol { display: flex; gap: 8px; }
+  .story-rail ol { display: flex; gap: 10px; }
   .story-rail li { padding-right: 0; font-size: 0; }
   .story-rail button { font-size: 0; padding: 0; }
   .story-rail li::after { position: static; display: block; width: 8px; height: 8px; transform: none; }
   .rail-line, .rail-scrubber { display: none; }
+
+  /* Mobile Story Card sits at bottom with high-contrast frosted panel */
+  .story-copy {
+    top: auto;
+    bottom: 32px;
+    left: var(--page-gutter);
+    right: var(--page-gutter);
+    width: auto;
+    transform: none;
+    background: rgba(6, 10, 8, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 22px 24px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
+  }
+  .story-panels { min-height: 220px; }
+  .story-panel h1,
+  .story-panel h2 { font-size: clamp(32px, 7vw, 48px); }
+  .story-body { margin-top: 14px; font-size: 14px; line-height: 1.5; }
+  .story-facts { margin-top: 16px; }
+
+  /* Adjust wash so 3D protagonist stays bright and centered */
+  .story-wash {
+    background:
+      radial-gradient(ellipse 90% 55% at 50% 36%, rgba(6, 9, 8, 0) 30%, rgba(3, 5, 4, 0.78) 100%),
+      linear-gradient(180deg, 
+        rgba(6, 9, 8, 0.75) 0%, 
+        rgba(6, 9, 8, 0.1) 20%, 
+        rgba(6, 9, 8, 0.1) 50%, 
+        rgba(6, 9, 8, 0.9) 85%, 
+        rgba(6, 9, 8, 0.98) 100%);
+  }
 
   .bento-wide,
   .bento-card:not(.bento-wide):not(.bento-full) {
@@ -1122,15 +1158,19 @@ body.no-webgl .static-visual { display: flex; z-index: 0; opacity: 1; }
   .repo-link span:first-child { display: none; }
   .repo-link { padding: 5px; }
   
-  .story-meta { top: 72px; }
+  .story-meta { top: 66px; }
   .meta-chamber { display: none; }
+  .story-rail { top: 92px; }
 
-  .story-copy { bottom: 60px; }
-  .story-panels { min-height: 310px; }
+  .story-copy {
+    bottom: 20px;
+    padding: 18px;
+  }
+  .story-panels { min-height: 240px; }
   .story-panel h1,
-  .story-panel h2 { font-size: clamp(32px, 10vw, 44px); }
-  .story-body { font-size: 13px; }
-  .story-facts li { font-size: 9px; padding: 5px 9px; }
+  .story-panel h2 { font-size: clamp(28px, 8.5vw, 38px); }
+  .story-body { font-size: 13px; margin-top: 10px; }
+  .story-facts li { font-size: 9px; padding: 4px 8px; }
 
   .site-footer {
     flex-direction: column;
@@ -1143,3 +1183,44 @@ body.no-webgl .static-visual { display: flex; z-index: 0; opacity: 1; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+.courier-line {
+  position: absolute;
+  left: calc(50% + 10px);
+  bottom: 28px;
+  margin: 0;
+  max-width: 34vw;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  background: rgba(8, 14, 11, 0.7);
+  border: 1px solid rgba(216, 255, 100, 0.28);
+  color: #e9f5d0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.courier-line::before { content: 'COURIER: '; color: var(--accent); font-weight: 700; }
+.story-copy {
+  padding: 22px 26px 22px 0;
+  background: linear-gradient(90deg, rgba(6,10,8,0.82) 0%, rgba(6,10,8,0.82) 82%, rgba(6,10,8,0) 100%);
+}
+.story-wash {
+  background:
+    radial-gradient(90% 80% at 65% 48%, rgba(6, 9, 8, 0) 50%, rgba(3, 5, 4, 0.45) 100%),
+    linear-gradient(90deg, rgba(6,9,8,0.9) 0%, rgba(6,9,8,0.8) 26%, rgba(6,9,8,0.3) 40%, rgba(6,9,8,0) 52%, rgba(6,9,8,0) 90%, rgba(6,9,8,0.5) 100%);
+}
+.story-body { color: #dbe6de; }
+.story-disclaimer { display: none; }
+@media (max-width: 1180px) {
+  .courier-line { display: none; }
+  .story-copy { padding: 22px 24px; background: rgba(6, 10, 8, 0.9); }
+  .story-wash {
+    background:
+      linear-gradient(180deg, rgba(6,9,8,0.55) 0%, rgba(6,9,8,0) 16%, rgba(6,9,8,0) 52%, rgba(6,9,8,0.7) 78%, rgba(6,9,8,0.95) 100%);
+  }
+}
+
+@media (min-width:1181px){.courier-line{left:var(--page-gutter);max-width:36vw;bottom:34px}}
+
+@media (max-width:1180px){.story-panels{min-height:290px}.story-copy{bottom:14px}}
+@media (max-width:640px){.story-panels{min-height:300px}.story-body{font-size:13px}}

@@ -7,7 +7,7 @@ document.body.classList.add('story-module-loaded');
 gsap.registerPlugin(ScrollTrigger);
 
 /* ------------------------------------------------------------------ *
- * Global Selectors & UI Elements
+ * DOM Selectors & State
  * ------------------------------------------------------------------ */
 const body = document.body;
 const story = document.querySelector('#task-story');
@@ -27,23 +27,11 @@ const soundStateLabel = btnSound?.querySelector('.sound-state');
 const staticVisual = document.querySelector('.static-visual');
 
 const inspectTarget = document.querySelector('#inspect-target');
-const inspectSymbol = document.querySelector('#inspect-symbol');
-const inspectSector = document.querySelector('#inspect-sector');
-const inspectIntegrity = document.querySelector('#inspect-integrity');
+const inspectState = document.querySelector('#inspect-state');
+const inspectBench = document.querySelector('#inspect-bench');
+const inspectGain = document.querySelector('#inspect-gain');
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-/* Low-quality tier: phones, coarse pointers and weak devices (or ?quality=low) */
-const LOW_QUALITY = (() => {
-  const q = new URLSearchParams(window.location.search).get('quality');
-  if (q === 'low') return true;
-  if (q === 'high') return false;
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  const narrow = Math.min(window.innerWidth, window.innerHeight) < 700;
-  const weak = (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
-    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
-  return coarse || narrow || !!weak;
-})();
 let isReduced = reduced.matches;
 
 let scene = null;
@@ -52,18 +40,53 @@ let lenis = null;
 let lastStep = -1;
 let scrollVelocity = 0;
 
-const CHAMBERS = [
-  'CHAMBER 01 / CONTRACT MONOLITH',
-  'CHAMBER 02 / BOUNDARY DEFLECTOR SHIELD',
-  'CHAMBER 03 / SHA-256 GIMBAL LASER COLLAR',
-  'CHAMBER 04 / AST CONTRACT INSPECTION CORES',
-  'CHAMBER 05 / ISOLATED GIT WORKTREE REACTOR',
-  'CHAMBER 06 / QUAD-GATE SUITE & HEALING ARC',
-  'CHAMBER 07 / MASTER REPO DOCK & AUDIT TRAIL',
+const STAGE_CHAMBERS = [
+  'STAGE 01 / THE TASK BOUNDARY',
+  'STAGE 02 / BOUNDARY FILE SELECTION',
+  'STAGE 03 / SEALED TEST COLLAR',
+  'STAGE 04 / AST CONTRACT SCANNER',
+  'STAGE 05 / ISOLATED WORKTREE CONDUIT',
+  'STAGE 06 / QUARANTINE GATE ARENA',
+  'STAGE 07 / MASTER REPO COPY-BACK',
 ];
 
 /* ------------------------------------------------------------------ *
- * Procedural Web Audio Synthesizer (Zero External Audio Assets)
+ * Text Scrambler on Stage Entry
+ * ------------------------------------------------------------------ */
+function scrambleElement(el) {
+  if (!el) return;
+  const targetText = el.dataset.text || el.textContent;
+  if (!targetText) return;
+  el.dataset.text = targetText;
+  const chars = '01#_./!%><[]{}*~';
+  const len = targetText.length;
+  let frame = 0;
+  const totalFrames = 12;
+
+  const timer = setInterval(() => {
+    frame++;
+    const progress = frame / totalFrames;
+    const revealedIndex = Math.floor(progress * len);
+    let str = '';
+    for (let i = 0; i < len; i++) {
+      if (targetText[i] === ' ') {
+        str += ' ';
+      } else if (i < revealedIndex) {
+        str += targetText[i];
+      } else {
+        str += chars[Math.floor(Math.random() * chars.length)];
+      }
+    }
+    el.textContent = str;
+    if (frame >= totalFrames) {
+      clearInterval(timer);
+      el.textContent = targetText;
+    }
+  }, 24);
+}
+
+/* ------------------------------------------------------------------ *
+ * Procedural Web Audio Engine (Zero External Audio Assets)
  * ------------------------------------------------------------------ */
 class SoundEngine {
   constructor() {
@@ -104,11 +127,11 @@ class SoundEngine {
     osc.frequency.setValueAtTime(880, now);
     osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
     gain.gain.setValueAtTime(0.15, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
     osc.connect(gain);
     gain.connect(this.masterGain);
     osc.start(now);
-    osc.stop(now + 0.36);
+    osc.stop(now + 0.33);
   }
 
   playAlarm() {
@@ -118,7 +141,7 @@ class SoundEngine {
     const gain = this.ctx.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(220, now);
-    osc.frequency.linearRampToValueAtTime(180, now + 0.3);
+    osc.frequency.linearRampToValueAtTime(160, now + 0.35);
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
     osc.connect(gain);
@@ -133,8 +156,8 @@ class SoundEngine {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(120, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.28);
     gain.gain.setValueAtTime(0.25, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
     osc.connect(gain);
@@ -153,7 +176,7 @@ btnSound?.addEventListener('click', () => {
 });
 
 /* ------------------------------------------------------------------ *
- * UI & Step Synchronization
+ * UI & Step Sync
  * ------------------------------------------------------------------ */
 function setReducedState() {
   isReduced = reduced.matches;
@@ -164,20 +187,35 @@ function setReducedState() {
   }
 }
 
+const COURIER_LINES = [
+  'I am the patch. I may only touch solution.py.',
+  'I come back as one file. Anything else is refused.',
+  'The tests are sealed. I cannot change them.',
+  'My syntax is checked against the contract.',
+  'I run in a copy, so the source stays safe.',
+  'Four gates. If I fail, the original file is restored.',
+  'I passed every gate. Now I am copied back.',
+];
 function setStep(step) {
+  const cl = document.getElementById('courier-line');
+  if (cl) cl.textContent = COURIER_LINES[Math.min(6, Math.max(0, step))];
   const safeStep = Math.min(6, Math.max(0, step));
   if (safeStep === lastStep && !isReduced) return;
   const prevStep = lastStep;
   lastStep = safeStep;
 
   if (stageReadout) stageReadout.textContent = `${String(safeStep + 1).padStart(2, '0')} / 07`;
-  if (chamberReadout) chamberReadout.textContent = CHAMBERS[safeStep];
+  if (chamberReadout) chamberReadout.textContent = STAGE_CHAMBERS[safeStep];
   if (staticVisual) staticVisual.dataset.step = String(safeStep);
 
   panels.forEach((panel, index) => {
     const active = index === safeStep;
     panel.classList.toggle('is-current', active);
     panel.setAttribute('aria-hidden', String(!active));
+    if (active) {
+      const heading = panel.querySelector('h1, h2');
+      scrambleElement(heading);
+    }
   });
 
   railItems.forEach((item, index) => {
@@ -193,13 +231,13 @@ function setStep(step) {
   }
 }
 
-// Interactive rail jumps
+// Rail click navigation
 railItems.forEach((item, index) => {
   const btn = item.querySelector('button');
   btn?.addEventListener('click', () => {
     if (lenis && story) {
       const targetScroll = story.offsetTop + (index / 6) * (story.offsetHeight - window.innerHeight);
-      lenis.scrollTo(targetScroll, { duration: 1.2 });
+      lenis.scrollTo(targetScroll, { duration: 1.1 });
     } else {
       window.scrollTo({
         top: story.offsetTop + (index / 6) * (story.offsetHeight - window.innerHeight),
@@ -221,30 +259,30 @@ function triggerDriftSimulation() {
   btnDrift?.classList.add('is-breached');
   breachBanner?.classList.add('is-active');
 
-  if (inspectIntegrity) {
-    inspectIntegrity.textContent = 'DRIFT COMPROMISED (MISMATCH)';
-    inspectIntegrity.style.color = '#ff4747';
+  if (inspectState) {
+    inspectState.textContent = 'DRIFT_REJECTED';
+    inspectState.style.color = '#ff4747';
   }
 
-  scene.triggerDriftAlert();
+  scene.triggerDrift();
 
   setTimeout(() => {
     if (breachTitle) breachTitle.textContent = 'CD-AVC REJECTION PROTOCOL COMPLETE';
-    if (breachDetail) breachDetail.textContent = 'Untrusted patch ejected. Original test and implementation restored. Zero repository residue.';
+    if (breachDetail) breachDetail.textContent = 'Untrusted patch ejected. Original test and implementation restored. Zero residue in working tree.';
   }, 1600);
 
   setTimeout(() => {
     breachBanner?.classList.remove('is-active');
     btnDrift?.classList.remove('is-breached');
     isDrifting = false;
-    scene.resetDriftAlert();
-    if (inspectIntegrity) {
-      inspectIntegrity.textContent = 'PRE-SEALED (0 BYTES DRIFT)';
-      inspectIntegrity.style.color = '#d8ff64';
+    scene.resetDrift();
+    if (inspectState) {
+      inspectState.textContent = 'STEADY_VERIFIED';
+      inspectState.style.color = '#d8ff64';
     }
     setTimeout(() => {
-      if (breachTitle) breachTitle.textContent = 'SECURITY BREACH DETECTED: TEST DRIFT SIMULATED';
-      if (breachDetail) breachDetail.textContent = 'Locked SHA-256 mismatch detected in test suite. CD-AVC isolation protocol active. Candidate write refused.';
+      if (breachTitle) breachTitle.textContent = 'TEST DRIFT DETECTED: LOCKED SUITE COMPROMISED';
+      if (breachDetail) breachDetail.textContent = 'Locked SHA-256 mismatch detected. CD-AVC isolation active. Candidate write refused, worktree discarded.';
     }, 500);
   }, 3800);
 }
@@ -255,213 +293,124 @@ btnDrift?.addEventListener('click', triggerDriftSimulation);
  * Procedural Dynamic Canvas Textures
  * ------------------------------------------------------------------ */
 function createTexture(width, height, draw) {
-  const canvasElement = document.createElement('canvas');
-  canvasElement.width = width;
-  canvasElement.height = height;
-  const ctx = canvasElement.getContext('2d');
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, width, height);
   draw(ctx, width, height);
-  const texture = new THREE.CanvasTexture(canvasElement);
+  const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 4;
   return texture;
 }
 
-function roundRect(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
-}
+function courierFaceTexture() {
+  return createTexture(256, 256, (ctx, w, h) => {
+    ctx.fillStyle = '#0a1610';
+    ctx.fillRect(0, 0, w, h);
 
-function contractTexture() {
-  return createTexture(1024, 480, (ctx, width, height) => {
-    ctx.fillStyle = 'rgba(6, 10, 8, 0.95)';
-    roundRect(ctx, 4, 4, width - 8, height - 8, 16);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, 0.35)';
-    ctx.lineWidth = 2.5;
-    roundRect(ctx, 4, 4, width - 8, height - 8, 16);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.4)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, w - 8, h - 8);
 
-    // Laser bar
     ctx.fillStyle = '#d8ff64';
-    ctx.fillRect(36, 32, 6, height - 64);
+    ctx.font = '700 16px monospace';
+    ctx.fillText('solution.py', 16, 32);
 
-    ctx.font = '700 24px monospace';
-    ctx.fillStyle = '#d8ff64';
-    ctx.fillText('TASK SPECIFICATION CONTRACT', 64, 68);
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#7a8c80';
-    ctx.font = '500 20px monospace';
-    ctx.fillText('IMMUTABLE SCOPE', width - 44, 68);
-    ctx.textAlign = 'left';
-
-    ctx.fillStyle = '#f4f7f4';
-    ctx.font = '700 52px system-ui, sans-serif';
-    ctx.fillText('task_001 :: count_vowels', 64, 142);
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, 0.18)';
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.2)';
     ctx.beginPath();
-    ctx.moveTo(64, 175);
-    ctx.lineTo(width - 44, 175);
+    ctx.moveTo(16, 42);
+    ctx.lineTo(w - 16, 42);
     ctx.stroke();
 
-    const items = [
-      ['TARGET IMPLEMENTATION', 'solution.py'],
-      ['REQUIRED EXPORTED SYMBOL', 'FunctionDef: count_vowels'],
-      ['TEST INTEGRITY CONSTRAINT', 'SHA-256 pre-hash == post-hash'],
-      ['ISOLATION ENVIRONMENT', 'Ephemeral git worktree'],
-      ['MAX ATTEMPT BUDGET', '2 retries before hard rejection'],
+    const codeLines = [
+      'def count_vowels(t):',
+      '    v = "aeiou"',
+      '    c = 0',
+      '    for ch in t:',
+      '        if ch in v:',
+      '            c += 1',
+      '    return c',
     ];
 
-    items.forEach(([lbl, val], idx) => {
-      const y = 224 + idx * 46;
-      ctx.fillStyle = '#839689';
-      ctx.font = '600 20px monospace';
-      ctx.fillText(lbl, 64, y);
-      ctx.fillStyle = '#d8ff64';
-      ctx.font = '600 22px monospace';
-      ctx.fillText(val, 420, y);
+    codeLines.forEach((line, i) => {
+      ctx.fillStyle = line.includes('def') || line.includes('return') ? '#d8ff64' : '#b7c7bc';
+      ctx.font = '500 13px monospace';
+      ctx.fillText(line, 16, 68 + i * 24);
     });
   });
 }
 
-function receiptLogTexture() {
-  return createTexture(768, 960, (ctx, width, height) => {
-    ctx.fillStyle = 'rgba(7, 12, 9, 0.96)';
-    roundRect(ctx, 4, 4, width - 8, height - 8, 16);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, 0.35)';
+function gridFloorTexture() {
+  return createTexture(2048, 2048, (ctx, w, h) => {
+    ctx.strokeStyle = 'rgba(150, 180, 160, 0.12)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += 64) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += 64) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.22)';
     ctx.lineWidth = 2;
-    roundRect(ctx, 4, 4, width - 8, height - 8, 16);
-    ctx.stroke();
+    for (let x = 0; x <= w; x += 256) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += 256) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
 
-    ctx.fillStyle = '#d8ff64';
-    ctx.fillRect(32, 28, 5, height - 56);
-
-    ctx.font = '700 22px monospace';
-    ctx.fillStyle = '#d8ff64';
-    ctx.fillText('EXECUTION RECEIPT', 56, 62);
-
-    ctx.fillStyle = '#f4f7f4';
-    ctx.font = '700 36px monospace';
-    ctx.fillText('execution_log.json', 56, 116);
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, 0.16)';
-    ctx.beginPath();
-    ctx.moveTo(56, 142);
-    ctx.lineTo(width - 44, 142);
-    ctx.stroke();
-
-    const lines = [
-      '// Deterministic Run Evidence',
-      '{',
-      '  "task_id": "task_001_count_vowels",',
-      '  "timestamp": "2026-10-20T01:28:10Z",',
-      '  "pre_test_hash": "9c1f4e82b2e7d581...",',
-      '  "post_test_hash": "9c1f4e82b2e7d581...",',
-      '  "hash_drift_bits": 0,',
-      '  "ast_contract": {',
-      '    "parsed": true,',
-      '    "symbols_found": ["count_vowels"]',
-      '  },',
-      '  "worktree_exit_code": 0,',
-      '  "gates": {',
-      '    "gate_1_sha256": "VERIFIED_PASS",',
-      '    "gate_2_ast": "VERIFIED_PASS",',
-      '    "gate_3_targeted": "PASS (4/4)",',
-      '    "gate_4_regression": "PASS (12/12)"',
-      '  },',
-      '  "verified_copy_back": ["solution.py"]',
-      '}',
-    ];
-
-    lines.forEach((line, i) => {
-      const y = 180 + i * 36;
-      ctx.fillStyle = line.includes('PASS') || line.includes('true') || line.includes('solution.py') ? '#d8ff64' : '#b2c0b6';
-      ctx.font = '400 20px monospace';
-      ctx.fillText(line, 56, y);
-    });
+    ctx.globalCompositeOperation = 'destination-in';
+    const fade = ctx.createRadialGradient(w / 2, h / 2, w * 0.05, w / 2, h / 2, w * 0.52);
+    fade.addColorStop(0, 'rgba(0,0,0,1)');
+    fade.addColorStop(0.65, 'rgba(0,0,0,0.6)');
+    fade.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, w, h);
   });
 }
 
 function statusPlateTexture({ title, code, detail, color = '#d8ff64' }) {
-  return createTexture(512, 190, (ctx, width, height) => {
+  return createTexture(512, 180, (ctx, w, h) => {
     ctx.fillStyle = 'rgba(6, 10, 8, 0.94)';
-    roundRect(ctx, 3, 3, width - 6, height - 6, 10);
-    ctx.fill();
+    ctx.fillRect(4, 4, w - 8, h - 8);
     ctx.strokeStyle = color === '#ff4747' ? 'rgba(255, 71, 71, 0.5)' : 'rgba(216, 255, 100, 0.3)';
     ctx.lineWidth = 2;
-    roundRect(ctx, 3, 3, width - 6, height - 6, 10);
-    ctx.stroke();
+    ctx.strokeRect(4, 4, w - 8, h - 8);
 
     ctx.fillStyle = color;
-    ctx.fillRect(20, 20, 4, height - 40);
+    ctx.fillRect(20, 20, 4, h - 40);
 
     ctx.font = '700 18px monospace';
     ctx.fillStyle = color;
     ctx.fillText(title.toUpperCase(), 38, 48);
 
     ctx.fillStyle = '#f4f7f4';
-    ctx.font = '700 32px monospace';
-    ctx.fillText(code, 38, 100);
+    ctx.font = '700 30px monospace';
+    ctx.fillText(code, 38, 98);
 
     ctx.fillStyle = '#8f9f94';
     ctx.font = '500 18px system-ui, sans-serif';
-    ctx.fillText(detail, 38, 144);
-  });
-}
-
-function gridFloorTexture() {
-  return createTexture(2048, 2048, (ctx, width, height) => {
-    ctx.strokeStyle = 'rgba(150, 180, 160, 0.12)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= width; x += 64) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, 0.22)';
-    ctx.lineWidth = 2;
-    for (let x = 0; x <= width; x += 256) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 256) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-
-    ctx.globalCompositeOperation = 'destination-in';
-    const fade = ctx.createRadialGradient(width / 2, height / 2, width * 0.05, width / 2, height / 2, width * 0.52);
-    fade.addColorStop(0, 'rgba(0,0,0,1)');
-    fade.addColorStop(0.65, 'rgba(0,0,0,0.6)');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillText(detail, 38, 142);
   });
 }
 
 /* ------------------------------------------------------------------ *
- * Three.js 3D Spatial Pipeline & Post-Processing Engine
+ * Three.js 3D Protagonist Pipeline Engine
  * ------------------------------------------------------------------ */
 class TaskScene {
   constructor(targetCanvas) {
@@ -469,26 +418,33 @@ class TaskScene {
     this.width = targetCanvas.clientWidth || window.innerWidth;
     this.height = targetCanvas.clientHeight || window.innerHeight;
 
+    // Detect capabilities & initialize Performance Tier
+    this.isMobile = window.innerWidth < 768 || /Android|iPhone|iPad/i.test(navigator.userAgent);
+    this.tier = this.isMobile ? 'LOW' : 'HIGH';
+    this.slowFrameAccumulator = 0;
+
+    const dpr = this.tier === 'HIGH' ? Math.min(window.devicePixelRatio || 1, 1.75) : 1;
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: this.tier !== 'LOW',
       alpha: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(LOW_QUALITY ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(this.width, this.height, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.7;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x060908, 0.00065);
+    this.scene.background = new THREE.Color(0x0b1713);
+    this.scene.fog = new THREE.FogExp2(0x0b1612, 0.00035);
 
     this.camera = new THREE.PerspectiveCamera(34, this.width / Math.max(1, this.height), 1, 5000);
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
     this.time = 0;
     this.progress = 0;
-    this.running = false;
     this.alertIntensity = 0;
 
     // Pointer Parallax & Raycasting
@@ -499,19 +455,19 @@ class TaskScene {
 
     this.buildProceduralEnvironment();
     this.buildLighting();
-    this.buildSplinePath();
+    this.buildSplineCameraTrack();
     this.buildSceneWorld();
     this.setupPostProcessing();
     this.setupPointerEvents();
   }
 
   buildProceduralEnvironment() {
+    if (this.tier === 'LOW') return;
     try {
       const pmrem = new THREE.PMREMGenerator(this.renderer);
       pmrem.compileEquirectangularShader();
 
       const envScene = new THREE.Scene();
-      // Emissive studio softboxes to create metallic sheens and crystal refractions
       const limeLight = new THREE.Mesh(
         new THREE.PlaneGeometry(800, 800),
         new THREE.MeshBasicMaterial({ color: 0xd8ff64 }),
@@ -540,45 +496,55 @@ class TaskScene {
       this.scene.environment = envTarget.texture;
       pmrem.dispose();
     } catch (e) {
-      console.warn('Procedural PMREM environment generation bypassed:', e);
+      console.warn('Procedural PMREM environment bypassed:', e);
     }
   }
 
   buildLighting() {
-    this.scene.add(new THREE.HemisphereLight(0xd4e4da, 0x060908, 0.9));
+    this.scene.add(new THREE.HemisphereLight(0xe4f2ea, 0x1a2a22, 1.9));
 
-    const mainKey = new THREE.DirectionalLight(0xffffff, 2.5);
+    const mainKey = new THREE.DirectionalLight(0xffffff, 3.2);
     mainKey.position.set(-300, 500, 600);
     this.scene.add(mainKey);
 
-    const rimLight = new THREE.DirectionalLight(0xd8ff64, 2.0);
+    const rimLight = new THREE.DirectionalLight(0xd8ff64, 1.8);
     rimLight.position.set(600, 300, -400);
     this.scene.add(rimLight);
 
-    const cyanRim = new THREE.DirectionalLight(0x5ef3d2, 1.2);
-    cyanRim.position.set(-500, -100, 400);
-    this.scene.add(cyanRim);
+    const fillLight = new THREE.DirectionalLight(0x5ef3d2, 1.1);
+    fillLight.position.set(-400, -100, 400);
+    this.scene.add(fillLight);
+    this.scene.add(new THREE.AmbientLight(0x6f8f80, 1.2));
+    this.courierLight = new THREE.PointLight(0xd8ff64, 90000, 520, 2);
+    this.scene.add(this.courierLight);
+    this.stageLights = [];
+    [[-460,240],[-260,170],[-80,90],[75,70],[260,20],[480,40],[780,120]].forEach(([x,y]) => {
+      const l = new THREE.PointLight(0x9fffd8, 60000, 520, 2);
+      l.position.set(x, y, 160);
+      this.scene.add(l);
+      this.stageLights.push(l);
+    });
   }
 
-  buildSplinePath() {
-    // 7 Spatial Waypoints through the 3D pipeline
+  buildSplineCameraTrack() {
+    // 7 Spatial Camera Waypoints: Narrative shots (intimate -> dynamic -> tense -> macro -> wide -> arena -> orbit)
     const cameraWaypoints = [
-      new THREE.Vector3(-460, 260, 640),  // 01: Contract Vault
-      new THREE.Vector3(-260, 160, 520),  // 02: Boundary Deflector
-      new THREE.Vector3(-80, 80, 440),    // 03: SHA-256 Laser Collar
-      new THREE.Vector3(70, 35, 260),     // 04: AST Core Macro
-      new THREE.Vector3(260, -90, 480),   // 05: Worktree Reactor Pod
-      new THREE.Vector3(480, -30, 580),   // 06: Test Suite Pylons
-      new THREE.Vector3(760, 120, 540),   // 07: Master Working Tree Dock
+      new THREE.Vector3(-420, 215, 830),  // 01 Contract: Intimate close low-angle looking at newborn courier
+      new THREE.Vector3(-240, 150, 740),  // 02 Patch: Tracking side angle following courier past boundary opening
+      new THREE.Vector3(-60, 80, 470),    // 03 Tests: Low, tense macro shot right behind courier at locked vault
+      new THREE.Vector3(80, 50, 400),     // 04 AST: Close profile shot watching AST scan beam sweep syntax nodes
+      new THREE.Vector3(270, 0, 620),   // 05 Worktree: Wide pull-back shot showing dual spaces & conduit tube
+      new THREE.Vector3(480, 10, 520),   // 06 Gates: Low-angle dramatic arena shot framing retry arc
+      new THREE.Vector3(770, 110, 470),   // 07 Copy-back: Ascending orbit shot as verified courier docks
     ];
 
     const lookWaypoints = [
       new THREE.Vector3(-460, 200, 0),
-      new THREE.Vector3(-250, 130, 0),
+      new THREE.Vector3(-260, 130, 0),
       new THREE.Vector3(-80, 50, 0),
       new THREE.Vector3(75, 25, 0),
-      new THREE.Vector3(260, -110, 0),
-      new THREE.Vector3(490, -20, 0),
+      new THREE.Vector3(260, -90, 0),
+      new THREE.Vector3(480, -20, 0),
       new THREE.Vector3(780, 70, 0),
     ];
 
@@ -590,21 +556,21 @@ class TaskScene {
     this.world = new THREE.Group();
     this.scene.add(this.world);
 
-    // Floor Plane
+    // Floor Grid
     const floorGeo = new THREE.PlaneGeometry(4800, 4800);
     const floorMat = new THREE.MeshBasicMaterial({
       map: gridFloorTexture(),
       transparent: true,
       depthWrite: false,
-      opacity: 0.8,
+      opacity: 0.75,
     });
     this.floor = new THREE.Mesh(floorGeo, floorMat);
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.position.y = -220;
     this.world.add(this.floor);
 
-    // Pipeline Atmospheric Particles
-    const dustCount = 350;
+    // Atmospheric Floating Dust Particles
+    const dustCount = this.tier === 'LOW' ? 120 : 280;
     const dustGeo = new THREE.BufferGeometry();
     const dustPos = new Float32Array(dustCount * 3);
     for (let i = 0; i < dustCount; i++) {
@@ -617,284 +583,265 @@ class TaskScene {
       dustGeo,
       new THREE.PointsMaterial({
         color: 0xd8ff64,
-        size: 2.2,
+        size: 2.0,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.3,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       }),
     );
     this.world.add(this.dust);
 
-    // 1. The Obsidian-Titanium Containment Vault Monolith (Step 01)
-    this.buildVaultMonolith();
+    // 1. Protagonist: THE COURIER (Code Cube)
+    this.buildProtagonistCourier();
 
-    // 2. The Glowing Polyhedral AST Crystal (The Hero Object: solution.py)
-    this.buildASTCrystal();
+    // 2. Stage 1: Task Boundary Glass Cage (Birth Chamber)
+    this.buildTaskBoundaryCage();
 
-    // 3. Boundary Deflector Shield & Rogue Shards (Step 02)
-    this.buildBoundaryShield();
+    // 3. Stage 2: Boundary Opening & Rogue Shard Deflector
+    this.buildBoundaryOpening();
 
-    // 4. Triple Gimbal SHA-256 Laser Scanning Rings (Step 03)
-    this.buildGimbalRings();
+    // 4. Stage 3: Sealed Test Vault Collar & Gimbal Laser Rings
+    this.buildSealedVaultCollar();
 
-    // 5. AST Inspection Cores & Symbol Target (Step 04)
-    this.buildASTInspectionZone();
+    // 5. Stage 4: AST Scan Blade & 3D Syntax Tree Network
+    this.buildASTScanZone();
 
-    // 6. Subterranean Git Worktree Reactor Pod (Step 05)
-    this.buildWorktreePod();
+    // 6. Stage 5: Dual Space (Pristine Source Tree, Conduit Tube & Worktree Pod)
+    this.buildDualWorktreeSpace();
 
-    // 7. Quad-Gate Test Suite & Healing Arc (Step 06)
-    this.buildTestSuiteGates();
+    // 7. Stage 6: Quarantine Gate Arena & Failure/Retry Arc
+    this.buildGateArena();
 
-    // 8. Master Repository Docking Vault & Evidence Log (Step 07)
-    this.buildMasterRepoDock();
+    // 8. Stage 7: Master Working Tree Dock & Evidence Plates
+    this.buildMasterDock();
+
+    // 9. Route, pylons and trail: the courier's path through the pipeline
+    this.buildRouteAndBeacons();
   }
 
-  buildVaultMonolith() {
-    const monolithGroup = new THREE.Group();
-    monolithGroup.position.set(-460, 220, 0);
-
-    const titaniumMat = new THREE.MeshStandardMaterial({
-      color: 0x0d1511,
-      roughness: 0.25,
-      metalness: 0.85,
-    });
-
-    // Outer Chassis Pylons
-    [-1, 1].forEach((dir) => {
-      const pylon = new THREE.Mesh(new THREE.BoxGeometry(24, 280, 48), titaniumMat);
-      pylon.position.set(dir * 140, 0, 0);
-      monolithGroup.add(pylon);
-
-      const claw = new THREE.Mesh(
-        new THREE.BoxGeometry(40, 16, 28),
-        new THREE.MeshStandardMaterial({ color: 0x1a261f, roughness: 0.3, metalness: 0.7 }),
-      );
-      claw.position.set(dir * 115, 0, 16);
-      monolithGroup.add(claw);
-    });
-
-    // Contract Holographic Screen
-    const contractGeo = new THREE.PlaneGeometry(320, 150);
-    const contractMat = new THREE.MeshBasicMaterial({
-      map: contractTexture(),
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-    this.contractScreen = new THREE.Mesh(contractGeo, contractMat);
-    this.contractScreen.position.set(0, 140, 20);
-    monolithGroup.add(this.contractScreen);
-
-    // Status beacon
-    const beacon = new THREE.Mesh(
-      new THREE.SphereGeometry(6, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xd8ff64 }),
+  buildRouteAndBeacons() {
+    const stops = [[-460,200,0],[-260,130,0],[-80,50,0],[75,25,0],[260,50,-40],[260,-110,0],[430,-20,0],[540,-20,0],[780,70,78]];
+    const curve = new THREE.CatmullRomCurve3(stops.map((s) => new THREE.Vector3(...s)), false, 'centripetal', 0.5);
+    this.routeLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curve.getPoints(240)),
+      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.35 }),
     );
-    beacon.position.set(0, 160, 28);
-    monolithGroup.add(beacon);
-
-    this.world.add(monolithGroup);
-    this.vaultMonolith = monolithGroup;
+    this.world.add(this.routeLine);
+    const names = ['01','02','03','04','05','06','07'];
+    const xy = [[-460,200],[-260,130],[-80,50],[75,25],[260,-30],[480,-20],[780,70]];
+    xy.forEach(([x, y], i) => {
+      const pyl = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,-220,0), new THREE.Vector3(x,y,0)]),
+        new THREE.LineBasicMaterial({ color: 0x5ef3d2, transparent: true, opacity: 0.28 }),
+      );
+      this.world.add(pyl);
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(46, 52, 48),
+        new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(x, -219, 0);
+      this.world.add(ring);
+      const tex = createTexture(128, 128, (ctx) => {
+        ctx.fillStyle = '#d8ff64';
+        ctx.font = '700 64px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(names[i], 64, 64);
+      });
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false }));
+      sp.scale.set(40, 40, 1);
+      sp.position.set(x, -178, 0);
+      this.world.add(sp);
+    });
+    // glowing trail behind the courier
+    this.trailN = 90;
+    this.trailPts = [];
+    this.trailGeo = new THREE.BufferGeometry();
+    this.trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.trailN * 3), 3));
+    this.trail = new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
+    this.trail.frustumCulled = false;
+    this.world.add(this.trail);
   }
 
-  buildASTCrystal() {
-    this.crystalGroup = new THREE.Group();
-    this.crystalGroup.position.set(-460, 200, 0);
+  buildProtagonistCourier() {
+    this.courier = new THREE.Group();
+    this.courier.position.set(-460, 200, 0);
 
-    // Outer Glass Refractive Shell (MeshPhysicalMaterial with high transmission)
-    const shellGeo = new THREE.IcosahedronGeometry(58, 1);
-    this.crystalShellMat = LOW_QUALITY
-      ? new THREE.MeshStandardMaterial({
-        color: 0x122a1e,
-        emissive: 0x0d3822,
-        emissiveIntensity: 0.4,
-        roughness: 0.2,
-        metalness: 0.3,
-        transparent: true,
-        opacity: 0.55,
-      })
-      : new THREE.MeshPhysicalMaterial({
-      color: 0x122a1e,
-      emissive: 0x0d3822,
-      emissiveIntensity: 0.28,
-      roughness: 0.08,
-      metalness: 0.12,
-      transmission: 0.94,
-      ior: 1.54,
-      thickness: 2.6,
-      specularIntensity: 1.0,
-      specularColor: 0xd8ff64,
+    // Visible Inner Energetic Core
+    const coreGeo = new THREE.BoxGeometry(16, 16, 16);
+    this.courierCoreMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64 });
+    this.courierCore = new THREE.Mesh(coreGeo, this.courierCoreMat);
+    this.courier.add(this.courierCore);
+
+    // Outer Translucent Glass Code Shell (28x28x28)
+    const shellGeo = new THREE.BoxGeometry(28, 28, 28);
+    const codeTexture = courierFaceTexture();
+
+    const faceMat = new THREE.MeshStandardMaterial({
+      map: codeTexture,
+      roughness: 0.15,
+      metalness: 0.3,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.88,
+    });
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0x12241a,
+      roughness: 0.2,
+      metalness: 0.6,
+      transparent: true,
+      opacity: 0.75,
     });
 
-    this.crystalMesh = new THREE.Mesh(shellGeo, this.crystalShellMat);
-    this.crystalMesh.userData = {
-      type: 'crystal',
-      name: 'AST_POLYHEDRON',
+    this.courierShell = new THREE.Mesh(shellGeo, [sideMat, sideMat, sideMat, sideMat, faceMat, sideMat]);
+    this.courier.add(this.courierShell);
+
+    // Beveled Wireframe Edge
+    const wireGeo = new THREE.EdgesGeometry(shellGeo);
+    this.courierWireMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.6 });
+    this.courierWire = new THREE.LineSegments(wireGeo, this.courierWireMat);
+    this.courier.add(this.courierWire);
+
+    // Orbiting Code Glyphs (8 small floating runes)
+    this.orbitingGlyphs = new THREE.Group();
+    const glyphChars = ['{', '}', 'def', '->', 'int', '""', '+1', 'ret'];
+    this.glyphSprites = [];
+    glyphChars.forEach((ch, idx) => {
+      const tex = createTexture(64, 64, (ctx) => {
+        ctx.fillStyle = '#d8ff64';
+        ctx.font = '700 32px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ch, 32, 32);
+      });
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.7 }));
+      sprite.scale.set(10, 10, 1);
+      this.orbitingGlyphs.add(sprite);
+      this.glyphSprites.push({ sprite, angle: (idx / glyphChars.length) * Math.PI * 2, radius: 26 + (idx % 2) * 6 });
+    });
+    this.courier.add(this.orbitingGlyphs);
+
+    // Red Crack Overlay Mesh for Failure State
+    const crackGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(17, 1));
+    this.crackMat = new THREE.LineBasicMaterial({ color: 0xff4747, transparent: true, opacity: 0 });
+    this.crackMesh = new THREE.LineSegments(crackGeo, this.crackMat);
+    this.courier.add(this.crackMesh);
+
+    this.courier.userData = {
+      name: 'THE_COURIER',
       file: 'solution.py',
       symbols: 'count_vowels(text)',
-      sector: 'ZERO_TRUST_CONTAINMENT_VAULT',
-      integrity: 'PRE-SEALED (0 BYTES DRIFT)',
+      state: 'IDLE_BREATHING',
     };
-    this.interactiveObjects.push(this.crystalMesh);
-    this.crystalGroup.add(this.crystalMesh);
+    this.interactiveObjects.push(this.courierShell);
 
-    // Wireframe Cage Rim
-    const wireMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.45 });
-    const wireMesh = new THREE.LineSegments(new THREE.WireframeGeometry(shellGeo), wireMat);
-    this.crystalGroup.add(wireMesh);
-
-    // Internal 3D Abstract Syntax Tree (AST) Nodes & Vector Links
-    this.astNodesGroup = new THREE.Group();
-    const nodeCoords = [
-      { name: 'Module (task_001)', pos: [0, 28, 0], color: 0x5ef3d2, size: 6.5 },
-      { name: 'FunctionDef: count_vowels', pos: [0, 6, 0], color: 0xd8ff64, size: 9 }, // Target symbol!
-      { name: 'arg: text', pos: [-20, -12, 10], color: 0x8fffa8, size: 5 },
-      { name: 'For: ch in text', pos: [18, -14, -8], color: 0x8fffa8, size: 5 },
-      { name: 'If: ch in "aeiou"', pos: [0, -28, 14], color: 0xffd864, size: 5.5 },
-      { name: 'Return: total', pos: [0, -36, -10], color: 0x5ef3d2, size: 6 },
-    ];
-
-    this.astNodeMeshes = [];
-    nodeCoords.forEach((node) => {
-      const nMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(node.size, 16, 16),
-        new THREE.MeshBasicMaterial({ color: node.color }),
-      );
-      nMesh.position.set(...node.pos);
-      nMesh.userData = {
-        type: 'ast_node',
-        name: node.name,
-        file: 'solution.py',
-        symbols: node.name,
-        sector: 'AST_SYNTAX_LATTICE',
-        integrity: 'SYNTACTICALLY_VALID',
-      };
-      this.interactiveObjects.push(nMesh);
-      this.astNodesGroup.add(nMesh);
-      this.astNodeMeshes.push(nMesh);
-    });
-
-    // Links between AST nodes
-    const linksGeo = new THREE.BufferGeometry();
-    const linkPositions = [];
-    // Module -> FunctionDef
-    linkPositions.push(0, 28, 0, 0, 6, 0);
-    // FunctionDef -> arg & For
-    linkPositions.push(0, 6, 0, -20, -12, 10);
-    linkPositions.push(0, 6, 0, 18, -14, -8);
-    // For -> If
-    linkPositions.push(18, -14, -8, 0, -28, 14);
-    // If -> Return
-    linkPositions.push(0, -28, 14, 0, -36, -10);
-
-    linksGeo.setAttribute('position', new THREE.Float32BufferAttribute(linkPositions, 3));
-    const linksMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.6 });
-    this.astLinks = new THREE.LineSegments(linksGeo, linksMat);
-    this.astNodesGroup.add(this.astLinks);
-
-    this.crystalGroup.add(this.astNodesGroup);
-    this.world.add(this.crystalGroup);
+    this.world.add(this.courier);
   }
 
-  buildBoundaryShield() {
-    this.shieldGroup = new THREE.Group();
-    this.shieldGroup.position.set(-250, 130, 0);
+  buildTaskBoundaryCage() {
+    this.boundaryCage = new THREE.Group();
+    this.boundaryCage.position.set(-460, 200, 0);
 
-    // Hexagonal Boundary Barrier Mesh
-    const shieldGeo = new THREE.CircleGeometry(110, 6);
-    this.shieldMat = new THREE.MeshBasicMaterial({
-      color: 0x5ef3d2,
-      wireframe: true,
+    // Closed Glass Outline (Task Scope Boundary)
+    const cageGeo = new THREE.BoxGeometry(160, 140, 100);
+    const cageEdges = new THREE.EdgesGeometry(cageGeo);
+    const cageMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.4 });
+    const wireCage = new THREE.LineSegments(cageEdges, cageMat);
+    this.boundaryCage.add(wireCage);
+
+    // Translucent Boundary Glass Panes
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x09140f,
+      roughness: 0.1,
+      metalness: 0.4,
       transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
+      opacity: 0.18,
     });
-    this.shieldMesh = new THREE.Mesh(shieldGeo, this.shieldMat);
-    this.shieldGroup.add(this.shieldMesh);
+    const glassMesh = new THREE.Mesh(cageGeo, glassMat);
+    this.boundaryCage.add(glassMesh);
 
-    // Outer Barrier Ring
-    const ringGeo = new THREE.RingGeometry(105, 115, 6);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, side: THREE.DoubleSide });
-    this.shieldRing = new THREE.Mesh(ringGeo, ringMat);
-    this.shieldGroup.add(this.shieldRing);
+    // Specification Status Plate
+    const specPlate = new THREE.Mesh(
+      new THREE.PlaneGeometry(220, 80),
+      new THREE.MeshBasicMaterial({
+        map: statusPlateTexture({ title: 'STAGE 01 · TASK BOUNDARY', code: 'solution.py', detail: 'declared scope: count_vowels' }),
+        transparent: true,
+        side: THREE.DoubleSide,
+      }),
+    );
+    specPlate.position.set(0, 110, 0);
+    this.boundaryCage.add(specPlate);
 
-    // Rogue File Shards (Unauthorized incoming attempts deflecting off the boundary)
+    this.world.add(this.boundaryCage);
+  }
+
+  buildBoundaryOpening() {
+    this.boundaryZone = new THREE.Group();
+    this.boundaryZone.position.set(-260, 130, 0);
+
+    // Hexagonal Boundary Portal Ring
+    const ringGeo = new THREE.RingGeometry(85, 95, 6);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x5ef3d2, side: THREE.DoubleSide });
+    this.boundaryPortal = new THREE.Mesh(ringGeo, ringMat);
+    this.boundaryZone.add(this.boundaryPortal);
+
+    // Deflecting Rogue Shards (untrusted file fragments)
     this.rogueShards = [];
-    const shardNames = ['test_tamper.py', 'evil_exec.sh', 'override.config', 'leak.patch'];
+    const shardNames = ['test_tamper.py', 'evil.sh', 'override.config', 'leak.patch'];
     for (let i = 0; i < 4; i++) {
-      const shardGeo = new THREE.TetrahedronGeometry(18, 0);
-      const shardMat = new THREE.MeshStandardMaterial({
+      const sGeo = new THREE.TetrahedronGeometry(14, 0);
+      const sMat = new THREE.MeshStandardMaterial({
         color: 0x1f0b0b,
         emissive: 0xff3b30,
         emissiveIntensity: 0.4,
         roughness: 0.3,
       });
-      const shard = new THREE.Mesh(shardGeo, shardMat);
-      shard.position.set(-230 + (i % 2 === 0 ? -60 : 60), 110 + i * 28, 40 + i * 15);
-      shard.userData = {
-        name: shardNames[i],
-        deflected: false,
-      };
-      this.shieldGroup.add(shard);
+      const shard = new THREE.Mesh(sGeo, sMat);
+      shard.position.set(-240 + (i % 2 === 0 ? -50 : 50), 110 + i * 22, 35 + i * 14);
+      shard.userData = { name: shardNames[i], basePos: shard.position.clone() };
+      this.boundaryZone.add(shard);
       this.rogueShards.push(shard);
     }
 
-    this.world.add(this.shieldGroup);
+    this.world.add(this.boundaryZone);
   }
 
-  buildGimbalRings() {
-    this.gimbalGroup = new THREE.Group();
-    this.gimbalGroup.position.set(-80, 50, 0);
+  buildSealedVaultCollar() {
+    this.vaultCollar = new THREE.Group();
+    this.vaultCollar.position.set(-80, 50, 0);
 
-    const metalMat = new THREE.MeshStandardMaterial({
-      color: 0x15221b,
-      roughness: 0.22,
-      metalness: 0.9,
-    });
+    // Mechanical Collar Frame
+    const frameGeo = new THREE.CylinderGeometry(110, 110, 36, 16, 1, true);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x111c16, roughness: 0.25, metalness: 0.85 });
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    frame.rotation.z = Math.PI / 2;
+    this.vaultCollar.add(frame);
 
-    // 3 Concentric Gimbal Laser Rings
-    this.ringOuter = new THREE.Mesh(new THREE.TorusGeometry(125, 4, 16, 64), metalMat);
-    this.ringMid = new THREE.Mesh(new THREE.TorusGeometry(100, 3.5, 16, 64), metalMat);
-    this.ringInner = new THREE.Mesh(
-      new THREE.TorusGeometry(75, 3, 16, 64),
+    // Triple Counter-Rotating Gimbal Laser Rings
+    this.gimbalR1 = new THREE.Mesh(new THREE.TorusGeometry(100, 3.5, 12, 48), frameMat);
+    this.gimbalR2 = new THREE.Mesh(new THREE.TorusGeometry(82, 3, 12, 48), frameMat);
+    this.gimbalR3 = new THREE.Mesh(
+      new THREE.TorusGeometry(64, 2.5, 12, 48),
       new THREE.MeshStandardMaterial({ color: 0xd8ff64, emissive: 0xd8ff64, emissiveIntensity: 0.4 }),
     );
 
-    this.ringOuter.userData = {
-      type: 'sensor',
-      name: 'GIMBAL_SHA256_RING_OUTER',
-      sector: 'GATE_01_TEST_SEAL',
-      integrity: 'SYNCHRONIZED',
-    };
-    this.interactiveObjects.push(this.ringOuter);
+    this.vaultCollar.add(this.gimbalR1);
+    this.vaultCollar.add(this.gimbalR2);
+    this.vaultCollar.add(this.gimbalR3);
 
-    this.gimbalGroup.add(this.ringOuter);
-    this.gimbalGroup.add(this.ringMid);
-    this.gimbalGroup.add(this.ringInner);
+    // Crossfire Laser Lines
+    const laserGeo = new THREE.BufferGeometry();
+    laserGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+      -95, 0, 0, 95, 0, 0,
+      0, -95, 0, 0, 95, 0,
+    ], 3));
+    this.laserMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.85 });
+    this.lasers = new THREE.LineSegments(laserGeo, this.laserMat);
+    this.vaultCollar.add(this.lasers);
 
-    // Crossfire Laser Scanner Beams
-    const laserMat = new THREE.LineBasicMaterial({
-      color: 0xd8ff64,
-      transparent: true,
-      opacity: 0.85,
-    });
-    this.laserMat = laserMat;
-
-    const laserLines = new THREE.BufferGeometry();
-    const lPos = [
-      -120, 0, 0, 120, 0, 0,
-      0, -120, 0, 0, 120, 0,
-      0, 0, -120, 0, 0, 120,
-    ];
-    laserLines.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3));
-    this.lasers = new THREE.LineSegments(laserLines, laserMat);
-    this.gimbalGroup.add(this.lasers);
-
-    // Holographic SHA-256 Plate
-    this.shaPlate = new THREE.Mesh(
+    // Sealed Vault Status Plate
+    const vaultPlate = new THREE.Mesh(
       new THREE.PlaneGeometry(240, 80),
       new THREE.MeshBasicMaterial({
         map: statusPlateTexture({ title: 'GATE 01 · LOCKED TESTS', code: '9c1f…b2e7', detail: 'sha-256 before == after' }),
@@ -902,181 +849,306 @@ class TaskScene {
         side: THREE.DoubleSide,
       }),
     );
-    this.shaPlate.position.set(0, 140, 0);
-    this.gimbalGroup.add(this.shaPlate);
+    vaultPlate.position.set(0, 130, 0);
+    this.vaultCollar.add(vaultPlate);
 
-    this.world.add(this.gimbalGroup);
+    this.world.add(this.vaultCollar);
   }
 
-  buildASTInspectionZone() {
+  buildASTScanZone() {
     this.astZone = new THREE.Group();
     this.astZone.position.set(75, 25, 0);
 
-    // Optical Inspection Aperture
-    const apertureRing = new THREE.Mesh(
-      new THREE.RingGeometry(85, 95, 32),
-      new THREE.MeshBasicMaterial({ color: 0x5ef3d2, side: THREE.DoubleSide }),
-    );
-    this.astZone.add(apertureRing);
+    // Glowing Vertical Scan Blade (sweeps across courier in stage 4)
+    const bladeGeo = new THREE.PlaneGeometry(6, 120);
+    this.bladeMat = new THREE.MeshBasicMaterial({
+      color: 0x5ef3d2,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+    });
+    this.scanBlade = new THREE.Mesh(bladeGeo, this.bladeMat);
+    this.scanBlade.position.set(-30, 0, 0);
+    this.astZone.add(this.scanBlade);
 
-    // AST Contract Status Plate
-    this.astPlate = new THREE.Mesh(
-      new THREE.PlaneGeometry(240, 80),
-      new THREE.MeshBasicMaterial({
-        map: statusPlateTexture({ title: 'GATE 02 · AST CONTRACT', code: 'count_vowels', detail: 'syntax valid · symbol present' }),
-        transparent: true,
-        side: THREE.DoubleSide,
-      }),
+    // 3D Syntax Tree Network (AST branches surrounding courier)
+    this.astBranchNodes = [];
+    const astCoords = [
+      { name: 'Module (task_001)', pos: [0, 42, 0], col: 0x5ef3d2, r: 6 },
+      { name: 'FunctionDef: count_vowels', pos: [0, 18, 0], col: 0xd8ff64, r: 8 },
+      { name: 'arg: text', pos: [-24, -6, 10], col: 0x8fffa8, r: 5 },
+      { name: 'For: ch in text', pos: [22, -8, -8], col: 0x8fffa8, r: 5 },
+      { name: 'If: ch in "aeiou"', pos: [0, -28, 14], col: 0xffd864, r: 5.5 },
+      { name: 'Return: total', pos: [0, -42, -10], col: 0x5ef3d2, r: 6 },
+    ];
+
+    astCoords.forEach((node) => {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(node.r, 16, 16),
+        new THREE.MeshBasicMaterial({ color: node.col, transparent: true, opacity: 0.15 }),
+      );
+      mesh.position.set(...node.pos);
+      mesh.userData = { name: node.name };
+      this.astZone.add(mesh);
+      this.astBranchNodes.push(mesh);
+    });
+
+    // Connecting Branches
+    const branchGeo = new THREE.BufferGeometry();
+    branchGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+      0, 42, 0, 0, 18, 0,
+      0, 18, 0, -24, -6, 10,
+      0, 18, 0, 22, -8, -8,
+      22, -8, -8, 0, -28, 14,
+      0, -28, 14, 0, -42, -10,
+    ], 3));
+    this.branchLines = new THREE.LineSegments(
+      branchGeo,
+      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.25 }),
     );
-    this.astPlate.position.set(0, 125, 0);
-    this.astZone.add(this.astPlate);
+    this.astZone.add(this.branchLines);
 
     this.world.add(this.astZone);
   }
 
-  buildWorktreePod() {
-    this.podGroup = new THREE.Group();
-    this.podGroup.position.set(260, -110, 0);
+  buildDualWorktreeSpace() {
+    this.dualSpace = new THREE.Group();
 
-    // Heavy Octagonal Subterranean Reactor Pod Shell
-    const podShellGeo = new THREE.CylinderGeometry(150, 150, 240, 8, 1, true);
-    const podShellMat = new THREE.MeshStandardMaterial({
-      color: 0x090f0c,
-      roughness: 0.35,
-      metalness: 0.75,
-      wireframe: true,
+    // 1. Pristine Main Source Tree Platform (elevated, sealed behind protective glass)
+    this.sourceTree = new THREE.Group();
+    this.sourceTree.position.set(260, 60, -40);
+
+    const cabinetGeo = new THREE.BoxGeometry(160, 110, 80);
+    const cabinetMat = new THREE.MeshStandardMaterial({ color: 0x0c1510, roughness: 0.3, metalness: 0.7 });
+    const cabinet = new THREE.Mesh(cabinetGeo, cabinetMat);
+    this.sourceTree.add(cabinet);
+
+    // Protective Sealed Glass Shroud around Source Tree
+    const shroudGeo = new THREE.BoxGeometry(176, 126, 96);
+    const shroudMat = new THREE.MeshStandardMaterial({
+      color: 0x5ef3d2,
+      roughness: 0.1,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.22,
     });
-    this.podShell = new THREE.Mesh(podShellGeo, podShellMat);
-    this.podShell.userData = {
-      type: 'pod',
-      name: 'GIT_WORKTREE_REACTOR',
-      sector: 'EPHEMERAL_ISOLATION_CELL',
-      integrity: 'ISOLATED /tmp/cdavc-worktree-001',
-    };
-    this.interactiveObjects.push(this.podShell);
-    this.podGroup.add(this.podShell);
+    this.sourceTree.add(new THREE.Mesh(shroudGeo, shroudMat));
 
-    // Magnetic Confinement Rings
-    [-90, 0, 90].forEach((y) => {
-      const coil = new THREE.Mesh(
-        new THREE.TorusGeometry(152, 3, 8, 32),
-        new THREE.MeshBasicMaterial({ color: 0xd8ff64 }),
-      );
-      coil.rotation.x = Math.PI / 2;
-      coil.position.y = y;
-      this.podGroup.add(coil);
-    });
-
-    // Worktree Holographic Plate
-    this.podPlate = new THREE.Mesh(
-      new THREE.PlaneGeometry(260, 85),
+    // Status Label: Pristine Source
+    const sourceLabel = new THREE.Mesh(
+      new THREE.PlaneGeometry(160, 40),
       new THREE.MeshBasicMaterial({
-        map: statusPlateTexture({ title: 'ISOLATION CELL', code: 'git worktree', detail: 'source tree untouched · disposable' }),
+        map: statusPlateTexture({ title: 'SOURCE REPOSITORY', code: 'main (clean)', detail: 'sealed · write-protected' }),
         transparent: true,
         side: THREE.DoubleSide,
       }),
     );
-    this.podPlate.position.set(0, 160, 0);
-    this.podGroup.add(this.podPlate);
+    sourceLabel.position.set(0, 80, 0);
+    this.sourceTree.add(sourceLabel);
+    this.dualSpace.add(this.sourceTree);
 
-    // Quarantined Ejection Tray for failed Attempt 1
-    const trayGeo = new THREE.BoxGeometry(110, 12, 90);
-    const trayMat = new THREE.MeshStandardMaterial({ color: 0x22120e, roughness: 0.6 });
-    this.ejectTray = new THREE.Mesh(trayGeo, trayMat);
-    this.ejectTray.position.set(0, -100, 120);
-    this.podGroup.add(this.ejectTray);
+    // 2. Curved Conduit Tube (TubeGeometry on CatmullRomCurve3 connecting source to quarantine pod)
+    const conduitPoints = [
+      new THREE.Vector3(260, 50, -40),
+      new THREE.Vector3(260, -20, 20),
+      new THREE.Vector3(260, -70, 0),
+      new THREE.Vector3(260, -110, 0),
+    ];
+    this.conduitCurve = new THREE.CatmullRomCurve3(conduitPoints);
+    const tubeGeo = new THREE.TubeGeometry(this.conduitCurve, 48, 16, 16, false);
+    this.tubeMat = new THREE.MeshStandardMaterial({
+      color: 0x10251c,
+      roughness: 0.2,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.55,
+      wireframe: true,
+    });
+    this.conduitTube = new THREE.Mesh(tubeGeo, this.tubeMat);
+    this.dualSpace.add(this.conduitTube);
 
-    this.world.add(this.podGroup);
+    // 3. Subterranean Quarantined Reactor Pod
+    this.quarantinePod = new THREE.Group();
+    this.quarantinePod.position.set(260, -110, 0);
+
+    const podShellGeo = new THREE.CylinderGeometry(130, 130, 160, 8, 1, true);
+    const podShellMat = new THREE.MeshStandardMaterial({
+      color: 0x090f0c,
+      roughness: 0.4,
+      metalness: 0.7,
+      wireframe: true,
+    });
+    this.podMesh = new THREE.Mesh(podShellGeo, podShellMat);
+    this.quarantinePod.add(this.podMesh);
+
+    // Quarantined Worktree Plate
+    const worktreePlate = new THREE.Mesh(
+      new THREE.PlaneGeometry(240, 75),
+      new THREE.MeshBasicMaterial({
+        map: statusPlateTexture({ title: 'ISOLATION SPACE', code: 'git worktree', detail: 'disposable /tmp/cdavc-worktree' }),
+        transparent: true,
+        side: THREE.DoubleSide,
+      }),
+    );
+    worktreePlate.position.set(0, 110, 0);
+    this.quarantinePod.add(worktreePlate);
+
+    this.dualSpace.add(this.quarantinePod);
+    this.world.add(this.dualSpace);
   }
 
-  buildTestSuiteGates() {
-    this.gatesGroup = new THREE.Group();
-    this.gatesGroup.position.set(490, -20, 0);
+  buildGateArena() {
+    this.gateArena = new THREE.Group();
+    this.gateArena.position.set(480, -20, 0);
 
-    const gateTitles = [
-      { t: 'GATE 03A', n: 'TARGETED', c: '4/4 pass' },
-      { t: 'GATE 03B', n: 'HIDDEN', c: 'assertions ok' },
-      { t: 'GATE 03C', n: 'NEGATIVE', c: 'invariants safe' },
-      { t: 'GATE 04', n: 'REGRESSION', c: '12/12 pass' },
+    const gateSpecs = [
+      { id: '1', name: 'TARGETED', pass: '4/4' },
+      { id: '2', name: 'HIDDEN', pass: 'pass' },
+      { id: '3', name: 'NEGATIVE', pass: 'safe' },
+      { id: '4', name: 'REGRESSION', pass: '12/12' },
     ];
 
-    this.gatePylons = [];
-    gateTitles.forEach((g, idx) => {
-      const pylonGroup = new THREE.Group();
-      pylonGroup.position.set(-120 + idx * 80, 0, 0);
+    this.arenaGates = [];
+    gateSpecs.forEach((g, idx) => {
+      const gGroup = new THREE.Group();
+      gGroup.position.set(-110 + idx * 75, 0, 0);
 
-      // Vertical Gate Arch
+      // Gate Arch Beam
       const arch = new THREE.Mesh(
-        new THREE.BoxGeometry(10, 180, 14),
+        new THREE.BoxGeometry(8, 160, 12),
         new THREE.MeshStandardMaterial({ color: 0x111c16, roughness: 0.3, metalness: 0.8 }),
       );
-      pylonGroup.add(arch);
+      gGroup.add(arch);
 
       // Gate Laser Curtains
       const curtain = new THREE.Mesh(
-        new THREE.PlaneGeometry(60, 160),
+        new THREE.PlaneGeometry(55, 140),
         new THREE.MeshBasicMaterial({
           color: 0xd8ff64,
           transparent: true,
-          opacity: 0.15,
+          opacity: 0.12,
           side: THREE.DoubleSide,
         }),
       );
-      curtain.position.set(30, 0, 0);
-      pylonGroup.add(curtain);
+      curtain.position.set(27.5, 0, 0);
+      gGroup.add(curtain);
 
-      // Indicator Lamp
+      // Status Beacon
       const lamp = new THREE.Mesh(
-        new THREE.SphereGeometry(6, 16, 16),
+        new THREE.SphereGeometry(5.5, 16, 16),
         new THREE.MeshBasicMaterial({ color: 0x243329 }),
       );
-      lamp.position.set(0, 95, 0);
-      pylonGroup.add(lamp);
+      lamp.position.set(0, 85, 0);
+      gGroup.add(lamp);
 
-      this.gatePylons.push({ pylonGroup, lamp, curtain });
-      this.gatesGroup.add(pylonGroup);
+      this.arenaGates.push({ lamp, curtain });
+      this.gateArena.add(gGroup);
     });
 
-    this.world.add(this.gatesGroup);
+    // Red Retry Curve Arc (Dashed arc showing courier flinch and fallback)
+    const retryCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(-35, 10, 0),     // Gate 2 failure point
+      new THREE.Vector3(-70, -30, 40),   // Recoil arc apex
+      new THREE.Vector3(-110, -5, 0),    // Retry launch point
+    );
+    const retryPoints = retryCurve.getPoints(32);
+    const retryGeo = new THREE.BufferGeometry().setFromPoints(retryPoints);
+    this.retryArcMat = new THREE.LineDashedMaterial({
+      color: 0xff4747,
+      dashSize: 6,
+      gapSize: 4,
+      transparent: true,
+      opacity: 0,
+    });
+    this.retryArc = new THREE.Line(retryGeo, this.retryArcMat);
+    this.retryArc.computeLineDistances();
+    this.gateArena.add(this.retryArc);
+
+    this.world.add(this.gateArena);
   }
 
-  buildMasterRepoDock() {
-    this.dockGroup = new THREE.Group();
-    this.dockGroup.position.set(780, 70, 0);
+  buildMasterDock() {
+    this.masterDock = new THREE.Group();
+    this.masterDock.position.set(780, 70, 0);
 
-    // Master Working Tree Vault Frame
-    const frameGeo = new THREE.BoxGeometry(220, 240, 180);
-    const frameMat = new THREE.MeshStandardMaterial({
-      color: 0x09110d,
-      roughness: 0.2,
-      metalness: 0.9,
-    });
-    this.dockFrame = new THREE.Mesh(frameGeo, frameMat);
-    this.dockGroup.add(this.dockFrame);
+    // Working Tree Vault File Socket
+    const frameGeo = new THREE.BoxGeometry(190, 220, 150);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x0a130e, roughness: 0.2, metalness: 0.85 });
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    this.masterDock.add(frame);
 
-    // Crystal Dock Receptacle Socket
-    const socketGeo = new THREE.BoxGeometry(100, 100, 4);
-    const socketMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, wireframe: true });
-    this.dockSocket = new THREE.Mesh(socketGeo, socketMat);
-    this.dockSocket.position.set(0, 0, 92);
-    this.dockGroup.add(this.dockSocket);
+    // Target File Slot for solution.py
+    const slotGeo = new THREE.BoxGeometry(36, 36, 10);
+    this.slotMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, wireframe: true });
+    this.solutionSlot = new THREE.Mesh(slotGeo, this.slotMat);
+    this.solutionSlot.position.set(0, 0, 78);
+    this.masterDock.add(this.solutionSlot);
 
-    // Cryptographic Evidence Log Receipts (3D floating plate)
-    const receiptGeo = new THREE.PlaneGeometry(240, 300);
+    // Receipt Trail (execution_log.json & execution_report.md)
+    const receiptGeo = new THREE.PlaneGeometry(220, 280);
     const receiptMat = new THREE.MeshBasicMaterial({
-      map: receiptLogTexture(),
+      map: createTexture(512, 640, (ctx, w, h) => {
+        ctx.fillStyle = 'rgba(7, 12, 9, 0.96)';
+        ctx.fillRect(4, 4, w - 8, h - 8);
+        ctx.strokeStyle = 'rgba(216, 255, 100, 0.35)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(4, 4, w - 8, h - 8);
+
+        ctx.fillStyle = '#d8ff64';
+        ctx.fillRect(24, 24, 4, h - 48);
+
+        ctx.font = '700 20px monospace';
+        ctx.fillStyle = '#d8ff64';
+        ctx.fillText('AUDIT EVIDENCE TRAIL', 42, 54);
+
+        ctx.fillStyle = '#f4f7f4';
+        ctx.font = '700 28px monospace';
+        ctx.fillText('execution_log.json', 42, 100);
+
+        ctx.strokeStyle = 'rgba(216, 255, 100, 0.16)';
+        ctx.beginPath();
+        ctx.moveTo(42, 120);
+        ctx.lineTo(w - 42, 120);
+        ctx.stroke();
+
+        const logs = [
+          '// illustrative receipt, not REPORT30 data',
+          '{',
+          '  "task": "task_001_count_vowels",',
+          '  "pre_test_hash": "9c1f...b2e7",',
+          '  "post_test_hash": "9c1f...b2e7",',
+          '  "hash_drift_bits": 0,',
+          '  "ast_parsed": true,',
+          '  "gates_passed": [1, 2, 3, 4],',
+          '  "exit_code": 0,',
+          '  "verified_copy_back": ["solution.py"]',
+          '}',
+        ];
+
+        logs.forEach((line, i) => {
+          ctx.fillStyle = line.includes('0') || line.includes('true') || line.includes('solution.py') ? '#d8ff64' : '#a8b8ad';
+          ctx.font = '400 17px monospace';
+          ctx.fillText(line, 42, 154 + i * 32);
+        });
+      }),
       transparent: true,
       side: THREE.DoubleSide,
     });
-    this.receiptPlate = new THREE.Mesh(receiptGeo, receiptMat);
-    this.receiptPlate.position.set(190, 40, 40);
-    this.receiptPlate.rotation.y = -0.3;
-    this.dockGroup.add(this.receiptPlate);
 
-    this.world.add(this.dockGroup);
+    this.receiptMesh = new THREE.Mesh(receiptGeo, receiptMat);
+    this.receiptMesh.position.set(180, 30, 40);
+    this.receiptMesh.rotation.y = -0.28;
+    this.masterDock.add(this.receiptMesh);
+
+    this.world.add(this.masterDock);
   }
 
   setupPostProcessing() {
+    if (this.tier === 'LOW') {
+      this.usePost = false;
+      return;
+    }
+
     try {
       this.renderTarget = new THREE.WebGLRenderTarget(this.width, this.height, {
         minFilter: THREE.LinearFilter,
@@ -1119,12 +1191,10 @@ class TaskScene {
             vec2 dist = uv - center;
             float r2 = dot(dist, dist);
 
-            // Subtle barrel lens distortion modulated by scroll velocity
-            float distortion = 1.0 + r2 * (0.03 + abs(uVelocity) * 0.0001);
+            float distortion = 1.0 + r2 * (0.025 + abs(uVelocity) * 0.0001);
             vec2 distortedUv = center + dist * distortion;
 
-            // Velocity-driven chromatic aberration + alert flare
-            float chroma = abs(uVelocity) * 0.00075 + uAlert * 0.0035;
+            float chroma = abs(uVelocity) * 0.0007 + uAlert * 0.0035;
             vec2 dir = normalize(dist + vec2(0.0001));
 
             float r = texture2D(tDiffuse, distortedUv + dir * chroma).r;
@@ -1132,18 +1202,15 @@ class TaskScene {
             float b = texture2D(tDiffuse, distortedUv - dir * chroma).b;
             vec3 col = vec3(r, g, b);
 
-            // Red alert emergency flash during drift simulation
             if (uAlert > 0.01) {
               col = mix(col, vec3(col.r * 1.5 + 0.18, col.g * 0.5, col.b * 0.45), uAlert * 0.55);
             }
 
-            // Cinematic analog film grain
-            float grain = (random(uv + sin(uTime * 8.0)) - 0.5) * 0.026;
+            float grain = (random(uv + sin(uTime * 8.0)) - 0.5) * 0.024;
             col += grain;
 
-            // Edge vignette
             float vignette = smoothstep(0.95, 0.35, length(dist));
-            col *= (0.75 + 0.25 * vignette);
+            col *= (0.9 + 0.1 * vignette);
 
             gl_FragColor = vec4(col, 1.0);
           }
@@ -1154,7 +1221,7 @@ class TaskScene {
       this.postScene.add(quad);
       this.usePost = true;
     } catch (e) {
-      console.warn('Post-processing initialized directly to default canvas:', e);
+      console.warn('Post-processing unavailable, rendering directly:', e);
       this.usePost = false;
     }
   }
@@ -1166,20 +1233,35 @@ class TaskScene {
     }, { passive: true });
   }
 
-  triggerDriftAlert() {
-    this.alertIntensity = 1.0;
-    this.laserMat.color.setHex(0xff4747);
-    this.ringInner.material.color.setHex(0xff4747);
-    this.crystalShellMat.color.setHex(0x381212);
-    this.crystalShellMat.emissive.setHex(0x550909);
+  downgradeTier() {
+    if (this.tier === 'HIGH') {
+      this.tier = 'MID';
+      this.renderer.setPixelRatio(1.2);
+    } else if (this.tier === 'MID') {
+      this.tier = 'LOW';
+      this.renderer.setPixelRatio(1);
+      this.usePost = false;
+      if (this.renderTarget) {
+        this.renderTarget.dispose();
+        this.renderTarget = null;
+      }
+    }
   }
 
-  resetDriftAlert() {
+  triggerDrift() {
+    this.alertIntensity = 1.0;
+    this.laserMat.color.setHex(0xff4747);
+    this.gimbalR3.material.color.setHex(0xff4747);
+    this.courierCoreMat.color.setHex(0xff4747);
+    this.crackMat.opacity = 0.9;
+  }
+
+  resetDrift() {
     this.alertIntensity = 0;
     this.laserMat.color.setHex(0xd8ff64);
-    this.ringInner.material.color.setHex(0xd8ff64);
-    this.crystalShellMat.color.setHex(0x122a1e);
-    this.crystalShellMat.emissive.setHex(0x0d3822);
+    this.gimbalR3.material.color.setHex(0xd8ff64);
+    this.courierCoreMat.color.setHex(0xd8ff64);
+    this.crackMat.opacity = 0;
   }
 
   resize() {
@@ -1199,120 +1281,268 @@ class TaskScene {
     this.progress = Math.max(0, Math.min(1, p));
   }
 
-  updatePhysics(deltaTime) {
+  updateProtagonistChoreography(deltaTime) {
     this.time += deltaTime;
     const p = this.progress;
     const t = this.time;
 
-    // Smooth pointer lerping
+    // Smooth pointer lerp
     this.pointer.x += (this.pointerTarget.x - this.pointer.x) * 0.08;
     this.pointer.y += (this.pointerTarget.y - this.pointer.y) * 0.08;
 
-    // Camera CatmullRomCurve3 Spline Tracking
+    // Mobile vertical framing offset: center hero above bottom copy sheet
+    const mobileYOffset = this.isMobile ? -25 : 0;
+
+    // Camera Spline Pathing
     const camPos = this.cameraSpline.getPointAt(p);
     const lookPos = this.lookSpline.getPointAt(p);
 
-    // Apply smooth mouse parallax to camera
+    const aspect = this.width / Math.max(1, this.height);
+    const zoom = aspect < 1 ? Math.max(1, 1.2 / aspect) : 1;
+    const cx = lookPos.x + (camPos.x - lookPos.x) * zoom;
+    const cy = lookPos.y + (camPos.y - lookPos.y) * zoom;
+    const cz = camPos.z * zoom;
     this.camera.position.set(
-      camPos.x + this.pointer.x * 35,
-      camPos.y + this.pointer.y * 25,
-      camPos.z,
+      cx + this.pointer.x * 24,
+      cy + this.pointer.y * 18 + mobileYOffset,
+      cz,
     );
-    this.camera.lookAt(lookPos.x, lookPos.y, lookPos.z);
-
-    // Floating Dust Particle Motion
-    if (this.dust) {
-      this.dust.rotation.y = t * 0.02;
-    }
-
-    // 1. Crystal Motion along Pipeline
-    const crystalTrack = [
-      [0, new THREE.Vector3(-460, 200, 0)],
-      [1 / 7, new THREE.Vector3(-460, 200, 0)],
-      [2 / 7, new THREE.Vector3(-250, 130, 0)],
-      [3 / 7, new THREE.Vector3(-80, 50, 0)],
-      [4 / 7, new THREE.Vector3(75, 25, 0)],
-      [5 / 7, new THREE.Vector3(260, -110, 0)],
-      [6 / 7, new THREE.Vector3(490, -20, 0)],
-      [1, new THREE.Vector3(780, 70, 92)],
-    ];
-
-    let currentPos = crystalTrack[0][1].clone();
-    for (let i = 1; i < crystalTrack.length; i++) {
-      if (p <= crystalTrack[i][0]) {
-        const [p0, v0] = crystalTrack[i - 1];
-        const [p1, v1] = crystalTrack[i];
-        const alpha = (p - p0) / Math.max(0.0001, p1 - p0);
-        currentPos = v0.clone().lerp(v1, alpha);
-        break;
-      }
-    }
-
-    const floatBob = Math.sin(t * 1.8) * 3;
-    this.crystalGroup.position.copy(currentPos);
-    this.crystalGroup.position.y += floatBob;
-
-    this.crystalMesh.rotation.y = t * 0.45;
-    this.crystalMesh.rotation.x = Math.sin(t * 0.6) * 0.2;
-
-    // 2. Gimbal Rings Dynamic Rotation (Step 03)
-    if (this.gimbalGroup) {
-      this.ringOuter.rotation.z = t * 1.2;
-      this.ringMid.rotation.y = t * 1.8;
-      this.ringInner.rotation.x = t * 2.4;
-      this.lasers.rotation.z = -t * 1.2;
-    }
-
-    // 3. Rogue Shards Deflection (Step 02)
-    const step2Active = p >= 1 / 7 && p <= 2.8 / 7;
-    this.rogueShards.forEach((shard, idx) => {
-      if (step2Active) {
-        shard.position.x = -240 + Math.sin(t * 3 + idx) * 35;
-        shard.rotation.x += 0.05;
-        shard.rotation.y += 0.08;
-      }
-    });
-
-    // 4. Test Suite Pylon Activation (Step 06)
-    this.gatePylons.forEach((gate, idx) => {
-      const threshold = 5 / 7 + (idx * 0.22) / 7;
-      const passed = p >= threshold;
-      gate.lamp.material.color.setHex(passed ? 0xd8ff64 : 0x243329);
-      gate.curtain.material.opacity = passed ? 0.35 : 0.08;
-    });
-
-    // 5. Worktree Pod Confinement Rotation (Step 05)
-    if (this.podShell) {
-      this.podShell.rotation.y = t * 0.25;
-    }
-
-    // 6. Dock Socket Lock Indicator (Step 07)
-    if (p >= 0.96) {
-      this.dockSocket.material.color.setHex(0xd8ff64);
-    }
-
-    // Raycast Interaction with 3D Objects
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.interactiveObjects, true);
-
-    if (intersects.length > 0) {
-      const obj = intersects[0].object;
-      const data = obj.userData;
-      if (data && data.name) {
-        if (inspectTarget) inspectTarget.textContent = `${data.name} (${data.file || 'SYSTEM'})`;
-        if (inspectSymbol) inspectSymbol.textContent = data.symbols || data.name;
-        if (inspectSector) inspectSector.textContent = data.sector || CHAMBERS[lastStep] || 'PIPELINE';
-        if (inspectIntegrity && !isDrifting) inspectIntegrity.textContent = data.integrity || 'VERIFIED';
-        body.style.cursor = 'crosshair';
-      }
+    if (aspect >= 1) {
+      this.camera.setViewOffset(this.width, this.height, -this.width * 0.17, -this.height * 0.11, this.width, this.height);
     } else {
-      body.style.cursor = 'default';
+      this.camera.setViewOffset(this.width, this.height, 0, this.height * 0.12, this.width, this.height);
     }
+    this.camera.lookAt(lookPos.x, lookPos.y + mobileYOffset, lookPos.z);
+
+    // Dust particles
+    if (this.dust) this.dust.rotation.y = t * 0.02;
+
+    // --- COURIER CONTINUOUS TRAJECTORY THROUGH 7 STAGES ---
+    // Positions corresponding to each stage
+    const p1 = new THREE.Vector3(-460, 200, 0); // Stage 1: In glass boundary cage
+    const p2 = new THREE.Vector3(-260, 130, 0); // Stage 2: Passing boundary opening
+    const p3 = new THREE.Vector3(-80, 50, 0);   // Stage 3: Stopped at vault collar
+    const p4 = new THREE.Vector3(75, 25, 0);    // Stage 4: In AST scan zone
+    const p5a = new THREE.Vector3(260, 50, -40);// Stage 5: Top of conduit
+    const p5b = new THREE.Vector3(260, -110, 0);// Stage 5: Inside quarantine pod
+    const p6a = new THREE.Vector3(430, -20, 0); // Stage 6: Gate 2 failure flinch point
+    const p6b = new THREE.Vector3(540, -20, 0); // Stage 6: Cleared all gates
+    const p7 = new THREE.Vector3(780, 70, 78);  // Stage 7: Docks into solution.py slot
+
+    let courierPos = p1.clone();
+    let courierScale = 1.0;
+    let courierColor = 0xd8ff64;
+    let flinchOffset = new THREE.Vector3(0, 0, 0);
+
+    // Breathing pulse when idle
+    const breathing = 1.0 + 0.05 * Math.sin(t * 2.5);
+
+    if (p <= 1 / 7) {
+      // Stage 1: Born inside closed glass outline, tiny, pulsing slowly
+      const a = p / (1 / 7);
+      courierPos = p1.clone();
+      courierScale = 0.45 + a * 0.35; // grows from tiny to medium
+      courierColor = 0xa4e8b0; // dim cool jade green when unsure
+      if (inspectState && !isDrifting) inspectState.textContent = 'BORN_IN_BOUNDARY';
+    } else if (p <= 2 / 7) {
+      // Stage 2: Code lines wrap on faces, travels through boundary opening
+      const a = (p - 1 / 7) / (1 / 7);
+      courierPos = p1.clone().lerp(p2, a);
+      courierScale = 0.8 + a * 0.2;
+      courierColor = 0xb8f070;
+      if (inspectState && !isDrifting) inspectState.textContent = 'CODE_WRAPPED_PORTAL';
+
+      // Rogue shards deflect off boundary portal
+      this.rogueShards.forEach((shard, i) => {
+        const bounce = Math.sin(t * 4 + i) * 20;
+        shard.position.x = shard.userData.basePos.x - bounce;
+      });
+    } else if (p <= 3 / 7) {
+      // Stage 3: Stops at sealed vault collar; tight, tense camera; vault locks
+      const a = (p - 2 / 7) / (1 / 7);
+      courierPos = p2.clone().lerp(p3, a);
+      courierScale = 1.0;
+      courierColor = 0xd8ff64; // tensed
+      if (inspectState && !isDrifting) inspectState.textContent = 'TENSED_AT_VAULT';
+
+      // Counter-rotating gimbal laser rings
+      this.gimbalR1.rotation.z = t * 1.4;
+      this.gimbalR2.rotation.y = t * 2.0;
+      this.gimbalR3.rotation.x = t * 2.6;
+      this.lasers.rotation.z = -t * 1.4;
+    } else if (p <= 4 / 7) {
+      // Stage 4: Scan blade sweeps, AST nodes light one by one
+      const a = (p - 3 / 7) / (1 / 7);
+      courierPos = p3.clone().lerp(p4, a);
+      courierScale = 1.0;
+      courierColor = 0xd8ff64;
+      if (inspectState && !isDrifting) inspectState.textContent = 'AST_SCANNING';
+
+      // Sweep scan blade across courier
+      this.scanBlade.position.x = -25 + a * 50;
+
+      // Light up AST branch nodes sequentially
+      this.astBranchNodes.forEach((node, i) => {
+        const threshold = i / this.astBranchNodes.length;
+        const lit = a >= threshold;
+        node.material.opacity = lit ? 0.95 : 0.15;
+      });
+    } else if (p <= 5 / 7) {
+      // Stage 5: Clone travels down conduit into quarantine space, source stays sealed
+      const a = (p - 4 / 7) / (1 / 7);
+      // Courier follows conduit curve
+      courierPos = this.conduitCurve.getPointAt(Math.min(1, Math.max(0, a)));
+      courierScale = 1.0;
+      courierColor = 0x8fffa8;
+      if (inspectState && !isDrifting) inspectState.textContent = 'CONDUIT_DESCENT';
+
+      // Source tree platform stays sealed and dimmed
+      this.sourceTree.position.y = 60 + Math.sin(t * 0.8) * 1.5;
+      this.podMesh.rotation.y = t * 0.3;
+    } else if (p <= 6 / 7) {
+      // Stage 6: Gates arena. Fails gate 2 (red flinch/cracks), retries cleaner, passes all 4
+      const a = (p - 5 / 7) / (1 / 7);
+      courierScale = 1.0;
+
+      if (a < 0.42) {
+        // Approach and fail at gate 2
+        const subA = a / 0.42;
+        courierPos = p5b.clone().lerp(p6a, subA);
+        courierColor = 0xd8ff64;
+        this.crackMat.opacity = 0;
+        this.retryArcMat.opacity = 0;
+        if (inspectState && !isDrifting) inspectState.textContent = 'ATTEMPT_1_RUNNING';
+      } else if (a < 0.62) {
+        // Flinch, crack, red flash, recoil along retry arc
+        const subA = (a - 0.42) / 0.2;
+        courierColor = 0xff4747; // RED ON REJECT
+        this.crackMat.opacity = 0.9;
+        this.retryArcMat.opacity = 0.8;
+        flinchOffset.set(
+          -Math.sin(subA * Math.PI) * 28,
+          Math.sin(subA * Math.PI) * 18,
+          Math.sin(subA * Math.PI) * 12,
+        );
+        this.courier.rotation.z = Math.sin(subA * Math.PI) * 0.45;
+        courierPos = p6a.clone().add(flinchOffset);
+        if (inspectState && !isDrifting) inspectState.textContent = 'GATE_2_FLINCH_RETRY';
+      } else {
+        // Retry cleaner: gather composure, brighter, steady green, pass all four gates
+        const subA = (a - 0.62) / 0.38;
+        courierPos = p6a.clone().lerp(p6b, subA);
+        courierColor = 0xd8ff64; // STEADY EMERALD PHOSPHOR
+        this.crackMat.opacity = Math.max(0, 0.9 - subA * 2.5);
+        this.retryArcMat.opacity = Math.max(0, 0.8 - subA * 2);
+        this.courier.rotation.z = 0;
+        if (inspectState && !isDrifting) inspectState.textContent = 'RETRY_ALL_GATES_PASS';
+      }
+
+      // Gate lights
+      this.arenaGates.forEach((gate, i) => {
+        const gateThresh = 0.62 + (i / 4) * 0.36;
+        const pass = a >= gateThresh;
+        gate.lamp.material.color.setHex(pass ? 0xd8ff64 : (a > 0.42 && a < 0.62 && i === 1 ? 0xff4747 : 0x243329));
+        gate.curtain.material.opacity = pass ? 0.35 : 0.08;
+      });
+    } else {
+      // Stage 7: Verified courier travels back up conduit, dissolves into solution.py in file tree
+      const a = (p - 6 / 7) / (1 / 7);
+      if (a < 0.5) {
+        // Ascending back up the conduit
+        const subA = 1.0 - a * 2.0;
+        courierPos = this.conduitCurve.getPointAt(Math.min(1, Math.max(0, subA)));
+        courierScale = 1.0;
+      } else {
+        // Docking and dissolving into solution.py
+        const subA = (a - 0.5) / 0.5;
+        courierPos = p5a.clone().lerp(p7, subA);
+        // Dissolves into file slot
+        courierScale = Math.max(0.01, 1.0 - subA * 0.7);
+        if (subA > 0.9) {
+          audio.playDock();
+          this.slotMat.color.setHex(0xd8ff64);
+        }
+      }
+      courierColor = 0xd8ff64;
+      if (inspectState && !isDrifting) inspectState.textContent = 'VERIFIED_DOCKED';
+
+      // Quarantined space retracts and dims
+      this.quarantinePod.position.y = -110 - a * 40;
+      this.podMesh.material.opacity = Math.max(0.1, 0.7 - a * 0.6);
+      this.receiptMesh.material.opacity = a;
+    }
+
+    // Apply color and breathing to Courier
+    this.courierCoreMat.color.setHex(isDrifting ? 0xff4747 : courierColor);
+    this.courierWireMat.color.setHex(isDrifting ? 0xff4747 : courierColor);
+
+    this.courier.position.copy(courierPos);
+    this.courier.scale.setScalar(courierScale * breathing * 2.2);
+    if (this.courierLight) {
+      this.courierLight.position.set(courierPos.x, courierPos.y + 40, courierPos.z + 90);
+      this.courierLight.color.setHex(isDrifting ? 0xff4747 : courierColor);
+    }
+    if (this.trail) {
+      const last = this.trailPts[this.trailPts.length - 1];
+      if (!last || last.distanceTo(courierPos) > 2.5) {
+        this.trailPts.push(courierPos.clone());
+        if (this.trailPts.length > this.trailN) this.trailPts.shift();
+      }
+      const arr = this.trailGeo.attributes.position.array;
+      for (let i = 0; i < this.trailN; i++) {
+        const pt = this.trailPts[Math.min(i, this.trailPts.length - 1)] || courierPos;
+        arr[i*3] = pt.x; arr[i*3+1] = pt.y; arr[i*3+2] = pt.z;
+      }
+      this.trailGeo.attributes.position.needsUpdate = true;
+      this.trail.material.color.setHex(isDrifting ? 0xff4747 : courierColor);
+    }
+
+    // Orbiting Glyphs motion around Courier
+    this.glyphSprites.forEach((item) => {
+      item.angle += deltaTime * 1.8;
+      item.sprite.position.set(
+        Math.cos(item.angle) * item.radius,
+        Math.sin(item.angle * 1.5) * 8,
+        Math.sin(item.angle) * item.radius,
+      );
+    });
+
+    // Inactive object fading: smoothly adjust opacity of stages away from current progress
+    const activeStage = p * 7;
+    this.boundaryCage.traverse((obj) => {
+      if (obj.material && obj !== this.courier) {
+        obj.visible = activeStage < 2.3;
+      }
+    });
+    this.vaultCollar.traverse((obj) => {
+      if (obj.material) obj.visible = activeStage > 1.6 && activeStage < 3.6;
+    });
+    this.astZone.traverse((obj) => {
+      if (obj.material) obj.visible = activeStage > 2.6 && activeStage < 4.6;
+    });
+    this.boundaryZone.traverse((obj) => { if (obj.material) obj.visible = activeStage > 0.9 && activeStage < 3.3; });
+    this.dualSpace.traverse((obj) => { if (obj.material) obj.visible = activeStage > 3.75 && activeStage < 6.2; });
+    this.masterDock.traverse((obj) => { if (obj.material) obj.visible = activeStage > 5.6; });
+    this.gateArena.traverse((obj) => {
+      if (obj.material) obj.visible = activeStage > 4.7;
+    });
   }
 
-  renderFrame(time, deltaTime) {
+  render(elapsed, deltaTime) {
     if (isReduced) return;
-    this.updatePhysics(deltaTime);
+
+    // Auto-downgrade performance check
+    if (deltaTime > 0.024) {
+      this.slowFrameAccumulator += deltaTime;
+      if (this.slowFrameAccumulator > 1.0) {
+        this.downgradeTier();
+        this.slowFrameAccumulator = 0;
+      }
+    } else {
+      this.slowFrameAccumulator = Math.max(0, this.slowFrameAccumulator - deltaTime * 0.5);
+    }
+
+    this.updateProtagonistChoreography(deltaTime);
 
     if (this.usePost && this.renderTarget) {
       this.renderer.setRenderTarget(this.renderTarget);
@@ -1329,10 +1559,15 @@ class TaskScene {
       this.renderer.render(this.scene, this.camera);
     }
   }
+
+  dispose() {
+    this.renderer.dispose();
+    if (this.renderTarget) this.renderTarget.dispose();
+  }
 }
 
 /* ------------------------------------------------------------------ *
- * Initialization & Deterministic Single Tick Loop
+ * Initialization & Single Deterministic Ticker Loop
  * ------------------------------------------------------------------ */
 function initStoryScene() {
   if (scene || isReduced) return;
@@ -1405,10 +1640,13 @@ function setupLenis() {
     scrollVelocity = e.velocity || 0;
   });
 
-  // Single Deterministic Ticker: eliminates double-requestAnimationFrame jitter
-  gsap.ticker.add((time, deltaTime) => {
+  // Single Ticker: Lenis + ScrollTrigger + Three.js Timer render
+  gsap.ticker.add((time) => {
     lenis?.raf(time * 1000);
-    scene?.renderFrame(time, (deltaTime || 16) / 1000);
+    if (scene) {
+      scene.timer.update();
+      scene.render(scene.timer.getElapsed(), scene.timer.getDelta());
+    }
   });
   gsap.ticker.lagSmoothing(1000, 16);
 }
@@ -1420,6 +1658,8 @@ reduced.addEventListener?.('change', () => {
     lenis.destroy();
     lenis = null;
   }
+  scene?.dispose();
+  scene = null;
   ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
   setupScroll();
   setupLenis();
