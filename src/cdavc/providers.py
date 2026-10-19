@@ -6,12 +6,45 @@ import json
 import inspect
 import socket
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 
 Message = Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class ProviderCompletion:
+    """Completion text with usage when the local provider reports it.
+
+    The existing provider API returns a string.  This small value object is an
+    additive metadata API used by the benchmark runner; ``complete`` continues
+    to return only ``text`` for existing callers.
+    """
+
+    text: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    model: str | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def input_tokens(self) -> int | None:
+        return self.prompt_tokens
+
+    @property
+    def output_tokens(self) -> int | None:
+        return self.completion_tokens
+
+    @property
+    def token_in(self) -> int | None:
+        return self.prompt_tokens
+
+    @property
+    def token_out(self) -> int | None:
+        return self.completion_tokens
 
 
 class ProviderUnavailableError(RuntimeError):
@@ -33,17 +66,51 @@ class Provider(Protocol):
 class MockProvider:
     """Deterministic provider that consumes a scripted response per call."""
 
-    def __init__(self, responses: Iterable[str], *, available: bool = True) -> None:
+    def __init__(self, responses: Iterable[str | ProviderCompletion | Mapping[str, Any]], *, available: bool = True) -> None:
         self._responses = iter(responses)
         self.available = available
 
     def complete(self, messages: Iterable[Message]) -> str:
+        return self.complete_with_metadata(messages).text
+
+    def complete_with_metadata(
+        self,
+        messages: Iterable[Message],
+        *,
+        seed: int | None = None,
+    ) -> ProviderCompletion:
+        del messages, seed
         if not self.available:
             raise ProviderUnavailableError("mock provider is unavailable")
         try:
-            return next(self._responses)
+            response = next(self._responses)
         except StopIteration as exc:
             raise ProviderUnavailableError("mock provider has no scripted response") from exc
+        if isinstance(response, ProviderCompletion):
+            return response
+        if isinstance(response, str):
+            return ProviderCompletion(response)
+        if isinstance(response, Mapping):
+            text = response.get("text", response.get("content"))
+            usage = response.get("usage") if isinstance(response.get("usage"), Mapping) else response
+            if isinstance(text, str):
+                return ProviderCompletion(
+                    text,
+                    _usage_int(usage, "prompt_tokens", "input_tokens", "token_in"),
+                    _usage_int(usage, "completion_tokens", "output_tokens", "token_out"),
+                    response.get("model") if isinstance(response.get("model"), str) else None,
+                )
+        raise ValueError("mock provider response must be text, metadata, or ProviderCompletion")
+
+    def complete_with_usage(
+        self,
+        messages: Iterable[Message],
+        *,
+        seed: int | None = None,
+    ) -> ProviderCompletion:
+        """Backward-compatible spelling for callers that request usage."""
+
+        return self.complete_with_metadata(messages, seed=seed)
 
 
 class OpenAICompatibleProvider:
@@ -76,12 +143,21 @@ class OpenAICompatibleProvider:
         return bool(self.endpoint and self.model)
 
     def complete(self, messages: Iterable[Message]) -> str:
+        return self.complete_with_metadata(messages).text
+
+    def complete_with_metadata(
+        self,
+        messages: Iterable[Message],
+        *,
+        seed: int | None = None,
+    ) -> ProviderCompletion:
         if not self.available:
             raise ProviderUnavailableError("OpenAI-compatible provider is unavailable")
 
-        payload = json.dumps(
-            {"model": self.model, "messages": list(messages)}
-        ).encode("utf-8")
+        request_payload: dict[str, Any] = {"model": self.model, "messages": list(messages)}
+        if seed is not None:
+            request_payload["seed"] = seed
+        payload = json.dumps(request_payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -112,4 +188,31 @@ class OpenAICompatibleProvider:
             raise ValueError("invalid OpenAI-compatible response") from exc
         if not isinstance(content, str):
             raise ValueError("invalid OpenAI-compatible response content")
-        return content
+        usage = body.get("usage")
+        if not isinstance(usage, Mapping):
+            usage = {}
+        return ProviderCompletion(
+            content,
+            prompt_tokens=_usage_int(usage, "prompt_tokens", "input_tokens"),
+            completion_tokens=_usage_int(usage, "completion_tokens", "output_tokens"),
+            model=body.get("model") if isinstance(body.get("model"), str) else self.model,
+            metadata={"usage": dict(usage)} if usage else {},
+        )
+
+    def complete_with_usage(
+        self,
+        messages: Iterable[Message],
+        *,
+        seed: int | None = None,
+    ) -> ProviderCompletion:
+        """Backward-compatible spelling for callers that request usage."""
+
+        return self.complete_with_metadata(messages, seed=seed)
+
+
+def _usage_int(usage: Mapping[str, Any], *keys: str) -> int | None:
+    for key in keys:
+        value = usage.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    return None

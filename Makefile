@@ -1,4 +1,4 @@
-.PHONY: check-python test coverage run-demo package-test docker-test
+.PHONY: check-python test coverage run-demo benchmark-mock package-test docker-test
 
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 DOCKER ?= $(shell if command -v docker >/dev/null 2>&1; then command -v docker; elif test -x /Applications/Docker.app/Contents/Resources/bin/docker; then printf '%s' /Applications/Docker.app/Contents/Resources/bin/docker; else printf '%s' docker; fi)
@@ -19,6 +19,16 @@ run-demo:
 		--provider mock \
 		--mock-response examples/demo/responses/bad.json \
 		--mock-response examples/demo/responses/good.json
+
+benchmark-mock: check-python
+	PYTHONPATH=src $(PYTHON) -m cdavc.benchmark . \
+		--tasks benchmarks/tasks.json \
+		--mock \
+		--seed 0 \
+		--model mock-local \
+		--quantisation mock \
+		--version benchmark-v1 \
+		--hardware "$(shell uname -srm)"
 
 package-test: check-python
 	$(PYTHON) -c 'import shutil; shutil.rmtree("/tmp/cdavc-package-test", ignore_errors=True)'
