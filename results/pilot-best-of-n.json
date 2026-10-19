@@ -1,0 +1,312 @@
+{
+  "sampled:task_006": {
+    "rows": [
+      {
+        "i": 0,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_006: expected [-3, -2, 0, 0, 4, 9], got [-3, -2, 0, 4, 9]"
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_006: expected [-3, -2, 0, 0, 4, 9], got [-3, -2, 0, 4, 9]"
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_006: expected [-3, -2, 0, 0, 4, 9], got [-3, -2, 0, 4, 9]"
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_006: expected [-3, -2, 0, 0, 4, 9], got [-3, -2, 0, 4, 9]"
+      }
+    ],
+    "public_pass_k": 4,
+    "oracle_hidden_k": false,
+    "selected_hidden": false
+  },
+  "sampled:task_013": {
+    "rows": [
+      {
+        "i": 0,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_013: expected 'camel_case_value', got 'camel_ase_alue'"
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_013: expected 'http_request', got 'httprequest'"
+      }
+    ],
+    "public_pass_k": 3,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled:task_015": {
+    "rows": [
+      {
+        "i": 0,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_015: expected ValueError"
+      },
+      {
+        "i": 1,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_015: invalid literal for int() with base 10: 'MCMXCIV'"
+      },
+      {
+        "i": 2,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_015: invalid literal for int() with base 10: 'MCMXCIV'"
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": false,
+        "detail": "hidden test failed for task_015: expected ValueError"
+      }
+    ],
+    "public_pass_k": 2,
+    "oracle_hidden_k": false,
+    "selected_hidden": false
+  },
+  "sampled:task_023": {
+    "rows": [
+      {
+        "i": 0,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_023: No module named 'numpy'"
+      },
+      {
+        "i": 1,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      },
+      {
+        "i": 2,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      },
+      {
+        "i": 3,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      }
+    ],
+    "public_pass_k": 0,
+    "oracle_hidden_k": false,
+    "selected_hidden": false
+  },
+  "sampled:task_026": {
+    "rows": [
+      {
+        "i": 0,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      },
+      {
+        "i": 1,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_026: No module named 'numpy'"
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 2,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled:task_029": {
+    "rows": [
+      {
+        "i": 0,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_029: expected '1d 2h 3m 4s', got 'd1 h2 m3 s4'"
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 3,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled:task_030": {
+    "rows": [
+      {
+        "i": 0,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 2,
+        "public": false,
+        "hidden": false,
+        "detail": "apply: provider response is not a JSON files object"
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 2,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled_stdlib:task_023": {
+    "rows": [
+      {
+        "i": 0,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 4,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled_stdlib:task_026": {
+    "rows": [
+      {
+        "i": 0,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 1,
+        "public": false,
+        "hidden": false,
+        "detail": "public test failed for task_026: expected [[19, 22], [43, 50]], got [[36, 42], [84, 98]]"
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 3,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  },
+  "sampled_stdlib:task_030": {
+    "rows": [
+      {
+        "i": 0,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 1,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 2,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      },
+      {
+        "i": 3,
+        "public": true,
+        "hidden": true,
+        "detail": ""
+      }
+    ],
+    "public_pass_k": 4,
+    "oracle_hidden_k": true,
+    "selected_hidden": true
+  }
+}
