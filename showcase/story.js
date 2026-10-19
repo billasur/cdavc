@@ -535,7 +535,7 @@ class TaskScene {
       new THREE.Vector3(80, 50, 400),     // 04 AST: Close profile shot watching AST scan beam sweep syntax nodes
       new THREE.Vector3(270, 0, 620),   // 05 Worktree: Wide pull-back shot showing dual spaces & conduit tube
       new THREE.Vector3(480, 10, 520),   // 06 Gates: Low-angle dramatic arena shot framing retry arc
-      new THREE.Vector3(770, 110, 470),   // 07 Copy-back: Ascending orbit shot as verified courier docks
+      new THREE.Vector3(770, 110, 440),   // 07 Copy-back: Ascending orbit shot as verified courier docks
     ];
 
     const lookWaypoints = [
