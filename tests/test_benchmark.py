@@ -515,7 +515,41 @@ class BenchmarkTests(unittest.TestCase):
             self.assertFalse(cage["pass"])
             self.assertIn(
                 "AST Contract Failed: Task invariant requires input validation raising ValueError, "
-                "but no Raise statements were found in implementation.",
+                "but no raise of ValueError was found in implementation.",
+                cage["failure"],
+            )
+            self.assertEqual(cage["gate_results"], [])
+            self.assertNotIn("targeted test", labels)
+
+    def test_cage_rejects_wrong_exception_class_before_running_public_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(
+                max_retries=0,
+                invariants=("Raise ValueError when size is not positive.",),
+                regression_command=None,
+            )
+            candidate = self._response("def answer() -> int:\n    raise TypeError('wrong class')\n")
+            labels = []
+            original = BenchmarkRunner._run_command
+
+            def spy(runner, command, workspace, label, *, include_output=False):
+                labels.append(label)
+                return original(runner, command, workspace, label, include_output=include_output)
+
+            runner = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            )
+            with patch.object(BenchmarkRunner, "_run_command", spy):
+                records = runner.run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn(
+                "AST Contract Failed: Task invariant requires input validation raising ValueError, "
+                "but no raise of ValueError was found in implementation.",
                 cage["failure"],
             )
             self.assertEqual(cage["gate_results"], [])

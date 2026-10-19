@@ -160,6 +160,28 @@ class SupervisorTests(unittest.TestCase):
 
             self.assertEqual(result["tasks"]["TASK-001"]["status"], "COMPLETED")
 
+    def test_supervisor_rejects_candidate_that_raises_wrong_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["max_retries"] = 0
+            payload["tasks"][0]["invariants"] = ["Raise ValueError for non-positive input."]
+            graph_path.write_text(json.dumps(payload))
+            body = (
+                "def answer(value: int) -> int:\n"
+                "    if value < 0:\n"
+                "        raise TypeError('negative input')\n"
+                "    return value + 1\n"
+            )
+            response = json.dumps({"files": {"src/answer.py": body}})
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
+            self.assertIn("AST gate failed", result["tasks"]["TASK-001"]["failure"])
+            self.assertIn("no raise of ValueError", result["tasks"]["TASK-001"]["failure"])
+
 
 if __name__ == "__main__":
     unittest.main()

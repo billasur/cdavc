@@ -33,7 +33,7 @@ from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
-from .invariants import has_raise_statement, required_exception
+from .invariants import raises_exception, required_exception
 from .providers import (
     MockProvider,
     OpenAICompatibleProvider,
@@ -555,10 +555,10 @@ class BenchmarkRunner:
             if missing:
                 raise _GateFailure("AST contract is missing a required symbol")
             required = required_exception(task.invariants)
-            if required and not has_raise_statement(tree):
+            if required and not raises_exception(tree, required):
                 raise _GateFailure(
                     f"AST Contract Failed: Task invariant requires input validation raising {required}, "
-                    "but no Raise statements were found in implementation."
+                    f"but no raise of {required} was found in implementation."
                 )
         results.append("ast_contract")
         if task.boundary_probe:
