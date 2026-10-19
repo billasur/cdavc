@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h402_shortest_path_length",
+  "title": "Shortest path length in an unweighted graph",
+  "description": "Implement shortest_path_length(graph, start, goal). graph is an undirected graph given as a dict mapping each node (str) to an iterable of neighbour nodes. Return the fewest edges on a path from start to goal, 0 when start equals goal, or -1 when no path exists.",
+  "implementation_files": [
+    "benchmarks_heldout/agent4/task_h402_shortest_path_length/solution_stub.py"
+  ],
+  "symbols": [
+    "shortest_path_length"
+  ],
+  "invariants": [
+    "A node that appears only as a neighbour is still traversable.",
+    "When start equals goal the answer is 0 even if that node is absent from the graph.",
+    "Two nodes in different components give -1."
+  ],
+  "max_retries": 2
+}

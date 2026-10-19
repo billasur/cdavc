@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h403_topological_order",
+  "title": "Lexicographically smallest topological order",
+  "description": "Implement topological_order(graph). graph is a directed graph given as a dict mapping each node (str) to an iterable of successor nodes. Return the lexicographically smallest valid topological ordering of every node in the graph.",
+  "implementation_files": [
+    "benchmarks_heldout/agent4/task_h403_topological_order/solution_stub.py"
+  ],
+  "symbols": [
+    "topological_order"
+  ],
+  "invariants": [
+    "A node that appears only as a successor is still part of the ordering.",
+    "When several orderings are valid, the lexicographically smallest one is returned.",
+    "Raises ValueError when the graph contains a cycle."
+  ],
+  "max_retries": 2
+}

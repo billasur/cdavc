@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h405_sliding_window_max",
+  "title": "Sliding window maximum",
+  "description": "Implement sliding_window_max(values, k). values is a list of ints and k is the window length. Return a list with the maximum of each contiguous window of length k as the window slides one step to the right.",
+  "implementation_files": [
+    "benchmarks_heldout/agent4/task_h405_sliding_window_max/solution_stub.py"
+  ],
+  "symbols": [
+    "sliding_window_max"
+  ],
+  "invariants": [
+    "Raises ValueError when k is smaller than 1.",
+    "Only complete windows are reported, so a k larger than len(values) gives an empty list.",
+    "An empty values list gives an empty list."
+  ],
+  "max_retries": 2
+}

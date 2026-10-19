@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h401_connected_components",
+  "title": "Count connected components",
+  "description": "Implement connected_components(graph). graph is an undirected graph given as a dict mapping each node (str) to an iterable of neighbour nodes. Return the number of connected components.",
+  "implementation_files": [
+    "benchmarks_heldout/agent4/task_h401_connected_components/solution_stub.py"
+  ],
+  "symbols": [
+    "connected_components"
+  ],
+  "invariants": [
+    "A node that appears only as a neighbour still belongs to the graph.",
+    "An empty graph has 0 components.",
+    "Self-loops and duplicate edges do not change the component count."
+  ],
+  "max_retries": 2
+}

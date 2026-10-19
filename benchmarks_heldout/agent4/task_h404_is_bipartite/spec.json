@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h404_is_bipartite",
+  "title": "Check whether a graph is bipartite",
+  "description": "Implement is_bipartite(graph). graph is an undirected graph given as a dict mapping each node (str) to an iterable of neighbour nodes. Return True when the nodes can be coloured with two colours so that no edge joins two nodes of the same colour.",
+  "implementation_files": [
+    "benchmarks_heldout/agent4/task_h404_is_bipartite/solution_stub.py"
+  ],
+  "symbols": [
+    "is_bipartite"
+  ],
+  "invariants": [
+    "An empty graph is bipartite.",
+    "A self-loop makes the graph non-bipartite.",
+    "Disconnected components are checked independently."
+  ],
+  "max_retries": 2
+}
