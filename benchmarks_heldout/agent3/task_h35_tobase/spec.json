@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h35_tobase",
+  "title": "Integer to base string",
+  "description": "Implement to_base(n, base). Return the string representation of integer n in the given base (2 to 36) using lowercase digits 0-9 then a-z. Negative n gets a single leading '-'. Zero is '0'. Raise ValueError if base is outside 2..36.",
+  "implementation_files": [
+    "benchmarks_heldout/agent3/task_h35_tobase/solution.py"
+  ],
+  "symbols": [
+    "to_base"
+  ],
+  "invariants": [
+    "Lowercase letters for digits >= 10.",
+    "No leading zeros except for the value 0 itself.",
+    "Negative numbers use a leading '-' and no other sign.",
+    "Raise ValueError for base < 2 or base > 36."
+  ],
+  "max_retries": 2
+}

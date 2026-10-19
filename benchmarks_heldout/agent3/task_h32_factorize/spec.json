@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h32_factorize",
+  "title": "Prime factorization",
+  "description": "Implement prime_factorization(n). For an integer n >= 2 return a list of (prime, exponent) tuples sorted by ascending prime, such that the product of prime**exponent equals n. Raise ValueError if n < 2. Must finish quickly for n up to about 10**12 (trial division up to sqrt is enough).",
+  "implementation_files": [
+    "benchmarks_heldout/agent3/task_h32_factorize/solution.py"
+  ],
+  "symbols": [
+    "prime_factorization"
+  ],
+  "invariants": [
+    "Primes are ascending and unique.",
+    "Exponents are >= 1.",
+    "Raise ValueError for n < 2.",
+    "A large prime n returns [(n, 1)]."
+  ],
+  "max_retries": 2
+}

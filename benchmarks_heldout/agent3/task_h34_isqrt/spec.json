@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h34_isqrt",
+  "title": "Exact integer square root",
+  "description": "Implement integer_sqrt(n). Return the largest integer r such that r * r <= n, computed with integer arithmetic only (no float math, so it must be exact for huge n such as 10**60). Raise ValueError if n is negative. Do not call math.isqrt.",
+  "implementation_files": [
+    "benchmarks_heldout/agent3/task_h34_isqrt/solution.py"
+  ],
+  "symbols": [
+    "integer_sqrt"
+  ],
+  "invariants": [
+    "Exact for arbitrarily large ints (no float conversion).",
+    "integer_sqrt(0) == 0.",
+    "Raise ValueError for n < 0."
+  ],
+  "max_retries": 2
+}

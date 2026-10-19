@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h33_crt",
+  "title": "Chinese remainder with non-coprime moduli",
+  "description": "Implement solve_congruences(pairs). pairs is a list of (remainder, modulus) with each modulus >= 1. Find x satisfying x % modulus == remainder % modulus for every pair. Return (x, lcm) where x is the smallest non-negative solution and lcm is the least common multiple of all moduli, or None if the system has no solution. An empty list returns (0, 1). Moduli need not be coprime. Raise ValueError if any modulus < 1.",
+  "implementation_files": [
+    "benchmarks_heldout/agent3/task_h33_crt/solution.py"
+  ],
+  "symbols": [
+    "solve_congruences"
+  ],
+  "invariants": [
+    "Return None (not an exception) for inconsistent systems.",
+    "Remainders may be negative or >= modulus.",
+    "Result x is in [0, lcm).",
+    "Moduli need not be pairwise coprime."
+  ],
+  "max_retries": 2
+}

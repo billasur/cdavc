@@ -1,0 +1,17 @@
+{
+  "task_id": "task_h31_modinv",
+  "title": "Modular inverse",
+  "description": "Implement mod_inverse(a, m). Return the integer x with 0 <= x < m such that (a * x) % m == 1, using the extended Euclidean algorithm or equivalent. a may be negative or larger than m. Raise ValueError if m < 2 or if a and m are not coprime (no inverse exists).",
+  "implementation_files": [
+    "benchmarks_heldout/agent3/task_h31_modinv/solution.py"
+  ],
+  "symbols": [
+    "mod_inverse"
+  ],
+  "invariants": [
+    "Result is in range [0, m).",
+    "a may be negative or >= m.",
+    "Raise ValueError when gcd(a, m) != 1 or m < 2."
+  ],
+  "max_retries": 2
+}
