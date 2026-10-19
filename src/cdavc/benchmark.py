@@ -17,6 +17,7 @@ import inspect
 import json
 import os
 import platform
+import re
 import shlex
 import shutil
 import statistics
@@ -428,6 +429,7 @@ class BenchmarkRunner:
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
             elif arm == "cdavc":
                 repair = f"\nPrevious deterministic failure category: {_failure_category(previous_failure)}\n"
+        target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
             f"Benchmark arm: {arm}.\n"
@@ -436,24 +438,40 @@ class BenchmarkRunner:
             + f"Allowed implementation files: {', '.join(task.implementation_files)}\n"
             f"Required symbols: {', '.join(task.symbols) or '(none)'}\n"
             f"Public invariants: {', '.join(task.invariants) or '(see tests)'}\n"
-            "Return only JSON in the form {\"files\": {\"src/example.py\": \"complete file contents\"}}. "
+            f'Return only JSON in the form {{"files": {{"{target_example}": "complete file contents"}}}}. '
             "Use repository-relative paths, modify only allowed implementation files, and never modify tests.\n"
             + repair
         )
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
+        stripped = _strip_json_fence(response)
         try:
-            payload = json.loads(_strip_json_fence(response))
-            files = payload["files"]
-        except (json.JSONDecodeError, KeyError, TypeError):
+            payload = json.loads(stripped, strict=False)
+        except (json.JSONDecodeError, TypeError):
+            try:
+                fixed = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', stripped)
+                payload = json.loads(fixed, strict=False)
+            except Exception:
+                raise _GateFailure("provider response is not a JSON files object")
+        if not isinstance(payload, dict) or "files" not in payload:
             raise _GateFailure("provider response is not a JSON files object")
+        files = payload["files"]
         if not isinstance(files, dict) or not files:
             raise _GateFailure("provider files object is empty")
         allowed = set(task.implementation_files)
-        if not set(files).issubset(allowed):
+        normalized_files: dict[str, Any] = {}
+        basename_map = {Path(p).name: p for p in task.implementation_files}
+        for path_key, content in files.items():
+            if path_key in allowed:
+                normalized_files[path_key] = content
+            elif path_key in basename_map and len(task.implementation_files) == 1:
+                normalized_files[basename_map[path_key]] = content
+            else:
+                normalized_files[path_key] = content
+        if not set(normalized_files).issubset(allowed):
             raise _GateFailure("provider changed a file outside the implementation contract")
         workspace_root = workspace.resolve()
-        for relative, content in files.items():
+        for relative, content in normalized_files.items():
             if not isinstance(relative, str) or not isinstance(content, str):
                 raise _GateFailure("provider file paths and contents must be strings")
             target = (workspace_root / relative).resolve()
@@ -879,6 +897,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
+    parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
     return parser
@@ -890,6 +909,8 @@ def main(argv: list[str] | None = None) -> int:
         task_payload = json.loads(args.tasks.read_text())
         raw_tasks = task_payload.get("tasks") if isinstance(task_payload, Mapping) else task_payload
         tasks = _load_tasks(raw_tasks or [])
+        if args.limit is not None and args.limit > 0:
+            tasks = tasks[: args.limit]
         if args.mock or args.mock_response:
             if args.mock_response:
                 responses = [path.read_text() for path in args.mock_response]
@@ -1058,11 +1079,15 @@ def _restore_files(workspace: Path, original: Mapping[str, str | None]) -> None:
 
 def _strip_json_fence(response: str) -> str:
     text = response.strip()
-    if text.startswith("```") and text.endswith("```"):
-        lines = text.splitlines()
-        if len(lines) >= 3:
-            return "\n".join(lines[1:-1]).strip()
-    return text
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    candidate = fence_match.group(1).strip() if fence_match else text
+    if not candidate.startswith("{"):
+        start = candidate.find("{")
+        end = candidate.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = candidate[start : end + 1]
+    candidate = re.sub(r':\s*"""([\s\S]*?)"""', lambda m: ": " + json.dumps(m.group(1)), candidate)
+    return candidate
 
 
 def _call_with_optional_seed(method: Callable[..., Any], messages: list[Mapping[str, str]], seed: int) -> Any:

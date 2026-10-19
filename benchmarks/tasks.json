@@ -13,153 +13,35 @@
       "title": "Count vowels",
       "description": "Implement count_vowels(text). Return how many ASCII vowels (a, e, i, o, u) occur, ignoring case.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_001/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["count_vowels"],
-      "invariants": ["Do not count y or punctuation."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_001"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_001"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_001"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_011",
-      "title": "Top-k frequent values",
-      "description": "Implement top_k_frequent(values, k). Return up to k distinct values ordered by decreasing count, then first appearance.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_011/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["top_k_frequent"],
-      "invariants": ["Return an empty list when k is not positive."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_011"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_011"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_011"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_012",
-      "title": "Balanced brackets",
-      "description": "Implement balanced_brackets(text). Validate (), [] and {} nesting while ignoring all other characters.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_012/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["balanced_brackets"],
-      "invariants": ["A closing bracket must match the most recent unmatched opening bracket."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_012"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_012"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_012"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_013",
-      "title": "Camel case to snake case",
-      "description": "Implement camel_to_snake(name). Convert camelCase, PascalCase and acronym runs to lowercase snake_case.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_013/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["camel_to_snake"],
-      "invariants": ["Existing underscores are preserved as separators without duplicate underscores."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_013"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_013"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_013"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_014",
-      "title": "Parse a query string",
-      "description": "Implement parse_query(query). Decode an ampersand-separated query into a dict mapping each key to a list of values.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_014/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["parse_query"],
-      "invariants": ["Percent escapes are decoded and a key without a value maps to an empty string."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_014"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_014"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_014"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_015",
-      "title": "Roman numeral parsing",
-      "description": "Implement roman_to_int(numeral). Parse canonical Roman numerals in the range 1 through 3999.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_015/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["roman_to_int"],
-      "invariants": ["Raise ValueError for empty, non-canonical or out-of-range numerals."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_015"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_015"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_015"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_016",
-      "title": "Integer to Roman numeral",
-      "description": "Implement int_to_roman(value). Convert an integer from 1 through 3999 to its canonical Roman numeral.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_016/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["int_to_roman"],
-      "invariants": ["Raise ValueError outside the inclusive range 1..3999."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_016"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_016"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_016"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_017",
-      "title": "GCD of many values",
-      "description": "Implement gcd_many(values). Return the non-negative greatest common divisor of a non-empty integer list.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_017/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["gcd_many"],
-      "invariants": ["Zeros and negative inputs are accepted; raise ValueError for an empty list."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_017"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_017"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_017"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_018",
-      "title": "LCM of many values",
-      "description": "Implement lcm_many(values). Return the non-negative least common multiple of a non-empty integer list.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_018/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["lcm_many"],
-      "invariants": ["A zero input makes the result zero; use absolute values and raise ValueError for empty input."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_018"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_018"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_018"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_019",
-      "title": "Primality test",
-      "description": "Implement is_prime(value). Return whether a non-negative integer is prime.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_019/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["is_prime"],
-      "invariants": ["Values below 2 are not prime and the function must return a bool."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_019"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_019"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_019"],
-      "max_retries": 2
-    },
-    {
-      "task_id": "task_020",
-      "title": "Fibonacci number",
-      "description": "Implement fibonacci(index). Return the zero-indexed Fibonacci number for a non-negative index.",
-      "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_020/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["fibonacci"],
-      "invariants": ["Fibonacci(0)=0 and Fibonacci(1)=1; raise ValueError for negative indices."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_020"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_020"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_020"],
+      "implementation_files": [
+        "benchmarks/tasks/task_001/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "count_vowels"
+      ],
+      "invariants": [
+        "Do not count y or punctuation."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_001"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_001"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_001"
+      ],
       "max_retries": 2
     },
     {
@@ -167,13 +49,35 @@
       "title": "Normalized palindrome",
       "description": "Implement is_palindrome(text). Compare case-insensitively after removing every non-alphanumeric character.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_002/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["is_palindrome"],
-      "invariants": ["An empty normalized string is a palindrome."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_002"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_002"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_002"],
+      "implementation_files": [
+        "benchmarks/tasks/task_002/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "is_palindrome"
+      ],
+      "invariants": [
+        "An empty normalized string is a palindrome."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_002"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_002"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_002"
+      ],
       "max_retries": 2
     },
     {
@@ -181,13 +85,35 @@
       "title": "Reverse words",
       "description": "Implement reverse_words(text). Return whitespace-separated words in reverse order with exactly one space between words.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_003/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["reverse_words"],
-      "invariants": ["Leading, trailing and repeated whitespace is discarded."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_003"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_003"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_003"],
+      "implementation_files": [
+        "benchmarks/tasks/task_003/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "reverse_words"
+      ],
+      "invariants": [
+        "Leading, trailing and repeated whitespace is discarded."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_003"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_003"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_003"
+      ],
       "max_retries": 2
     },
     {
@@ -195,13 +121,35 @@
       "title": "Run-length encoding",
       "description": "Implement run_length_encode(text). Encode each consecutive run as its character followed by its decimal count.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_004/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["run_length_encode"],
-      "invariants": ["Return an empty string for empty input and do not escape digits."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_004"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_004"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_004"],
+      "implementation_files": [
+        "benchmarks/tasks/task_004/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "run_length_encode"
+      ],
+      "invariants": [
+        "Return an empty string for empty input and do not escape digits."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_004"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_004"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_004"
+      ],
       "max_retries": 2
     },
     {
@@ -209,13 +157,35 @@
       "title": "Chunk a list",
       "description": "Implement chunk(items, size). Return a new list containing consecutive lists of at most size items.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_005/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["chunk"],
-      "invariants": ["Raise ValueError when size is not positive."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_005"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_005"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_005"],
+      "implementation_files": [
+        "benchmarks/tasks/task_005/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "chunk"
+      ],
+      "invariants": [
+        "Raise ValueError when size is not positive."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_005"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_005"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_005"
+      ],
       "max_retries": 2
     },
     {
@@ -223,13 +193,35 @@
       "title": "Merge sorted lists",
       "description": "Implement merge_sorted(left, right). Merge two ascending lists into a new ascending list without dropping duplicates.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_006/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["merge_sorted"],
-      "invariants": ["Inputs are already sorted and may contain equal or negative values."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_006"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_006"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_006"],
+      "implementation_files": [
+        "benchmarks/tasks/task_006/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "merge_sorted"
+      ],
+      "invariants": [
+        "Inputs are already sorted and may contain equal or negative values."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_006"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_006"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_006"
+      ],
       "max_retries": 2
     },
     {
@@ -237,13 +229,35 @@
       "title": "Rotate a list",
       "description": "Implement rotate(values, steps). Return a new list rotated right by steps; normalize steps by the list length.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_007/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["rotate"],
-      "invariants": ["Empty input returns an empty list and negative steps are valid modulo rotation."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_007"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_007"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_007"],
+      "implementation_files": [
+        "benchmarks/tasks/task_007/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "rotate"
+      ],
+      "invariants": [
+        "Empty input returns an empty list and negative steps are valid modulo rotation."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_007"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_007"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_007"
+      ],
       "max_retries": 2
     },
     {
@@ -251,13 +265,35 @@
       "title": "Stable deduplication",
       "description": "Implement unique_preserve(values). Return first occurrences in input order for hashable values.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_008/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["unique_preserve"],
-      "invariants": ["Do not sort the result or mutate the input list."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_008"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_008"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_008"],
+      "implementation_files": [
+        "benchmarks/tasks/task_008/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "unique_preserve"
+      ],
+      "invariants": [
+        "Do not sort the result or mutate the input list."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_008"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_008"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_008"
+      ],
       "max_retries": 2
     },
     {
@@ -265,13 +301,35 @@
       "title": "Flatten one level",
       "description": "Implement flatten_once(groups). Concatenate one level of the supplied iterables into a new list.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_009/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["flatten_once"],
-      "invariants": ["Strings are iterables at this level and should be flattened character by character."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_009"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_009"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_009"],
+      "implementation_files": [
+        "benchmarks/tasks/task_009/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "flatten_once"
+      ],
+      "invariants": [
+        "Strings are iterables at this level and should be flattened character by character."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_009"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_009"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_009"
+      ],
       "max_retries": 2
     },
     {
@@ -279,13 +337,395 @@
       "title": "Group anagrams",
       "description": "Implement group_anagrams(words). Group words by the sorted lowercase letters signature, preserving word order in each group.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_010/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["group_anagrams"],
-      "invariants": ["Return a dictionary keyed by signature and keep insertion order of keys."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_010"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_010"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_010"],
+      "implementation_files": [
+        "benchmarks/tasks/task_010/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "group_anagrams"
+      ],
+      "invariants": [
+        "Return a dictionary keyed by signature and keep insertion order of keys."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_010"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_010"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_010"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_011",
+      "title": "Top-k frequent values",
+      "description": "Implement top_k_frequent(values, k). Return up to k distinct values ordered by decreasing count, then first appearance.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_011/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "top_k_frequent"
+      ],
+      "invariants": [
+        "Return an empty list when k is not positive."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_011"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_011"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_011"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_012",
+      "title": "Balanced brackets",
+      "description": "Implement balanced_brackets(text). Validate (), [] and {} nesting while ignoring all other characters.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_012/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "balanced_brackets"
+      ],
+      "invariants": [
+        "A closing bracket must match the most recent unmatched opening bracket."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_012"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_012"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_012"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_013",
+      "title": "Camel case to snake case",
+      "description": "Implement camel_to_snake(name). Convert camelCase, PascalCase and acronym runs to lowercase snake_case.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_013/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "camel_to_snake"
+      ],
+      "invariants": [
+        "Existing underscores are preserved as separators without duplicate underscores."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_013"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_013"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_013"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_014",
+      "title": "Parse a query string",
+      "description": "Implement parse_query(query). Decode an ampersand-separated query into a dict mapping each key to a list of values.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_014/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_query"
+      ],
+      "invariants": [
+        "Percent escapes are decoded and a key without a value maps to an empty string."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_014"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_014"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_014"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_015",
+      "title": "Roman numeral parsing",
+      "description": "Implement roman_to_int(numeral). Parse canonical Roman numerals in the range 1 through 3999.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_015/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "roman_to_int"
+      ],
+      "invariants": [
+        "Raise ValueError for empty, non-canonical or out-of-range numerals."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_015"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_015"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_015"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_016",
+      "title": "Integer to Roman numeral",
+      "description": "Implement int_to_roman(value). Convert an integer from 1 through 3999 to its canonical Roman numeral.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_016/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "int_to_roman"
+      ],
+      "invariants": [
+        "Raise ValueError outside the inclusive range 1..3999."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_016"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_016"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_016"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_017",
+      "title": "GCD of many values",
+      "description": "Implement gcd_many(values). Return the non-negative greatest common divisor of a non-empty integer list.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_017/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "gcd_many"
+      ],
+      "invariants": [
+        "Zeros and negative inputs are accepted; raise ValueError for an empty list."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_017"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_017"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_017"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_018",
+      "title": "LCM of many values",
+      "description": "Implement lcm_many(values). Return the non-negative least common multiple of a non-empty integer list.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_018/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "lcm_many"
+      ],
+      "invariants": [
+        "A zero input makes the result zero; use absolute values and raise ValueError for empty input."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_018"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_018"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_018"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_019",
+      "title": "Primality test",
+      "description": "Implement is_prime(value). Return whether a non-negative integer is prime.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_019/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "is_prime"
+      ],
+      "invariants": [
+        "Values below 2 are not prime and the function must return a bool."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_019"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_019"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_019"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_020",
+      "title": "Fibonacci number",
+      "description": "Implement fibonacci(index). Return the zero-indexed Fibonacci number for a non-negative index.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_020/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "fibonacci"
+      ],
+      "invariants": [
+        "Fibonacci(0)=0 and Fibonacci(1)=1; raise ValueError for negative indices."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_020"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_020"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_020"
+      ],
       "max_retries": 2
     },
     {
@@ -293,13 +733,35 @@
       "title": "First binary-search match",
       "description": "Implement binary_search(values, target). Search a sorted list and return the first index containing target, or -1.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_021/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["binary_search"],
-      "invariants": ["Duplicate targets require the lowest matching index."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_021"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_021"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_021"],
+      "implementation_files": [
+        "benchmarks/tasks/task_021/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "binary_search"
+      ],
+      "invariants": [
+        "Duplicate targets require the lowest matching index."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_021"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_021"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_021"
+      ],
       "max_retries": 2
     },
     {
@@ -307,13 +769,35 @@
       "title": "Longest common prefix",
       "description": "Implement longest_common_prefix(words). Return the longest string prefix shared by every word.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_022/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["longest_common_prefix"],
-      "invariants": ["Return an empty string for an empty input or no shared characters."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_022"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_022"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_022"],
+      "implementation_files": [
+        "benchmarks/tasks/task_022/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "longest_common_prefix"
+      ],
+      "invariants": [
+        "Return an empty string for an empty input or no shared characters."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_022"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_022"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_022"
+      ],
       "max_retries": 2
     },
     {
@@ -321,13 +805,35 @@
       "title": "Levenshtein distance",
       "description": "Implement levenshtein_distance(left, right). Return the minimum insertions, deletions and substitutions needed to transform left into right.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_023/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["levenshtein_distance"],
-      "invariants": ["The distance is zero only for equal strings and must be an integer."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_023"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_023"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_023"],
+      "implementation_files": [
+        "benchmarks/tasks/task_023/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "levenshtein_distance"
+      ],
+      "invariants": [
+        "The distance is zero only for equal strings and must be an integer."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_023"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_023"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_023"
+      ],
       "max_retries": 2
     },
     {
@@ -335,13 +841,35 @@
       "title": "Transpose a matrix",
       "description": "Implement transpose(matrix). Return the transpose of a rectangular matrix, preserving row and column order.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_024/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["transpose"],
-      "invariants": ["Return [] for an empty matrix and raise ValueError for a ragged matrix."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_024"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_024"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_024"],
+      "implementation_files": [
+        "benchmarks/tasks/task_024/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "transpose"
+      ],
+      "invariants": [
+        "Return [] for an empty matrix and raise ValueError for a ragged matrix."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_024"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_024"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_024"
+      ],
       "max_retries": 2
     },
     {
@@ -349,13 +877,35 @@
       "title": "Spiral matrix traversal",
       "description": "Implement spiral_order(matrix). Return all values of a rectangular matrix in clockwise spiral order.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_025/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["spiral_order"],
-      "invariants": ["Handle empty, one-row and one-column matrices without duplicating values."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_025"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_025"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_025"],
+      "implementation_files": [
+        "benchmarks/tasks/task_025/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "spiral_order"
+      ],
+      "invariants": [
+        "Handle empty, one-row and one-column matrices without duplicating values."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_025"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_025"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_025"
+      ],
       "max_retries": 2
     },
     {
@@ -363,13 +913,35 @@
       "title": "Matrix multiplication",
       "description": "Implement matrix_multiply(left, right). Multiply two rectangular matrices when left columns equal right rows.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_026/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["matrix_multiply"],
-      "invariants": ["Raise ValueError for incompatible or ragged matrices and return a new matrix."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_026"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_026"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_026"],
+      "implementation_files": [
+        "benchmarks/tasks/task_026/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "matrix_multiply"
+      ],
+      "invariants": [
+        "Raise ValueError for incompatible or ragged matrices and return a new matrix."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_026"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_026"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_026"
+      ],
       "max_retries": 2
     },
     {
@@ -377,13 +949,35 @@
       "title": "Merge intervals",
       "description": "Implement merge_intervals(intervals). Sort intervals by start and merge overlapping or touching closed intervals.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_027/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["merge_intervals"],
-      "invariants": ["Do not mutate the input and preserve singleton intervals."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_027"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_027"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_027"],
+      "implementation_files": [
+        "benchmarks/tasks/task_027/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "merge_intervals"
+      ],
+      "invariants": [
+        "Do not mutate the input and preserve singleton intervals."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_027"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_027"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_027"
+      ],
       "max_retries": 2
     },
     {
@@ -391,13 +985,35 @@
       "title": "Evaluate reverse Polish notation",
       "description": "Implement evaluate_rpn(tokens). Evaluate integer operands with +, -, *, and / operators.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_028/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["evaluate_rpn"],
-      "invariants": ["Division truncates toward zero; raise ValueError for malformed expressions."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_028"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_028"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_028"],
+      "implementation_files": [
+        "benchmarks/tasks/task_028/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "evaluate_rpn"
+      ],
+      "invariants": [
+        "Division truncates toward zero; raise ValueError for malformed expressions."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_028"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_028"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_028"
+      ],
       "max_retries": 2
     },
     {
@@ -405,13 +1021,35 @@
       "title": "Format a duration",
       "description": "Implement format_duration(seconds). Format non-negative seconds as space-separated non-zero d, h, m and s units.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_029/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["format_duration"],
-      "invariants": ["Use 0s for zero and raise ValueError for negative input."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_029"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_029"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_029"],
+      "implementation_files": [
+        "benchmarks/tasks/task_029/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "format_duration"
+      ],
+      "invariants": [
+        "Use 0s for zero and raise ValueError for negative input."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_029"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_029"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_029"
+      ],
       "max_retries": 2
     },
     {
@@ -419,13 +1057,35 @@
       "title": "Stable record sorting",
       "description": "Implement stable_sort_records(records, key). Return a new stable-sorted list using the named dictionary field.",
       "source": "CD-AVC-original-v1",
-      "implementation_files": ["benchmarks/tasks/task_030/solution.py"],
-      "test_files": ["benchmarks/public_tests.py", "benchmarks/hidden_tests.py", "benchmarks/regression_tests.py"],
-      "symbols": ["stable_sort_records"],
-      "invariants": ["Equal keys retain input order and the input list is not mutated."],
-      "test_command": ["python", "benchmarks/public_tests.py", "task_030"],
-      "hidden_test_command": ["python", "benchmarks/hidden_tests.py", "task_030"],
-      "regression_command": ["python", "benchmarks/regression_tests.py", "task_030"],
+      "implementation_files": [
+        "benchmarks/tasks/task_030/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "stable_sort_records"
+      ],
+      "invariants": [
+        "Equal keys retain input order and the input list is not mutated."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_030"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_030"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_030"
+      ],
       "max_retries": 2
     }
   ]
