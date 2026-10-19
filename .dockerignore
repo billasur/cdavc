@@ -15,3 +15,7 @@ execution_report.md
 build
 dist
 *.egg-info
+.ogcode
+.freebuff
+.vercel
+node_modules
