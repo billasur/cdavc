@@ -2,15 +2,84 @@
 
 **Recorded:** 2026-10-19
 
-**Repository:** `/Users/billasur/Projects/cdavc`
+**Repository:** `.` (repository root; all paths below are relative)
 
 **Branch:** `main`
 
-**Showcase base revision:** `6349b7a build: vendor showcase browser libraries`
+**Verification base revision:** `5a37ddd docs: document benchmark reproduction and runner usage`
 
-**Handoff commit:** `3afd1f4 docs: add showcase handoff`
+**Showcase implementation commit:** `399be78 feat(showcase): rebuild task-patch scroll story`
 
-**Git state when recorded:** `main...origin/main [ahead 6]`; showcase work was still uncommitted.
+**Original handoff commit:** `3afd1f4 docs: add showcase handoff`
+
+## Latest verification receipt — 2026-10-19
+
+**Status: local automated checks passed; clean-Linux and interactive visual
+verification remain incomplete.** This is a local evidence record, not an
+OmniRush.ai verification decision, submission or deployment receipt.
+
+This pass inspected the working tree rather than relying on earlier chat
+summaries. The showcase rebuild (`399be78`), benchmark harness (`23ab2c2`) and
+benchmark documentation (`5a37ddd`) are already committed. Do not repeat those
+commits or describe them as pending.
+
+At the start of verification, `main` was ahead of `origin/main` by 10 commits.
+There were three modified implementation files: `showcase/index.html`,
+`showcase/story.css` and `showcase/story.js`. Local untracked tool artifacts were
+`.freebuff/`, `showcase/.ogcode/` and `showcase/ogcode.json`.
+This verification pass changes only this handoff; it leaves those existing
+implementation edits and artifacts untouched and unstaged.
+
+### Checks actually run in this pass
+
+| Check | Working folder / command | Result |
+| --- | --- | --- |
+| Offline Python test suite | `.` — `make test` | **Passed: 61 tests**, 1.872 seconds, no skips reported |
+| JavaScript syntax | `showcase/` — `node --check story.js` | **Passed**; syntax only, not browser execution |
+| Vendor integrity | `showcase/` — `npm run verify-vendor --offline` | **Passed: 8 checked-in files verified** |
+| Whitespace validation | `.` — `git diff --check` | **Passed** |
+| Local HTTP smoke | Temporary Python standard-library HTTP server bound to loopback; parsed `/` and requested its local scripts/styles plus both Three.js modules | **Passed**: seven ordered story stages, repo CTA, simulation disclosure, and seven non-empty assets returned HTTP 200 |
+| Clean-Linux build and offline container tests | `.` — `make docker-test` | **Blocked before build**: Docker daemon socket unavailable; no image build or container tests completed |
+| Browser interaction / 360px touch / reduced-motion | Not run in this pass | **Pending** for the current uncommitted iteration |
+| Lint / typecheck | No separate showcase commands defined in `showcase/package.json` | **Not run**; syntax and integrity checks are not substitutes |
+| Deployment | Not requested or attempted in this pass | **Not deployed by this pass** |
+
+Observed tool versions: Python `3.11.16`, Node `26.11.1`, npm `11.20.0`.
+The project Python pin remains `3.11.11`; this host run does not prove the
+pinned Docker environment. No dependency installation or runtime change was
+performed.
+
+### Exact implementation snapshot checked
+
+These are Git blob object IDs from `git hash-object`, not commit IDs. They were
+unchanged between the initial checks and the HTTP smoke pass.
+
+| File | Git blob ID |
+| --- | --- |
+| `showcase/index.html` | `59a353cf45256e78598e698a34354c48be133e8f` |
+| `showcase/story.css` | `7ec7b198db6613219703503f54c1587881d77124` |
+| `showcase/story.js` | `a27199da84e4c39277d977d998d5c7378c5a40c7` |
+
+### Next verifier actions
+
+1. Start a Docker daemon, then run `make docker-test` from the repository root.
+   A pass must include the container test run with `--network none`, not just
+   an image build. No clean-Linux result is claimed yet.
+2. Serve the current site with
+   `python3 -m http.server 4173 --directory showcase`. In a browser, verify all
+   seven stages from top to bottom and back, then repeat at 360px and with
+   reduced motion. The HTTP smoke does not execute WebGL, GSAP or Lenis.
+3. Review and explicitly select the three existing showcase implementation
+   edits before any implementation commit. Exclude the tool artifacts.
+4. Rerun the commands above after any implementation change. Deployment and
+   any external verification submission require their own successful receipts.
+
+## Historical implementation notes
+
+The remaining sections preserve the original handoff from the first showcase
+pass. Their working-tree lists, check counts, QA hooks and blockers describe
+that earlier state, not the current iteration. The receipt above takes
+precedence wherever they differ.
 
 ## Goal
 
@@ -26,7 +95,7 @@ Rebuild the CD-AVC demo page as a calm, scroll-driven 3D story that is:
 - mobile-safe at 360px and accessible with `prefers-reduced-motion`;
 - honest about simulated/illustrative visuals and free of invented benchmark numbers.
 
-## Current state
+## Original implementation baseline
 
 ### Implemented
 
@@ -65,10 +134,11 @@ of timeline per story beat.
 
 ## Files
 
-### Showcase changes in the current working tree
+### Files in the original showcase change
 
-These are the files to preserve for the showcase handoff and eventually commit
-as one focused change:
+These files were included in the original showcase change, since committed as
+`399be78`. Only the three files listed in the latest receipt have newer
+uncommitted implementation edits:
 
 - `showcase/index.html` — new page shell, nav, seven story panels, fallback SVG,
   closing “Open repo” section, local script tags.
@@ -186,15 +256,16 @@ demo and sorenwest.com. No external site assets or CDN code were copied.
 
 ## Checks and evidence
 
-All results below were run from the current working tree on 2026-10-19.
+These are historical results from the earlier showcase pass on 2026-10-19,
+not new checks of the current iteration. Use the latest receipt above.
 
 ### Passed
 
-- `make test` from `/Users/billasur/Projects/cdavc`
+- `make test` from the repository root
   - **60 tests passed**.
-- `node --check story.js` from `/Users/billasur/Projects/cdavc/showcase`
+- `node --check story.js` from `showcase/`
   - passed.
-- `npm run verify-vendor --offline` from `/Users/billasur/Projects/cdavc/showcase`
+- `npm run verify-vendor --offline` from `showcase/`
   - passed; **8 checked-in vendor files verified**.
 - Local HTTP smoke from the repository root using
   `python3 -m http.server 4177 --directory showcase` plus `curl`:
@@ -235,7 +306,7 @@ files: `.freebuff/`, `showcase/.ogcode/`, `showcase/ogcode.json`,
 `showcase/_audit.html` and `showcase/_debug.html`. Preserve or remove them
 deliberately; do not accidentally include them in the showcase commit.
 
-## Known gaps and blockers
+## Original gaps and blockers (historical)
 
 - The current showcase changes are **uncommitted**.
 - No Vercel deployment has been performed in this session; Vercel CLI
@@ -250,7 +321,7 @@ deliberately; do not accidentally include them in the showcase commit.
 - The current browser evidence is headless snapshot evidence, not a signed-off
   interactive QA session.
 
-## Next action
+## Original next action (historical)
 
 Start with the showcase-only diff, leave the benchmark files untouched, and:
 
