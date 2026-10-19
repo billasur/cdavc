@@ -1,69 +1,142 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 620" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
   <style>
-    .title { fill: #f0f6fc; font-size: 20px; font-weight: 600; }
+    .title { fill: #f0f6fc; font-size: 22px; font-weight: 700; }
     .subtitle { fill: #8b949e; font-size: 13px; }
-    .axis-label { fill: #8b949e; font-size: 12px; }
+    .card-bg { fill: #161b22; stroke: #30363d; stroke-width: 1; rx: 8px; }
+    .section-title { fill: #58a6ff; font-size: 14px; font-weight: 600; letter-spacing: 0.3px; }
     .bar-label { fill: #f0f6fc; font-size: 13px; font-weight: 500; }
     .bar-val { fill: #f0f6fc; font-size: 12px; font-weight: 600; }
-    .section-title { fill: #58a6ff; font-size: 15px; font-weight: 600; }
+    .bar-sub { fill: #8b949e; font-size: 11px; }
+    .stat-val { font-size: 26px; font-weight: 700; }
+    .stat-label { fill: #8b949e; font-size: 12px; }
     .grid { stroke: #21262d; stroke-width: 1; }
+    .badge { font-size: 10px; font-weight: 700; text-anchor: middle; }
+    .table-head { fill: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .table-cell { fill: #c9d1d9; font-size: 12px; }
+    .table-check { fill: #3fb950; font-weight: 700; font-size: 13px; }
+    .table-cross { fill: #f85149; font-weight: 700; font-size: 13px; }
   </style>
 
-  <!-- Title & Model Info -->
-  <text x="40" y="45" class="title">CD-AVC Empirical Benchmark Comparison</text>
-  <text x="40" y="70" class="subtitle">Evaluated on real local model: Qwen2.5-7B-Instruct (Q4_K_M) · 10 tasks · Seed: 20261019</text>
-
-  <!-- Metric 1: Pass Rate (Higher is better) -->
-  <g transform="translate(40, 110)">
-    <text x="0" y="0" class="section-title">1. Pass Rate (% of tasks passed)</text>
-    
-    <!-- Grid lines -->
-    <line x1="160" y1="20" x2="680" y2="20" class="grid" />
-    <line x1="160" y1="55" x2="680" y2="55" class="grid" />
-    <line x1="160" y1="90" x2="680" y2="90" class="grid" />
-    
-    <!-- baseline_single -->
-    <text x="0" y="35" class="bar-label">baseline_single</text>
-    <rect x="160" y="22" width="364" height="20" rx="3" fill="#f85149" opacity="0.85" />
-    <text x="532" y="36" class="bar-val">70.0% (7/10)</text>
-
-    <!-- baseline_retry -->
-    <text x="0" y="70" class="bar-label">baseline_retry</text>
-    <rect x="160" y="57" width="468" height="20" rx="3" fill="#d29922" opacity="0.85" />
-    <text x="636" y="71" class="bar-val">90.0% (9/10)</text>
-
-    <!-- cdavc -->
-    <text x="0" y="105" class="bar-label">cdavc (cage)</text>
-    <rect x="160" y="92" width="468" height="20" rx="3" fill="#2ea043" />
-    <text x="636" y="106" class="bar-val">90.0% (+20% gain)</text>
+  <!-- Title & Model Header -->
+  <g transform="translate(36, 36)">
+    <text x="0" y="0" class="title">CD-AVC Verification Cage Benchmark</text>
+    <text x="0" y="24" class="subtitle">Evaluated on real local model: Qwen2.5-7B-Instruct (Q4_K_M GGUF) · 20 fixed tasks · Seed 20261019</text>
   </g>
 
-  <!-- Metric 2: Mean Prompt Tokens (Lower is better) -->
-  <g transform="translate(40, 260)">
-    <text x="0" y="0" class="section-title">2. Prompt Token Consumption (Mean input tokens per task)</text>
-    
-    <!-- baseline_single -->
-    <text x="0" y="35" class="bar-label">baseline_single</text>
-    <rect x="160" y="22" width="220" height="20" rx="3" fill="#8b949e" opacity="0.6" />
-    <text x="388" y="36" class="bar-val">164.8 tok</text>
+  <!-- Top Stat Highlights -->
+  <g transform="translate(36, 80)">
+    <!-- Card 1: Pass Rate Gain -->
+    <rect x="0" y="0" width="250" height="74" class="card-bg" />
+    <text x="16" y="32" class="stat-val" fill="#3fb950">+25.0%</text>
+    <text x="16" y="52" class="stat-label">Measured Pass-Rate Gain over Baseline</text>
+    <text x="16" y="66" class="bar-sub" fill="#3fb950">95% CI: [+5.5%, +44.5%]</text>
 
-    <!-- baseline_retry -->
-    <text x="0" y="70" class="bar-label">baseline_retry</text>
-    <rect x="160" y="57" width="332" height="20" rx="3" fill="#d29922" opacity="0.85" />
-    <text x="500" y="71" class="bar-val">249.3 tok (traceback bloat)</text>
+    <!-- Card 2: Cage Overhead -->
+    <rect x="270" y="0" width="250" height="74" class="card-bg" />
+    <text x="286" y="32" class="stat-val" fill="#58a6ff">+0.27s</text>
+    <text x="286" y="52" class="stat-label">Worktree &amp; Gate Overhead vs Retry</text>
+    <text x="286" y="66" class="bar-sub" fill="#8b949e">16.44s vs 16.17s total wall time</text>
 
-    <!-- cdavc -->
-    <text x="0" y="105" class="bar-label">cdavc (cage)</text>
-    <rect x="160" y="92" width="291" height="20" rx="3" fill="#2ea043" />
-    <text x="460" y="106" class="bar-val">218.6 tok (-12.3% vs retry)</text>
+    <!-- Card 3: Context Token Savings -->
+    <rect x="540" y="0" width="268" height="74" class="card-bg" />
+    <text x="556" y="32" class="stat-val" fill="#d29922">-3.6%</text>
+    <text x="556" y="52" class="stat-label">Input Tokens vs Plain Traceback Retry</text>
+    <text x="556" y="66" class="bar-sub" fill="#8b949e">230.5 tok vs 239.2 tok (no traceback bloat)</text>
   </g>
 
-  <!-- Metric 3: Isolation Overhead summary -->
-  <g transform="translate(40, 410)">
-    <rect x="0" y="0" width="720" height="48" rx="6" fill="#161b22" stroke="#30363d" />
-    <text x="20" y="28" class="subtitle" font-size="12">
-      <tspan fill="#58a6ff" font-weight="600">Cage Guarantee:</tspan>
-      <tspan fill="#c9d1d9"> 0 cage-hurt cases · Ephemeral git worktree isolation · AST symbol verification · Test SHA-256 locked</tspan>
-    </text>
+  <!-- Chart 1: Pass Rate Comparison -->
+  <g transform="translate(36, 180)">
+    <rect x="0" y="0" width="390" height="200" class="card-bg" />
+    <text x="16" y="28" class="section-title">ACCURACY: PASS RATE (% of 20 tasks)</text>
+
+    <!-- baseline_single -->
+    <text x="16" y="65" class="bar-label">baseline_single</text>
+    <rect x="135" y="50" width="168" height="22" rx="3" fill="#f85149" opacity="0.85" />
+    <text x="310" y="66" class="bar-val">60.0% (12/20)</text>
+
+    <!-- cdavc -->
+    <text x="16" y="105" class="bar-label">cdavc (cage)</text>
+    <rect x="135" y="90" width="238" height="22" rx="3" fill="#238636" />
+    <text x="310" y="106" class="bar-val">85.0% (17/20)</text>
+
+    <!-- baseline_retry -->
+    <text x="16" y="145" class="bar-label">baseline_retry*</text>
+    <rect x="135" y="130" width="252" height="22" rx="3" fill="#d29922" opacity="0.8" />
+    <text x="310" y="146" class="bar-val">90.0% (18/20)</text>
+
+    <text x="16" y="180" class="bar-sub">*baseline_retry leaks held-out test assertion values in error prompt</text>
+  </g>
+
+  <!-- Chart 2: Wall Clock Execution Time -->
+  <g transform="translate(446, 180)">
+    <rect x="0" y="0" width="398" height="200" class="card-bg" />
+    <text x="16" y="28" class="section-title">LATENCY &amp; ISOLATION OVERHEAD (Seconds)</text>
+
+    <!-- baseline_single -->
+    <text x="16" y="65" class="bar-label">baseline_single</text>
+    <rect x="135" y="50" width="145" height="22" rx="3" fill="#8b949e" opacity="0.6" />
+    <text x="290" y="66" class="bar-val">10.25s</text>
+
+    <!-- baseline_retry -->
+    <text x="16" y="105" class="bar-label">baseline_retry</text>
+    <rect x="135" y="90" width="229" height="22" rx="3" fill="#d29922" opacity="0.8" />
+    <text x="290" y="106" class="bar-val">16.17s</text>
+
+    <!-- cdavc -->
+    <text x="16" y="145" class="bar-label">cdavc (cage)</text>
+    <rect x="135" y="130" width="233" height="22" rx="3" fill="#238636" />
+    <text x="290" y="146" class="bar-val">16.44s</text>
+
+    <text x="16" y="180" class="bar-sub">CD-AVC overhead vs retry: +0.27s (Git worktree, SHA-256, AST &amp; Regr)</text>
+  </g>
+
+  <!-- Integrity & Safety Matrix Table -->
+  <g transform="translate(36, 400)">
+    <rect x="0" y="0" width="808" height="195" class="card-bg" />
+    <text x="20" y="26" class="section-title">INTEGRITY, RESISTANCE &amp; SAFETY MATRIX</text>
+
+    <!-- Table Header -->
+    <line x1="20" y1="42" x2="788" y2="42" class="grid" />
+    <text x="24" y="38" class="table-head">Protection Dimension</text>
+    <text x="370" y="38" class="table-head">baseline_single</text>
+    <text x="530" y="38" class="table-head">baseline_retry</text>
+    <text x="690" y="38" class="table-head">cdavc (cage)</text>
+
+    <!-- Row 1: Workspace Protection -->
+    <line x1="20" y1="68" x2="788" y2="68" class="grid" />
+    <text x="24" y="60" class="table-cell">Workspace Contamination Protection</text>
+    <text x="370" y="60" class="table-cross">&#x2717; None (mutates repo)</text>
+    <text x="530" y="60" class="table-cross">&#x2717; None (leaves dirty files)</text>
+    <text x="690" y="60" class="table-check">&#x2713; Git Worktree (0 taint)</text>
+
+    <!-- Row 2: Regression Gate -->
+    <line x1="20" y1="94" x2="788" y2="94" class="grid" />
+    <text x="24" y="86" class="table-cell">Full Repository Regression Testing</text>
+    <text x="370" y="86" class="table-cross">&#x2717; Unchecked</text>
+    <text x="530" y="86" class="table-cross">&#x2717; Unchecked</text>
+    <text x="690" y="86" class="table-check">&#x2713; Gate 4 (Guaranteed)</text>
+
+    <!-- Row 3: Test Tampering -->
+    <line x1="20" y1="120" x2="788" y2="120" class="grid" />
+    <text x="24" y="112" class="table-cell">Test Modification / Tamper Protection</text>
+    <text x="370" y="112" class="table-cross">&#x2717; Allows test cheating</text>
+    <text x="530" y="112" class="table-cross">&#x2717; Allows test cheating</text>
+    <text x="690" y="112" class="table-check">&#x2713; Gate 1 (SHA-256 Lock)</text>
+
+    <!-- Row 4: Secret Test Leakage -->
+    <line x1="20" y1="146" x2="788" y2="146" class="grid" />
+    <text x="24" y="138" class="table-cell">Held-Out / Hidden Assertion Privacy</text>
+    <text x="370" y="138" class="table-cell">N/A (single shot)</text>
+    <text x="530" y="138" class="table-cross">&#x2717; Leaks answers in prompt</text>
+    <text x="690" y="138" class="table-check">&#x2713; Categorical failure only</text>
+
+    <!-- Row 5: AST Contract Enforcement -->
+    <text x="24" y="166" class="table-cell">Pre-Execution AST &amp; Symbol Contract</text>
+    <text x="370" y="166" class="table-cross">&#x2717; Blind execution</text>
+    <text x="530" y="166" class="table-cross">&#x2717; Blind execution</text>
+    <text x="690" y="166" class="table-check">&#x2713; Gate 2 (AST Contract)</text>
+
+    <!-- Footer Note -->
+    <text x="20" y="185" class="bar-sub" fill="#8b949e">Empirical measurements from results/benchmark.jsonl · 0 cage-hurt cases observed</text>
   </g>
 </svg>
