@@ -49,3 +49,12 @@ Measured, openai/gpt-oss-20b (reasoning_effort low), seed 1, first 8 dev tasks (
 | cdavc | 8/8 | 1.25 |
 Cost: 30 requests, about 42K tokens (13K in, 28K out by harness records, excluding reasoning overhead not reported) of the 200K daily budget. Records: results/groq/openai_gpt-oss-20b/1/.
 H-b observation (hypothesis, not tested): the prompt begins with "Benchmark arm: <arm>" and "Deterministic seed", which differ between arms, so the shared prefix is short; moving them after the contract would lengthen the stable prefix. Cached tokens do not count toward Groq limits (per docs), so layout could also affect budget. Untested.
+
+### Groq, 2 more models (same 8 dev tasks d01-d05,d801-d803, seed 1, same settings; NOT comparable to REPORT30 (Qwen2.5-7B local))
+| model | tasks | single | retry | cdavc | notes |
+|---|---|---|---|---|---|
+| openai/gpt-oss-20b | 8 | 5/8 | 7/8 | 8/8 | 30 requests, no 429 |
+| openai/gpt-oss-120b | 8 | 8/8 | 8/8 | 8/8 | 24 requests, no 429, all first attempt; ceiling, arms indistinguishable |
+| qwen/qwen3.8-27b (4-task PARTIAL, d01-d04, cut by user decision) | 4 | 4/4 | 4/4 | 4/4 | cdavc used 6 attempts vs 4: gates rejected some first attempts that baseline_single passed; not investigated. 14 successful requests, 31 429s |
+Rate limit finding: qwen/qwen3.8-27b has an enforced OTPM (output tokens per minute) limit of 1000 (429 body: "Request too large ... OTPM: Limit 1000"), not in the published table, so it runs ~1 request/minute and 429s often even with TPM headroom. gpt-oss-120b and 20b only hit the 8K TPM pacing without any 429.
+Operational note: background jobs in the agent sandbox only advance while the agent is actively running a command; do not rely on `nohup` plus waiting between turns. Poll with `sleep` inside a call.
