@@ -43,8 +43,14 @@ from .providers import (
 )
 
 
-ARMS = ("baseline_single", "baseline_retry", "cdavc")
-"""The stable order and names used in benchmark records."""
+ARMS = ("baseline_single", "baseline_retry_blind", "baseline_retry_oracle", "cdavc")
+"""The stable order and names used in benchmark records.
+
+``baseline_retry_blind`` repairs from public-test output only;
+``baseline_retry_oracle`` also receives hidden-test output.  Splitting them
+keeps the information asymmetry visible instead of folding it into one
+number.  The fair comparison is ``cdavc`` against the blind arm.
+"""
 
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
 BENCHMARK_VERSION = "2"
@@ -69,8 +75,13 @@ STATIC_REASKS = 1
 DIGEST_LIMIT = 5
 """Failing generated inputs carried into the next draw's repair prompt."""
 
-DEFAULT_SAMPLES = 4
-"""Independent draws for the CD-AVC arm when ``--samples`` is not given."""
+DEFAULT_SAMPLES = 3
+"""Default draw budget, shared by every arm that samples more than once.
+
+Equality is the point: a gain that only exists because the cage was allowed
+a fourth draw is not a gain.  ``baseline_single`` stays at one draw and is
+reported as the reference, never as the equal-budget competitor.
+"""
 
 BOUNDARY_PROBE = """\
 import importlib.util
@@ -425,7 +436,7 @@ class BenchmarkRunner:
                             )
                             public_gate_passes += 1
                         else:
-                            self._run_baseline_test(task, workspace)
+                            self._run_baseline_test(task, workspace, arm)
                         attempts.append(
                             _Attempt(True, prompt_tokens, completion_tokens, seed=seed, draw=draw)
                         )
@@ -562,7 +573,7 @@ class BenchmarkRunner:
             return int(self.samples)
         if arm == "baseline_single":
             return 1
-        if arm == "baseline_retry":
+        if arm in ("baseline_retry_blind", "baseline_retry_oracle"):
             return min(task.max_retries, self.retry_cap) + 1
         # The cage spends a fixed budget on independent draws rather than on
         # repairs, so its budget is independent of the task's retry allowance.
@@ -633,7 +644,7 @@ class BenchmarkRunner:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
         repair = ""
         if previous_failure:
-            if arm == "baseline_retry":
+            if arm in ("baseline_retry_blind", "baseline_retry_oracle"):
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
             elif arm == "cdavc":
                 repair = self._cage_repair(task, previous_failure)
@@ -736,10 +747,19 @@ class BenchmarkRunner:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
 
-    def _run_baseline_test(self, task: BenchmarkTask, workspace: Path) -> None:
-        command = task.hidden_test_command or task.test_command
-        label = "baseline hidden test" if task.hidden_test_command else "baseline evaluation test"
-        self._run_command(command, workspace, label, include_output=True)
+    def _run_baseline_test(self, task: BenchmarkTask, workspace: Path, arm: str) -> None:
+        """Score one baseline draw, keeping the blind arm truly blind.
+
+        Only ``baseline_retry_oracle`` is allowed to see hidden output.  The
+        blind arm is scored on the public command alone, so the comparison
+        against the cage shares both the information and the draw budget.
+        """
+
+        if arm == "baseline_retry_oracle" and task.hidden_test_command:
+            self._run_command(task.hidden_test_command, workspace, "baseline hidden test", include_output=True)
+            return
+        label = "baseline public test"
+        self._run_command(task.test_command, workspace, label, include_output=True)
 
     def _run_cage_gates(
         self,
@@ -1372,7 +1392,7 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
 
     rows = _read_records(Path(records)) if isinstance(records, (Path, str)) else list(records)
     summaries = {arm: _arm_summary(rows, arm) for arm in ARMS}
-    cage_difference = paired_pass_rate_difference(rows, "cdavc", "baseline_single")
+    cage_difference = paired_pass_rate_difference(rows, "cdavc", "baseline_retry_blind")
     lines = [
         "# CD-AVC benchmark report",
         "",
@@ -1392,7 +1412,7 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         )
 
     lines.extend(["", "## Paired pass-rate differences", "", "| Comparison | N | Difference | 95% CI |", "|---|---:|---:|---:|"])
-    for arm in ("baseline_retry", "cdavc"):
+    for arm in ("baseline_retry_blind", "baseline_retry_oracle", "cdavc"):
         difference = paired_pass_rate_difference(rows, arm, "baseline_single")
         lines.append(
             f"| `{arm}` − `baseline_single` | {difference['n']} | {_number(difference['difference'])} | "
@@ -1401,7 +1421,7 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
 
     lines.extend(["", "## Measured result", ""])
     if cage_difference["difference"] is None:
-        lines.append("Measured result: no paired `cdavc`/`baseline_single` records were available.")
+        lines.append("Measured result: no paired `cdavc`/`baseline_retry_blind` records were available.")
     else:
         difference = float(cage_difference["difference"])
         low = float(cage_difference["ci95_low"])
@@ -1421,7 +1441,7 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         )
 
     lines.extend(["", "## Measured overhead vs baseline_single", "", "| Arm | Paired N | Mean time overhead (s) | Mean time overhead (%) | Mean token overhead |", "|---|---:|---:|---:|---:|"])
-    for arm in ("baseline_retry", "cdavc"):
+    for arm in ("baseline_retry_blind", "baseline_retry_oracle", "cdavc"):
         overhead = _overhead(rows, arm, "baseline_single")
         lines.append(
             f"| `{arm}` | {overhead['n']} | {_number(overhead['time_seconds'])} | {_percent(overhead['time_ratio'])} | {_number(overhead['tokens'])} |"
