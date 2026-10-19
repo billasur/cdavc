@@ -17,7 +17,10 @@ for spec_path in sorted(root.glob("agent*/*/spec.json")):
         shutil.copy(d / "solution_stub.py", sol)
     rel = sol.as_posix()
     # agent1 tests resolve the argument relative to the task dir; the others relative to cwd.
-    arg = "solution.py" if d.parent.name == "agent1" else rel
+    # Some test files resolve their argument relative to the task dir, others relative to cwd.
+    # Detect which by reading the hidden test (fix: agent7-9 dev tasks used the task-dir form too).
+    task_dir_form = "parent / name" in (d / "hidden_tests.py").read_text()
+    arg = "solution.py" if task_dir_form else rel
     t = dict(spec)
     t["implementation_files"] = [rel]
     t["test_files"] = [(d / n).as_posix() for n in ("public_tests.py", "hidden_tests.py", "regression_tests.py")]

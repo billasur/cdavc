@@ -1,0 +1,1 @@
+{"data_provenance":"measured","kind":"harness smoke, 2 dev tasks x 3 arms x 1 seed, NOT a result","model":"liquid/lfm-2.5-2.6b:free","seed":1,"tasks":"benchmarks_dev/tasks.json --limit 2","label":"liquid/lfm-2.5-2.6b:free via OpenRouter free tier; NOT comparable to REPORT30 (Qwen2.5-7B local)"}

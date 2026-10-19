@@ -230,6 +230,7 @@ class BenchmarkRunner:
         hardware: str | None = None,
         timeout_seconds: float = 30.0,
         retry_cap: int = 3,
+        arms: tuple[str, ...] | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -258,6 +259,9 @@ class BenchmarkRunner:
         self.hardware = hardware
         self.timeout_seconds = timeout_seconds
         self.retry_cap = retry_cap
+        self.arms = tuple(arms) if arms else ARMS
+        if any(a not in ARMS for a in self.arms):
+            raise BenchmarkError(f"unknown arm in {self.arms}")
         if records_path is None:
             output_path = self.root / "results" / "benchmark.jsonl"
         else:
@@ -293,7 +297,7 @@ class BenchmarkRunner:
 
         for task in self.tasks:
             hashes = self._lock_test_hashes(task)
-            missing = [arm for arm in ARMS if (task.task_id, arm) not in self._keys]
+            missing = [arm for arm in self.arms if (task.task_id, arm) not in self._keys]
             existing_hashes = {
                 tuple(sorted(record.get("locked_test_hashes", {}).items()))
                 for record in self._records
@@ -969,6 +973,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
+    parser.add_argument("--arms", default=None, help="comma-separated subset of arms to run (default: all three)")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
@@ -1009,6 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
             hardware=args.hardware,
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
+            arms=tuple(args.arms.split(",")) if args.arms else None,
         )
         records = runner.run()
         output = render_report(records)
