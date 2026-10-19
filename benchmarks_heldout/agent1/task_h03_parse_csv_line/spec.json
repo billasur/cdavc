@@ -1,0 +1,15 @@
+{
+  "task_id": "task_h03_parse_csv_line",
+  "title": "Parse one CSV line with quoted fields",
+  "description": "Implement parse_csv_line(line). Split one line of CSV text into a list of field strings. Fields are separated by commas. A field that begins with a double quote is a quoted field: it ends at the next unescaped double quote, may contain commas, and two adjacent double quotes inside it encode one literal double quote. Whitespace is never trimmed. Raise ValueError on an unterminated quoted field, on any character other than a comma after a closing quote, and on a double quote inside an unquoted field.",
+  "implementation_files": ["benchmarks_heldout/agent1/task_h03_parse_csv_line/solution_stub.py"],
+  "symbols": ["parse_csv_line"],
+  "invariants": [
+    "No whitespace trimming: ' \"a\" ' is a quoted field wrapped in spaces only if the quote is the first character; a space before an opening quote makes the field unquoted.",
+    "A space after a closing quote (before the comma or end of line) is a ValueError.",
+    "The empty string parses to ['']; 'a,' parses to ['a', '']; 'a,,b' parses to ['a', '', 'b'].",
+    "Only a quote in the very first position of a field starts quoting; 'a\"b' is a ValueError.",
+    "Quoted fields keep their commas and escaped quotes: '\"x,y\"' is one field 'x,y' and '\"a\"\"b\"' is 'a\"b'."
+  ],
+  "max_retries": 2
+}

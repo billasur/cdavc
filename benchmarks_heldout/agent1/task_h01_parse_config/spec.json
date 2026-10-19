@@ -1,0 +1,16 @@
+{
+  "task_id": "task_h01_parse_config",
+  "title": "Parse INI-style config text",
+  "description": "Implement parse_config(text). Parse INI-style configuration text into a dict mapping section names to dicts of key/value strings. Lines are split on newlines. Blank lines and full-line comments (first non-space character is '#' or ';') are skipped. A section header is a line whose stripped form is '[' + name + ']'. Any other non-skipped line must contain '=' and sets key = value in the current section, with key and value stripped of surrounding whitespace. Raise ValueError on a key/value line before any section, on a non-comment line without '=', on a malformed or empty section header, and on an empty key.",
+  "implementation_files": ["benchmarks_heldout/agent1/task_h01_parse_config/solution_stub.py"],
+  "symbols": ["parse_config"],
+  "invariants": [
+    "Keys and values are stripped of surrounding whitespace; inner whitespace and '=' characters inside the value are preserved (split on the first '=' only).",
+    "A repeated key inside one section overwrites the earlier value.",
+    "A repeated section header merges into the existing section instead of replacing it.",
+    "Empty input returns {}.",
+    "ValueError on: key/value line before any section, non-comment line without '=', malformed section header (missing ']' or empty name), empty key.",
+    "Inline comments after a value are NOT special: the comment text is part of the value."
+  ],
+  "max_retries": 2
+}

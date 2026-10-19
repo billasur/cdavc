@@ -1,0 +1,15 @@
+{
+  "task_id": "task_h04_compare_versions",
+  "title": "Compare dotted version strings",
+  "description": "Implement compare_versions(a, b). Compare two version strings made of dot-separated non-negative integer components and return -1 if a < b, 0 if they are equal, 1 if a > b. Missing trailing components count as zero, so '2.0' equals '2' and '1.0.1' is greater than '1.0'. Comparison is numeric per component, not lexicographic. Raise ValueError for an empty string, an empty component, or a non-numeric component.",
+  "implementation_files": ["benchmarks_heldout/agent1/task_h04_compare_versions/solution_stub.py"],
+  "symbols": ["compare_versions"],
+  "invariants": [
+    "Numeric comparison: '1.2.3' < '1.2.10' and '10.0' > '9.9'.",
+    "Padding with zeros: '2.0' == '2' and '1.2.0.0' == '1.2'.",
+    "Leading zeros are allowed and carry no meaning: '1.02' == '1.2'.",
+    "ValueError on: empty string, empty component ('1..2', '1.2.', '.1'), non-numeric component ('1.a'), whitespace anywhere.",
+    "The result is exactly -1, 0, or 1."
+  ],
+  "max_retries": 2
+}

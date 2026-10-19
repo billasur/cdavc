@@ -1,0 +1,16 @@
+{
+  "task_id": "task_h02_eval_expression",
+  "title": "Evaluate an arithmetic expression string",
+  "description": "Implement eval_expression(expression). Evaluate a string containing non-negative integers, the binary operators + - * /, parentheses, and unary minus, with standard precedence (* and / before + and -) and left associativity. Whitespace may appear anywhere and is ignored. Division is true division. Return the result as an int when it is a whole number, otherwise as a float. Raise ValueError on empty or malformed input and on division by zero.",
+  "implementation_files": ["benchmarks_heldout/agent1/task_h02_eval_expression/solution_stub.py"],
+  "symbols": ["eval_expression"],
+  "invariants": [
+    "Unary minus binds tighter than binary operators: '2*-3' evaluates to -6 and '3--2' to 5.",
+    "'10/4' returns 2.5 (float); '10/5' returns 2 (int).",
+    "Whitespace is ignored anywhere, including inside multi-digit numbers is NOT allowed to change the number: '1 2' is invalid (two adjacent numbers are malformed input).",
+    "Implicit multiplication is not supported: '2(3)' raises ValueError.",
+    "ValueError on: empty string, trailing operator ('2+'), unbalanced parentheses, unknown characters, division by zero.",
+    "Left associativity: '8-3-2' is 3, '16/4/2' is 2."
+  ],
+  "max_retries": 2
+}

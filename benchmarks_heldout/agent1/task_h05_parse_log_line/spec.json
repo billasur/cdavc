@@ -1,0 +1,16 @@
+{
+  "task_id": "task_h05_parse_log_line",
+  "title": "Parse a structured log line",
+  "description": "Implement parse_log_line(line). Parse one log line of the exact form 'YYYY-MM-DD HH:MM:SS [LEVEL] message' into a dict with keys 'date', 'time', 'level', 'message'. Fields are separated by single spaces. LEVEL must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL (uppercase). The date must be a valid calendar date and the time a valid 24-hour clock time; both must use the exact widths shown (zero-padded). The message is everything after the level bracket, may itself contain spaces and bracket characters, and must be non-empty. Leading and trailing whitespace on the whole line is ignored. Raise ValueError on any deviation.",
+  "implementation_files": ["benchmarks_heldout/agent1/task_h05_parse_log_line/solution_stub.py"],
+  "symbols": ["parse_log_line"],
+  "invariants": [
+    "Single-space separators only: a double space between fields is a ValueError.",
+    "Exact widths: '2026-1-1 02:03:04 [INFO] x' is a ValueError even though the date is real.",
+    "Invalid dates and times are ValueError: month 13, February 30, hour 24, minute 60.",
+    "Unknown or lowercase levels are ValueError: '[TRACE]', '[info]'.",
+    "The message keeps everything after the third field verbatim, including '[' and ']' characters.",
+    "An empty message is a ValueError."
+  ],
+  "max_retries": 2
+}
