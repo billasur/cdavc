@@ -196,7 +196,18 @@ const COURIER_LINES = [
   'Four gates. If I fail, the original file is restored.',
   'I passed every gate. Now I am copied back.',
 ];
+const STEP_CUES = [
+  'HANDED A SEALED CONTRACT: one file only, solution.py',
+  'THE PATCH ARRIVES: only solution.py crosses, other files bounce off',
+  'TESTS SEALED: the hash before the run must equal the hash after',
+  'AST GATE: a missing symbol turns red, a found symbol turns green',
+  'RUNS IN A DISPOSABLE COPY: the source tree stays untouched',
+  'FOUR GATES LIGHT IN ORDER: a failure restores the original and retries',
+  'VERIFIED FILE COPIED BACK into solution.py, then the receipts appear',
+];
 function setStep(step) {
+  const sc = document.getElementById('step-cue');
+  if (sc) { const s = Math.min(6, Math.max(0, step)); sc.querySelector('.cue-n').textContent = String(s + 1).padStart(2, '0'); sc.querySelector('.cue-t').textContent = STEP_CUES[s]; }
   const cl = document.getElementById('courier-line');
   if (cl) cl.textContent = COURIER_LINES[Math.min(6, Math.max(0, step))];
   const safeStep = Math.min(6, Math.max(0, step));
@@ -535,7 +546,7 @@ class TaskScene {
       new THREE.Vector3(80, 50, 400),     // 04 AST: Close profile shot watching AST scan beam sweep syntax nodes
       new THREE.Vector3(270, 0, 620),   // 05 Worktree: Wide pull-back shot showing dual spaces & conduit tube
       new THREE.Vector3(480, 10, 520),   // 06 Gates: Low-angle dramatic arena shot framing retry arc
-      new THREE.Vector3(770, 110, 440),   // 07 Copy-back: Ascending orbit shot as verified courier docks
+      new THREE.Vector3(775, 100, 620),   // 07 Copy-back: Ascending orbit shot as verified courier docks
     ];
 
     const lookWaypoints = [
@@ -591,6 +602,17 @@ class TaskScene {
       }),
     );
     this.world.add(this.dust);
+    this.makeLabel = (text, color, w) => {
+      const tx = createTexture(512, 96, (ctx, cw, ch) => {
+        ctx.fillStyle = 'rgba(6,10,8,0.9)'; ctx.fillRect(2, 2, cw - 4, ch - 4);
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(2, 2, cw - 4, ch - 4);
+        ctx.fillStyle = color; ctx.font = '700 34px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, cw / 2, ch / 2);
+      });
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, transparent: true, depthWrite: false }));
+      sp.scale.set(w, w * 96 / 512, 1);
+      return sp;
+    };
 
     // 1. Protagonist: THE COURIER (Code Cube)
     this.buildProtagonistCourier();
@@ -618,11 +640,27 @@ class TaskScene {
 
     // 9. Route, pylons and trail: the courier's path through the pipeline
     this.buildRouteAndBeacons();
+
+    // Action labels that make cause and effect legible
+    const pass = this.makeLabel('solution.py  PASSES', '#d8ff64', 120); pass.position.set(-200, 175, 10); this.boundaryZone.parent.add(pass); this.passLabel = pass;
+    const refused = this.makeLabel('tests / other files  REFUSED', '#ff6b6b', 150); refused.position.set(-200, 148, 10); this.world.add(refused); this.refusedLabel = refused;
+    this.astMissing = this.makeLabel('symbol missing', '#ff4747', 110); this.astMissing.position.set(75, 110, 10); this.world.add(this.astMissing);
+    this.astFound = this.makeLabel('count_vowels  FOUND', '#d8ff64', 130); this.astFound.position.set(75, 110, 10); this.world.add(this.astFound); this.astFound.visible = false;
+    // direction chevrons along the route (left to right)
+    this.chevrons = [];
+    const cm = new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.8 });
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(7, 16, 3), cm.clone());
+      m.rotation.z = -Math.PI / 2;
+      this.world.add(m);
+      this.chevrons.push(m);
+    }
   }
 
   buildRouteAndBeacons() {
     const stops = [[-460,200,0],[-260,130,0],[-80,50,0],[75,25,0],[260,50,-40],[260,-110,0],[430,-20,0],[540,-20,0],[780,70,78]];
     const curve = new THREE.CatmullRomCurve3(stops.map((s) => new THREE.Vector3(...s)), false, 'centripetal', 0.5);
+    this.routeCurveObj = curve;
     this.routeLine = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(curve.getPoints(240)),
       new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.35 }),
@@ -813,7 +851,7 @@ class TaskScene {
 
     // Mechanical Collar Frame
     const frameGeo = new THREE.CylinderGeometry(110, 110, 36, 16, 1, true);
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x111c16, roughness: 0.25, metalness: 0.85 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2f5a46, emissive: 0x1d6a4a, emissiveIntensity: 0.9, roughness: 0.4, metalness: 0.3, side: THREE.DoubleSide, transparent: true, opacity: 0.55 });
     const frame = new THREE.Mesh(frameGeo, frameMat);
     frame.rotation.z = Math.PI / 2;
     this.vaultCollar.add(frame);
@@ -851,6 +889,18 @@ class TaskScene {
     );
     vaultPlate.position.set(0, 130, 0);
     this.vaultCollar.add(vaultPlate);
+    [['BEFORE THE RUN', -112], ['AFTER THE RUN', 112]].forEach(([t, x]) => {
+      const hp = new THREE.Mesh(
+        new THREE.PlaneGeometry(200, 70),
+        new THREE.MeshBasicMaterial({ map: statusPlateTexture({ title: t, code: '9c1f…b2e7', detail: 'sha-256 · example hash' }), transparent: true, side: THREE.DoubleSide }),
+      );
+      hp.position.set(x, -135, 30);
+      this.vaultCollar.add(hp);
+    });
+    const eq = createTexture(128, 128, (ctx) => { ctx.fillStyle = '#d8ff64'; ctx.font = '700 100px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('=', 64, 64); });
+    const eqS = new THREE.Sprite(new THREE.SpriteMaterial({ map: eq, transparent: true }));
+    eqS.scale.set(40, 40, 1); eqS.position.set(0, -135, 30);
+    this.vaultCollar.add(eqS);
 
     this.world.add(this.vaultCollar);
   }
@@ -1071,74 +1121,81 @@ class TaskScene {
     this.masterDock = new THREE.Group();
     this.masterDock.position.set(780, 70, 0);
 
-    // Working Tree Vault File Socket
-    const frameGeo = new THREE.BoxGeometry(190, 220, 150);
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x0a130e, roughness: 0.2, metalness: 0.85 });
-    const frame = new THREE.Mesh(frameGeo, frameMat);
-    this.masterDock.add(frame);
-
-    // Target File Slot for solution.py
-    const slotGeo = new THREE.BoxGeometry(36, 36, 10);
-    this.slotMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, wireframe: true });
-    this.solutionSlot = new THREE.Mesh(slotGeo, this.slotMat);
-    this.solutionSlot.position.set(0, 0, 78);
-    this.masterDock.add(this.solutionSlot);
-
-    // Receipt Trail (execution_log.json & execution_report.md)
-    const receiptGeo = new THREE.PlaneGeometry(220, 280);
-    const receiptMat = new THREE.MeshBasicMaterial({
-      map: createTexture(512, 640, (ctx, w, h) => {
-        ctx.fillStyle = 'rgba(7, 12, 9, 0.96)';
-        ctx.fillRect(4, 4, w - 8, h - 8);
-        ctx.strokeStyle = 'rgba(216, 255, 100, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(4, 4, w - 8, h - 8);
-
-        ctx.fillStyle = '#d8ff64';
-        ctx.fillRect(24, 24, 4, h - 48);
-
-        ctx.font = '700 20px monospace';
-        ctx.fillStyle = '#d8ff64';
-        ctx.fillText('AUDIT EVIDENCE TRAIL', 42, 54);
-
-        ctx.fillStyle = '#f4f7f4';
-        ctx.font = '700 28px monospace';
-        ctx.fillText('execution_log.json', 42, 100);
-
-        ctx.strokeStyle = 'rgba(216, 255, 100, 0.16)';
-        ctx.beginPath();
-        ctx.moveTo(42, 120);
-        ctx.lineTo(w - 42, 120);
-        ctx.stroke();
-
-        const logs = [
-          '// illustrative receipt, not REPORT30 data',
-          '{',
-          '  "task": "task_001_count_vowels",',
-          '  "pre_test_hash": "9c1f...b2e7",',
-          '  "post_test_hash": "9c1f...b2e7",',
-          '  "hash_drift_bits": 0,',
-          '  "ast_parsed": true,',
-          '  "gates_passed": [1, 2, 3, 4],',
-          '  "exit_code": 0,',
-          '  "verified_copy_back": ["solution.py"]',
-          '}',
-        ];
-
-        logs.forEach((line, i) => {
-          ctx.fillStyle = line.includes('0') || line.includes('true') || line.includes('solution.py') ? '#d8ff64' : '#a8b8ad';
-          ctx.font = '400 17px monospace';
-          ctx.fillText(line, 42, 154 + i * 32);
-        });
-      }),
-      transparent: true,
-      side: THREE.DoubleSide,
+    // Working tree panel: file tree where solution.py lands
+    const treeTex = createTexture(512, 400, (ctx, w, h) => {
+      ctx.fillStyle = 'rgba(7, 14, 11, 0.96)';
+      ctx.fillRect(4, 4, w - 8, h - 8);
+      ctx.strokeStyle = 'rgba(216, 255, 100, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+      ctx.fillStyle = '#d8ff64';
+      ctx.font = '700 22px monospace';
+      ctx.fillText('WORKING TREE', 28, 52);
+      ctx.fillStyle = 'rgba(216,255,100,0.2)';
+      ctx.fillRect(28, 66, w - 56, 2);
+      const rows = [
+        [110, '#9fb3a6', 'repo/'],
+        [150, '#9fb3a6', '  src/'],
+        [200, '#6f8176', '    solution.py   (previous)'],
+        [250, '#9fb3a6', '  tests/   locked, sha-256'],
+        [300, '#9fb3a6', '  results/'],
+        [340, '#6f8176', '    (empty)'],
+      ];
+      ctx.font = '500 24px monospace';
+      rows.forEach(([y, col, t]) => { ctx.fillStyle = col; ctx.fillText(t, 28, y + 8); });
     });
+    this.treePanel = new THREE.Mesh(new THREE.PlaneGeometry(190, 150), new THREE.MeshBasicMaterial({ map: treeTex, transparent: true, side: THREE.DoubleSide }));
+    this.treePanel.position.set(-90, 0, 0);
+    this.masterDock.add(this.treePanel);
 
-    this.receiptMesh = new THREE.Mesh(receiptGeo, receiptMat);
-    this.receiptMesh.position.set(180, 30, 40);
-    this.receiptMesh.rotation.y = -0.28;
+    // Verified solution.py row that fades in when the courier lands
+    const rowTex = createTexture(512, 52, (ctx, w, h) => {
+      ctx.fillStyle = 'rgba(216, 255, 100, 0.95)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#0a130e';
+      ctx.font = '700 26px monospace';
+      ctx.fillText('    solution.py   VERIFIED', 16, 36);
+    });
+    this.slotBar = new THREE.Mesh(new THREE.PlaneGeometry(175, 17.5), new THREE.MeshBasicMaterial({ map: rowTex, transparent: true, opacity: 0 }));
+    this.slotBar.position.set(-90, 0, 2);
+    this.masterDock.add(this.slotBar);
+
+    // legacy handle used by the choreography
+    this.slotMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, visible: false });
+    this.solutionSlot = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), this.slotMat);
+
+    const card = (title, lines, extra) => new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 86),
+      new THREE.MeshBasicMaterial({
+        map: createTexture(512, 366, (ctx, w, h) => {
+          ctx.fillStyle = 'rgba(7, 12, 9, 0.97)';
+          ctx.fillRect(4, 4, w - 8, h - 8);
+          ctx.strokeStyle = 'rgba(216, 255, 100, 0.45)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(4, 4, w - 8, h - 8);
+          ctx.fillStyle = '#d8ff64';
+          ctx.font = '700 30px monospace';
+          ctx.fillText(title, 24, 58);
+          ctx.fillStyle = '#c9d6cd';
+          ctx.font = '500 24px monospace';
+          lines.forEach((l, i) => ctx.fillText(l, 24, 112 + i * 38));
+          ctx.fillStyle = '#6f8176';
+          ctx.font = '500 18px monospace';
+          ctx.fillText(extra, 24, h - 24);
+        }),
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+      }),
+    );
+    this.receiptMesh = card('execution_log.json', ['{ "task": "task_001",', '  "gates": [1,2,3,4],', '  "verified": ["solution.py"] }'], 'timing, diff log, gate verdicts');
+    this.receiptMesh.position.set(70, 48, 14);
+    this.receiptMesh.rotation.y = -0.18;
     this.masterDock.add(this.receiptMesh);
+    this.reportMesh = card('execution_report.md', ['# Execution report', 'gate verdicts, in order', 'readable diff of the patch'], 'illustrative content');
+    this.reportMesh.position.set(70, -48, 14);
+    this.reportMesh.rotation.y = -0.18;
+    this.masterDock.add(this.reportMesh);
 
     this.world.add(this.masterDock);
   }
@@ -1299,8 +1356,15 @@ class TaskScene {
 
     const aspect = this.width / Math.max(1, this.height);
     const zoom = aspect < 1 ? Math.max(1, 1.2 / aspect) : 1;
-    const cx = lookPos.x + (camPos.x - lookPos.x) * zoom;
-    const cy = lookPos.y + (camPos.y - lookPos.y) * zoom;
+    let lkx = lookPos.x; let lky = lookPos.y;
+    let cpx = camPos.x; let cpy = camPos.y;
+    if (aspect < 1 && this.courier) {
+      const dx = this.courier.position.x - lookPos.x;
+      const dy = (this.courier.position.y - lookPos.y) * 0.8;
+      lkx += dx; lky += dy; cpx += dx; cpy += dy;
+    }
+    const cx = lkx + (cpx - lkx) * zoom;
+    const cy = lky + (cpy - lky) * zoom;
     const cz = camPos.z * zoom;
     this.camera.position.set(
       cx + this.pointer.x * 24,
@@ -1312,10 +1376,21 @@ class TaskScene {
     } else {
       this.camera.setViewOffset(this.width, this.height, 0, this.height * 0.12, this.width, this.height);
     }
-    this.camera.lookAt(lookPos.x, lookPos.y + mobileYOffset, lookPos.z);
+    this.camera.lookAt(lkx, lky + mobileYOffset, lookPos.z);
 
     // Dust particles
     if (this.dust) this.dust.rotation.y = t * 0.02;
+    const st = p * 7;
+    if (this.chevrons && this.routeCurveObj) {
+      this.chevrons.forEach((m, i) => {
+        const u = ((i / this.chevrons.length) + t * 0.05) % 1;
+        const pt = this.routeCurveObj.getPointAt(u);
+        m.position.copy(pt);
+        m.material.opacity = 0.15 + 0.5 * Math.max(0, 1 - Math.abs(u * 7 - st) / 1.6);
+      });
+    }
+    if (this.refusedLabel) { this.refusedLabel.visible = st > 0.9 && st < 2.1; this.passLabel.visible = st > 0.9 && st < 2.1; }
+    if (this.astMissing && !(st > 2.6 && st < 4.6)) { this.astMissing.visible = false; this.astFound.visible = false; }
 
     // --- COURIER CONTINUOUS TRAJECTORY THROUGH 7 STAGES ---
     // Positions corresponding to each stage
@@ -1327,7 +1402,7 @@ class TaskScene {
     const p5b = new THREE.Vector3(260, -110, 0);// Stage 5: Inside quarantine pod
     const p6a = new THREE.Vector3(430, -20, 0); // Stage 6: Gate 2 failure flinch point
     const p6b = new THREE.Vector3(540, -20, 0); // Stage 6: Cleared all gates
-    const p7 = new THREE.Vector3(780, 70, 78);  // Stage 7: Docks into solution.py slot
+    const p7 = new THREE.Vector3(660, 70, 40);  // Stage 7: Docks into solution.py slot
 
     let courierPos = p1.clone();
     let courierScale = 1.0;
@@ -1386,7 +1461,9 @@ class TaskScene {
         const threshold = i / this.astBranchNodes.length;
         const lit = a >= threshold;
         node.material.opacity = lit ? 0.95 : 0.15;
+        if (i === 1 && node.material.color) node.material.color.setHex(a < 0.55 ? 0xff4747 : 0xd8ff64);
       });
+      if (this.astMissing) { this.astMissing.visible = a < 0.55; this.astFound.visible = a >= 0.55; }
     } else if (p <= 5 / 7) {
       // Stage 5: Clone travels down conduit into quarantine space, source stays sealed
       const a = (p - 4 / 7) / (1 / 7);
@@ -1457,10 +1534,9 @@ class TaskScene {
         const subA = (a - 0.5) / 0.5;
         courierPos = p5a.clone().lerp(p7, subA);
         // Dissolves into file slot
-        courierScale = Math.max(0.01, 1.0 - subA * 0.7);
+        courierScale = Math.max(0.01, 1.0 - subA * 0.55);
         if (subA > 0.9) {
           audio.playDock();
-          this.slotMat.color.setHex(0xd8ff64);
         }
       }
       courierColor = 0xd8ff64;
@@ -1469,7 +1545,10 @@ class TaskScene {
       // Quarantined space retracts and dims
       this.quarantinePod.position.y = -110 - a * 40;
       this.podMesh.material.opacity = Math.max(0.1, 0.7 - a * 0.6);
-      this.receiptMesh.material.opacity = a;
+      const land = a < 0.5 ? 0 : Math.min(1, (a - 0.62) / 0.2);
+      this.slotBar.material.opacity = Math.max(0, land);
+      this.receiptMesh.material.opacity = Math.max(0, Math.min(1, (a - 0.72) / 0.12));
+      this.reportMesh.material.opacity = Math.max(0, Math.min(1, (a - 0.84) / 0.12));
     }
 
     // Apply color and breathing to Courier
@@ -1477,7 +1556,8 @@ class TaskScene {
     this.courierWireMat.color.setHex(isDrifting ? 0xff4747 : courierColor);
 
     this.courier.position.copy(courierPos);
-    this.courier.scale.setScalar(courierScale * breathing * 2.2);
+    const boost = 1 + 0.75 * Math.max(0, 1 - Math.abs(p * 7 - 1.5) / 1.0);
+    this.courier.scale.setScalar(courierScale * breathing * 2.2 * boost);
     if (this.courierLight) {
       this.courierLight.position.set(courierPos.x, courierPos.y + 40, courierPos.z + 90);
       this.courierLight.color.setHex(isDrifting ? 0xff4747 : courierColor);
