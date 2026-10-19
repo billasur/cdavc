@@ -1,0 +1,21 @@
+{
+  "task_id": "task_d02_multi_key_sort",
+  "title": "Stable multi-key sort with missing fields",
+  "description": "Implement sort_records(records, keys). records is a list of dicts. keys is a list of (field, descending) pairs, most significant first. Return a NEW list sorted by the first key, ties broken by the next key, and so on. Records whose field is missing (key not in the dict) sort AFTER all records that have it, for both ascending and descending keys; a field whose value is None counts as present. Records that tie on every key keep their original relative order. Do not mutate the input list or its dicts. An empty keys list returns a copy in original order.",
+  "implementation_files": [
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/solution_stub.py"
+  ],
+  "symbols": [
+    "sort_records"
+  ],
+  "invariants": [
+    "Result is a new list; the input list and its dicts are unchanged.",
+    "Sort is stable: full ties keep input order, even when a key is descending.",
+    "Descending reverses value order only; it does not reverse the order of tied records.",
+    "A record missing a field sorts after all records that have it, for ascending and descending alike; records missing the same field tie on that key and fall through to the next key.",
+    "Mixed keys: later keys only break ties of earlier keys.",
+    "Values of one field are assumed mutually comparable among present records.",
+    "Empty keys returns a shallow copy in the original order."
+  ],
+  "max_retries": 2
+}

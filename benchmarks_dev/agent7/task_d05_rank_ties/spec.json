@@ -1,0 +1,21 @@
+{
+  "task_id": "task_d05_rank_ties",
+  "title": "Rank scores with tie handling",
+  "description": "Implement rank(scores, method='min'). Return a list of ranks, one per score, in the ORIGINAL order of scores; higher score gets a better (smaller) rank, and ranks start at 1. Equal scores are tied (1 and 1.0 are equal). method selects tie handling: 'min' gives every tied score the lowest rank of its group (1, 2, 2, 4), 'dense' gives consecutive ranks with no gaps (1, 2, 2, 3), 'average' gives every tied score the mean of the ranks its group would occupy, as a float (1.0, 2.5, 2.5, 4.0). 'min' and 'dense' return ints. Raise ValueError for an unknown method or if any score is NaN. Empty input returns [].",
+  "implementation_files": [
+    "benchmarks_dev/agent7/task_d05_rank_ties/solution_stub.py"
+  ],
+  "symbols": [
+    "rank"
+  ],
+  "invariants": [
+    "Result list has the same length and order as scores.",
+    "Descending: the highest score is rank 1.",
+    "'min' skips ranks after a tie group (competition ranking); 'dense' does not.",
+    "'average' of a group of k tied scores starting at rank r is r + (k - 1) / 2, returned as float.",
+    "Ties use ==, so 2 and 2.0 tie; negative scores and zero are ordinary values.",
+    "ValueError for unknown method (checked even for empty input) and for NaN scores.",
+    "Input is not mutated and may be any iterable of numbers."
+  ],
+  "max_retries": 2
+}

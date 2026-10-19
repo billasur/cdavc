@@ -1,0 +1,20 @@
+{
+  "task_id": "task_d01_dedupe_stable",
+  "title": "Stable de-duplication with key function",
+  "description": "Implement dedupe(items, key=None). Return a list of the elements of the iterable items with duplicates removed, keeping the FIRST occurrence of each and preserving original order. Two elements are duplicates when their keys are equal, where the key is key(element) if key is given, else the element itself. Keys are compared with Python dict semantics (hash plus ==). items may be any iterable, including a generator, and is consumed once. Do not mutate input lists.",
+  "implementation_files": [
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/solution_stub.py"
+  ],
+  "symbols": [
+    "dedupe"
+  ],
+  "invariants": [
+    "First occurrence wins; relative order of kept elements is the input order.",
+    "With key given, the kept element is the original element, not the key.",
+    "Keys use dict semantics, so 1, True and 1.0 are the same key, and None is a valid key.",
+    "Works for any iterable (generators, tuples, strings) and returns a new list; an input list is not mutated.",
+    "key is called exactly once per element, in input order.",
+    "Empty input returns []."
+  ],
+  "max_retries": 2
+}

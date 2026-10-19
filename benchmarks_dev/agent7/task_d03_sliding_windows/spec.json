@@ -1,0 +1,20 @@
+{
+  "task_id": "task_d03_sliding_windows",
+  "title": "Sliding windows with step and partial tail",
+  "description": "Implement windows(seq, size, step=1, keep_partial=False). Return a list of lists (each a slice of seq). Windows start at indexes 0, step, 2*step, ... A window starting at i holds seq[i:i+size]. Only full windows (length size) are returned by default. If keep_partial is True, also return trailing shorter windows, but only ones that contain at least one element not already present in an earlier returned window; that is, a partial window starting at i is kept only when i is 0 or the previous window start (i - step) did not already reach the end of seq (i - step + size < len(seq)). Raise ValueError if size < 1 or step < 1. An empty seq returns [].",
+  "implementation_files": [
+    "benchmarks_dev/agent7/task_d03_sliding_windows/solution_stub.py"
+  ],
+  "symbols": [
+    "windows"
+  ],
+  "invariants": [
+    "Full windows: starts i = 0, step, 2*step, ... while i + size <= len(seq).",
+    "size > len(seq): [] by default; with keep_partial a single window equal to the whole seq (if seq non-empty).",
+    "keep_partial never adds a window whose elements were all already covered (no redundant trailing subsets when step < size).",
+    "step > size skips elements between windows; the skipped elements never appear, but a trailing partial still appears when keep_partial and it starts before len(seq).",
+    "ValueError for size < 1 or step < 1, even for an empty seq.",
+    "Works for any sequence supporting len and slicing (list, tuple, str); windows are returned as lists of elements."
+  ],
+  "max_retries": 2
+}
