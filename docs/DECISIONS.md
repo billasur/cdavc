@@ -17,3 +17,4 @@ Format: time (IST) - decision - why - alternatives.
 - 02:56 - Fixed scripts/make_heldout_tasks.py: tests that resolve their argument relative to the task dir (agent1, 7, 8, 9) get "solution.py"; others keep the cwd-relative path. Why: dev run failed with a doubled path. Held-out tasks.json is regenerated, test files and manifest unchanged.
 - 02:56 - Added --arms to cdavc.benchmark (default unchanged: all three). Why: slice runs by arm. Alternative: separate records files per arm (rejected, same effect with more code).
 - 02:56 - Free tier daily cap is 50 requests across all free models for this key, so full dev slices are not feasible without credit; see docs/OPENROUTER_RUN.md.
+- 03:15 - Groq via same proxy (--upstream, --tpm pacing, --extra). Why: user's single Groq key; per-model published limits. Slice limited to 8 tasks on gpt-oss-20b, per user's instruction to conserve tokens and report before scaling.

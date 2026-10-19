@@ -37,3 +37,15 @@ Why (hypotheses): small models fail on malformed output and misread invariants, 
 
 ## Smoke (measured, not a result)
 `results/openrouter/liquid_lfm-2.5-2.6b_free/1-smoke/`: liquid/lfm-2.5-2.6b:free, 2 dev tasks x 3 arms, seed 1. task_d01 passed on all 3 arms; task_d02 failed on all 3 ("ValueError during candidate execution", cause not investigated). 2 tasks is a harness check, not a pass rate.
+
+## Groq (added 20 Oct ~03:15 IST; one key, published per-model limits)
+Upstream `https://api.groq.com/openai/v1` (verified in console.groq.com/docs/openai). Limits per console.groq.com/docs/rate-limits for gpt-oss-20b, gpt-oss-120b, qwen/qwen3.8-27b: 30 RPM, 1K RPD, 8K TPM, 200K TPD (the key returned 1000 RPD / 8000 TPM headers). Models on the key: openai/gpt-oss-20b, openai/gpt-oss-120b, openai/gpt-oss-safeguard-20b, qwen/qwen3.8-27b, allam-2-7b (4096 ctx, not in the limits table), plus audio/guard models.
+Run: `OPENROUTER_KEY_FILE=<groq key file> UPSTREAM=https://api.groq.com/openai/v1 TPM=8000 EXTRA='{"reasoning_effort":"low"}' PROVIDER=groq MIN_INTERVAL=1 scripts/run_openrouter.sh openai/gpt-oss-20b 1 baseline_single,baseline_retry,cdavc 8`. The proxy paces to 90% of TPM using real usage and returns a daily-cap 429 (Retry-After > 300 s) instead of retrying. Python's default User-Agent got HTTP 403 from Groq; the proxy sends its own.
+Measured, openai/gpt-oss-20b (reasoning_effort low), seed 1, first 8 dev tasks (d01-d05, d801-d803), NOT comparable to REPORT30 (Qwen2.5-7B local), 8 tasks is too few for significance:
+| arm | passed | mean attempts |
+|---|---|---|
+| baseline_single | 5/8 | 1.0 |
+| baseline_retry | 7/8 | 1.5 |
+| cdavc | 8/8 | 1.25 |
+Cost: 30 requests, about 42K tokens (13K in, 28K out by harness records, excluding reasoning overhead not reported) of the 200K daily budget. Records: results/groq/openai_gpt-oss-20b/1/.
+H-b observation (hypothesis, not tested): the prompt begins with "Benchmark arm: <arm>" and "Deterministic seed", which differ between arms, so the shared prefix is short; moving them after the contract would lengthen the stable prefix. Cached tokens do not count toward Groq limits (per docs), so layout could also affect budget. Untested.
