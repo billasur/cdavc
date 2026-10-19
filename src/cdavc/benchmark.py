@@ -66,6 +66,9 @@ JSON_REASK_PROMPT = "Return only the JSON object requested above, with no prose 
 STATIC_REASKS = 1
 """Corrective turns allowed for a static contract violation; none spend a draw."""
 
+DIGEST_LIMIT = 5
+"""Failing generated inputs carried into the next draw's repair prompt."""
+
 DEFAULT_SAMPLES = 4
 """Independent draws for the CD-AVC arm when ``--samples`` is not given."""
 
@@ -363,7 +366,7 @@ class BenchmarkRunner:
                 baseline_changes = self._workspace_changes(workspace)
                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
                 for draw in range(1, budget + 1):
-                    prompt = self._prompt(task, arm, failure)
+                    prompt = self._prompt(task, arm, failure, digest=digest)
                     seed = _sample_seed(self.seed, draw)
                     completion: ProviderCompletion | None = None
                     prompt_tokens: int | None = None
@@ -618,7 +621,14 @@ class BenchmarkRunner:
         ]
         return self._complete_messages(provider, messages, seed=_sample_seed(self.seed, draw))
 
-    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
+    def _prompt(
+        self,
+        task: BenchmarkTask,
+        arm: str,
+        previous_failure: str,
+        *,
+        digest: Mapping[tuple[str, str], Mapping[str, Any]] | None = None,
+    ) -> str:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
         repair = ""
         if previous_failure:
@@ -626,6 +636,7 @@ class BenchmarkRunner:
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
             elif arm == "cdavc":
                 repair = self._cage_repair(task, previous_failure)
+        memory = self._digest_context(digest) if arm == "cdavc" else ""
         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
@@ -639,6 +650,36 @@ class BenchmarkRunner:
             f'Return only JSON in the form {{"files": {{"{target_example}": "complete file contents"}}}}. '
             "Use repository-relative paths, modify only allowed implementation files, and never modify tests.\n"
             + repair
+            + memory
+        )
+
+    def _digest_context(
+        self,
+        digest: Mapping[tuple[str, str], Mapping[str, Any]] | None,
+    ) -> str:
+        """Render the regression memory for a cage repair prompt.
+
+        Every entry was produced by this harness's own property table, so the
+        input and the expected value can be shown without exposing the
+        evaluator's assertions.  Replaying them every draw is what stops the
+        "fix the public test, break an earlier input" oscillation.
+        """
+
+        if not digest:
+            return ""
+        lines: list[str] = []
+        for item in list(digest.values())[:DIGEST_LIMIT]:
+            name = str(item.get("property"))
+            arguments = ", ".join(repr(_json_safe(value)) for value in item.get("args", ()))
+            message = str(item.get("message") or "failed").strip()
+            lines.append(f"- {name}({arguments}): {message}")
+        if not lines:
+            return ""
+        return (
+            "\nPreviously failing generated inputs. These come from the harness's own "
+            "property checks, not from the evaluator; the next candidate must satisfy all of them:\n"
+            + "\n".join(lines)
+            + "\n"
         )
 
     def _cage_repair(self, task: BenchmarkTask, failure: str) -> str:
@@ -920,7 +961,14 @@ class BenchmarkRunner:
         failures = [item for item in payload.get("failures", ()) if isinstance(item, Mapping)]
         for failure in failures:
             key = (str(failure.get("property")), json.dumps(failure.get("args", []), sort_keys=True))
-            digest.setdefault(key, {"property": failure.get("property"), "args": failure.get("args", [])})
+            digest.setdefault(
+                key,
+                {
+                    "property": failure.get("property"),
+                    "args": failure.get("args", []),
+                    "message": failure.get("message", ""),
+                },
+            )
         properties.clear()
         properties.update(
             {
@@ -1818,6 +1866,16 @@ def _add_usage(left: int | None, right: int | None) -> int | None:
     if left is None and right is None:
         return None
     return (left or 0) + (right or 0)
+
+
+def _json_safe(value: Any) -> Any:
+    """Return a value that renders like the JSON the property gate emitted."""
+
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 def _failure_signature(text: str) -> str:

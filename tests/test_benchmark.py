@@ -747,6 +747,71 @@ class BenchmarkTests(unittest.TestCase):
             self.assertFalse(cage["pass"])
             self.assertIn("outside the implementation contract: stray.txt", cage["failure"])
 
+    def test_digest_context_renders_generated_inputs_for_the_cage_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task()
+            runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task])
+            digest = {
+                ("merge_sorted_multiset", "[[1],[1]]"): {
+                    "property": "merge_sorted_multiset",
+                    "args": [[1], [1]],
+                    "message": "expected [1, 1], got [1]",
+                }
+            }
+            prompt = runner._prompt(task, "cdavc", "property gate failed", digest=digest)
+            self.assertIn("merge_sorted_multiset([1], [1]): expected [1, 1], got [1]", prompt)
+            self.assertIn("must satisfy all of them", prompt)
+            self.assertNotIn("merge_sorted_multiset", runner._prompt(task, "baseline_retry", "", digest=digest))
+
+    def test_property_failure_is_replayed_in_the_next_draw_prompt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            (root / "benchmarks").mkdir()
+            (root / "benchmarks" / "properties.json").write_text(
+                json.dumps(
+                    {
+                        "tasks": {
+                            "answer": [
+                                {"property": "merge_sorted_multiset", "cases": 6, "pure": True}
+                            ]
+                        }
+                    }
+                )
+            )
+            dedup = "def merge_sorted(left: list, right: list) -> list:\n    return sorted(set(list(left) + list(right)))\n"
+            good = "def merge_sorted(left: list, right: list) -> list:\n    return sorted(list(left) + list(right))\n"
+            task = self._task(max_retries=1, symbols=("merge_sorted",))
+            prompts = []
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self, record: bool = False):
+                    self.record = record
+                    self.responses = iter([self._response(dedup), self._response(good)])
+
+                def _response(self, body: str):
+                    return ProviderCompletion(text=json.dumps({"files": {"src/answer.py": body}}))
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    if self.record:
+                        prompts.append(messages[0]["content"])
+                    return next(self.responses)
+
+            records = BenchmarkRunner(
+                root,
+                lambda arm, _task: SequenceProvider(record=arm == "cdavc"),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertEqual(len(prompts), 2)
+            self.assertIn("merge_sorted_multiset", prompts[1])
+            self.assertIn("expected", prompts[1])
+            self.assertTrue(cage["property_table_hash"])
+            self.assertGreaterEqual(len(cage["failure_digest"]), 1)
+
     def test_patch_writer_refuses_escapes_and_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
