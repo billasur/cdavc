@@ -33,6 +33,7 @@ from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
+from .invariants import has_raise_statement, required_exception
 from .providers import (
     MockProvider,
     OpenAICompatibleProvider,
@@ -46,6 +47,32 @@ ARMS = ("baseline_single", "baseline_retry", "cdavc")
 
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
 BENCHMARK_VERSION = "1"
+
+HIDDEN_GATE_LABEL = "hidden test"
+"""Gate label whose diagnostics must never reach a repair prompt."""
+
+BOUNDARY_PROBE = """\
+import importlib.util
+import json
+import sys
+
+spec = json.loads(sys.argv[1])
+for path in spec["files"]:
+    loader = importlib.util.spec_from_file_location("cdavc_boundary_probe", path)
+    module = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(module)
+    for symbol in spec["symbols"]:
+        function = getattr(module, symbol, None)
+        if not callable(function):
+            continue
+        for argument in ("", [], 0):
+            try:
+                function(argument)
+            except (IndexError, ZeroDivisionError) as exc:
+                print(f"{symbol}({argument!r}) raised {type(exc).__name__}: {exc}", file=sys.stderr)
+                raise SystemExit(1)
+"""
+"""Opt-in gate that fuzzes each symbol with empty and zero inputs."""
 
 
 class BenchmarkError(RuntimeError):
@@ -78,6 +105,7 @@ class BenchmarkTask:
     hidden_test_command: tuple[str, ...] | None = None
     regression_command: tuple[str, ...] | None = DEFAULT_COMMAND
     negative_test_command: tuple[str, ...] | None = None
+    boundary_probe: bool = False
     max_retries: int = 2
     locked_test_hashes: Mapping[str, str] | None = None
 
@@ -102,6 +130,8 @@ class BenchmarkTask:
         object.__setattr__(self, "hidden_test_command", _optional_command(self.hidden_test_command, "hidden_test_command"))
         object.__setattr__(self, "regression_command", _optional_command(self.regression_command, "regression_command"))
         object.__setattr__(self, "negative_test_command", _optional_command(self.negative_test_command, "negative_test_command"))
+        if not isinstance(self.boundary_probe, bool):
+            raise BenchmarkError("boundary_probe must be a boolean")
         if isinstance(self.max_retries, bool) or not isinstance(self.max_retries, int) or self.max_retries < 0:
             raise BenchmarkError("max_retries must be a non-negative integer")
         if self.locked_test_hashes is not None:
@@ -141,6 +171,7 @@ class BenchmarkTask:
             hidden_test_command=payload.get("hidden_test_command"),
             regression_command=payload.get("regression_command", DEFAULT_COMMAND),
             negative_test_command=payload.get("negative_test_command"),
+            boundary_probe=payload.get("boundary_probe", False),
             max_retries=payload.get("max_retries", 2),
             locked_test_hashes=payload.get("locked_test_hashes"),
         )
@@ -166,6 +197,7 @@ class BenchmarkTask:
             "hidden_test_command": getattr(task, "hidden_test_command", None),
             "regression_command": getattr(task, "regression_command", DEFAULT_COMMAND),
             "negative_test_command": getattr(task, "negative_test_command", None),
+            "boundary_probe": getattr(task, "boundary_probe", False),
             "max_retries": getattr(task, "max_retries", 2),
             "locked_test_hashes": getattr(task, "locked_test_hashes", None),
         }
@@ -428,7 +460,7 @@ class BenchmarkRunner:
             if arm == "baseline_retry":
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
             elif arm == "cdavc":
-                repair = f"\nPrevious deterministic failure category: {_failure_category(previous_failure)}\n"
+                repair = self._cage_repair(task, previous_failure)
         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
@@ -442,6 +474,24 @@ class BenchmarkRunner:
             "Use repository-relative paths, modify only allowed implementation files, and never modify tests.\n"
             + repair
         )
+
+    def _cage_repair(self, task: BenchmarkTask, failure: str) -> str:
+        """Build cage repair context that never carries hidden assertions.
+
+        Targeted, negative and regression tests are public repository assets,
+        so their sanitised traceback is forwarded like a human engineer would
+        see it.  A hidden-gate rejection stays categorical and is answered with
+        the task's declared invariants instead of the failing assertion.
+        """
+
+        category = _failure_category(failure)
+        context = f"\nPrevious deterministic failure category: {category}\n"
+        if _is_hidden_failure(category):
+            return context + _invariant_guidance(task)
+        detail = failure.split(":", 1)[1].strip() if ":" in failure else ""
+        if detail:
+            return context + f"Public gate output:\n{detail}\n"
+        return context
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
         stripped = _strip_json_fence(response)
@@ -504,20 +554,41 @@ class BenchmarkRunner:
             missing = set(task.symbols) - declared
             if missing:
                 raise _GateFailure("AST contract is missing a required symbol")
+            required = required_exception(task.invariants)
+            if required and not has_raise_statement(tree):
+                raise _GateFailure(
+                    f"AST Contract Failed: Task invariant requires input validation raising {required}, "
+                    "but no Raise statements were found in implementation."
+                )
         results.append("ast_contract")
-        self._run_command(task.test_command, workspace, "targeted test")
+        if task.boundary_probe:
+            self._run_boundary_probe(task, workspace)
+            results.append("boundary_probe")
+        self._run_command(task.test_command, workspace, "targeted test", include_output=True)
         results.append("targeted_test")
         if task.hidden_test_command:
-            self._run_command(task.hidden_test_command, workspace, "hidden test")
+            # Hidden assertions stay private; only this gate is categorical.
+            self._run_command(task.hidden_test_command, workspace, HIDDEN_GATE_LABEL)
             results.append("hidden_test")
         if task.negative_test_command:
-            self._run_command(task.negative_test_command, workspace, "negative test")
+            self._run_command(task.negative_test_command, workspace, "negative test", include_output=True)
             results.append("negative_test")
         if task.regression_command:
-            self._run_command(task.regression_command, workspace, "regression test")
+            self._run_command(task.regression_command, workspace, "regression test", include_output=True)
             results.append("regression")
         _assert_test_hashes(workspace, hashes)
         return results
+
+    def _run_boundary_probe(self, task: BenchmarkTask, workspace: Path) -> None:
+        """Fuzz every declared symbol with empty and zero inputs."""
+
+        payload = json.dumps(
+            {
+                "files": [str((workspace / relative).resolve()) for relative in task.implementation_files],
+                "symbols": list(task.symbols),
+            }
+        )
+        self._run_command((sys.executable, "-c", BOUNDARY_PROBE, payload), workspace, "boundary probe", include_output=True)
 
     def _run_command(
         self,
@@ -549,10 +620,11 @@ class BenchmarkRunner:
             raise _GateFailure(f"{label} could not start") from exc
         if result.returncode:
             if not include_output:
-                # Cage diagnostics are deliberately categorical.  Hidden test
-                # source and assertions must never enter a repair prompt.
+                # Hidden gates stay categorical: their source and assertions
+                # must never enter a repair prompt.
                 raise _GateFailure(f"{label} failed")
-            output = (result.stdout + "\n" + result.stderr).replace(str(workspace), "$WORKSPACE").strip()
+            output = (result.stdout + "\n" + result.stderr).replace(str(workspace), "$WORKSPACE")
+            output = output.replace(str(self.root), "$PROJECT_ROOT").strip()
             raise _GateFailure(f"{label} failed:\n{output[-4000:]}")
 
     def _execution_directory(self, arm: str) -> contextlib.AbstractContextManager[Path]:
@@ -1184,6 +1256,25 @@ def _failure_category(failure: str) -> str:
     if ":" in first_line:
         first_line = first_line.split(":", 1)[0]
     return first_line[:200]
+
+
+def _is_hidden_failure(category: str) -> bool:
+    return category.startswith(HIDDEN_GATE_LABEL)
+
+
+def _invariant_guidance(task: BenchmarkTask) -> str:
+    """Restate declared invariants when a hidden gate rejects a candidate."""
+
+    checklist = "\n".join(f"- {invariant}" for invariant in task.invariants)
+    if not checklist:
+        checklist = "- (the contract declares no explicit invariants; re-read the specification)"
+    return (
+        "\nVerification Gate Failed: Invariant check or edge-case boundary violation.\n"
+        "Ensure your implementation satisfies all declared invariants:\n"
+        f"{checklist}\n"
+        "Check edge-case handling: duplicate values, empty inputs, boundary ranges, "
+        "and explicit exception raising.\n"
+    )
 
 
 def _arm_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[str, float | int | None]:

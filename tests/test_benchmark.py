@@ -398,6 +398,147 @@ class BenchmarkTests(unittest.TestCase):
         self.assertIn("b", report)
         self.assertIn("cage-hurt", report.lower())
         self.assertIn("Measured result", report)
+    def test_cage_forwards_public_test_traceback_with_sanitised_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=1)
+            bad = self._response("def answer() -> int:\n    return 0\n")
+            good = self._response("def answer() -> int:\n    return 42\n")
+            prompts = []
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self):
+                    self.responses = iter([bad, good])
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    prompts.append(messages[0]["content"])
+                    return next(self.responses)
+
+            def provider_factory(arm, _task):
+                return SequenceProvider() if arm == "cdavc" else MockProvider([good])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertTrue(cage["pass"])
+            self.assertEqual(cage["attempts"], 2)
+            self.assertIn("targeted test failed", prompts[1])
+            self.assertIn("AssertionError: 0 != 42", prompts[1])
+            self.assertIn("$WORKSPACE", prompts[1])
+            self.assertNotIn(str(root), prompts[1])
+
+    def test_cage_hidden_failure_reports_invariants_without_leaking_assertions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            secret = "hidden-secret-that-must-not-be-prompted"
+            hidden = root / "hidden_check.py"
+            hidden.write_text(
+                "from src.answer import answer\n"
+                f"assert answer() == 7, {secret!r}\n"
+            )
+            subprocess.run(["git", "add", "hidden_check.py"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "hidden check"], cwd=root, check=True)
+            invariants = (
+                "Preserve duplicate values when merging two sorted lists.",
+                "Return an empty list when either input is empty.",
+            )
+            task = self._task(
+                max_retries=1,
+                invariants=invariants,
+                test_files=("tests/test_answer.py", "hidden_check.py"),
+                hidden_test_command=("python", "hidden_check.py"),
+            )
+            candidate = self._response("def answer() -> int:\n    return 42\n")
+            prompts = []
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self):
+                    self.responses = iter([candidate, candidate])
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    prompts.append(messages[0]["content"])
+                    return next(self.responses)
+
+            def provider_factory(arm, _task):
+                return SequenceProvider() if arm == "cdavc" else MockProvider([candidate])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn("hidden test failed", cage["failure"])
+            self.assertIn("hidden test failed", prompts[1])
+            self.assertIn("Verification Gate Failed: Invariant check or edge-case boundary violation.", prompts[1])
+            self.assertIn("Ensure your implementation satisfies all declared invariants:", prompts[1])
+            for invariant in invariants:
+                self.assertIn(f"- {invariant}", prompts[1])
+            self.assertIn("duplicate values, empty inputs, boundary ranges, and explicit exception raising", prompts[1])
+            self.assertNotIn(secret, "\n".join(prompts))
+
+    def test_cage_rejects_missing_required_exception_before_running_public_tests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(
+                max_retries=0,
+                invariants=("Raise ValueError when size is not positive.",),
+                regression_command=None,
+            )
+            candidate = self._response("def answer() -> int:\n    return 42\n")
+            labels = []
+            original = BenchmarkRunner._run_command
+
+            def spy(runner, command, workspace, label, *, include_output=False):
+                labels.append(label)
+                return original(runner, command, workspace, label, include_output=include_output)
+
+            runner = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            )
+            with patch.object(BenchmarkRunner, "_run_command", spy):
+                records = runner.run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn(
+                "AST Contract Failed: Task invariant requires input validation raising ValueError, "
+                "but no Raise statements were found in implementation.",
+                cage["failure"],
+            )
+            self.assertEqual(cage["gate_results"], [])
+            self.assertNotIn("targeted test", labels)
+
+    def test_cage_boundary_probe_catches_empty_input_crash_when_enabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0, boundary_probe=True, regression_command=None)
+            self.assertFalse(self._task(max_retries=0).boundary_probe)
+            candidate = self._response("def answer(value=0) -> int:\n    return value[0]\n")
+
+            records = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn("boundary probe failed", cage["failure"])
+            self.assertIn("IndexError", cage["failure"])
+            self.assertNotIn("targeted test", cage["failure"])
 
 
 if __name__ == "__main__":

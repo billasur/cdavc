@@ -18,3 +18,4 @@ execution_report.md
 results/*.jsonl
 results/REPORT.md
 .opencode/
+ogcode.json

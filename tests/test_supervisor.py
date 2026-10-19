@@ -124,6 +124,41 @@ class SupervisorTests(unittest.TestCase):
 
             self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
             self.assertIn("missing symbols", result["tasks"]["TASK-001"]["failure"])
+    def test_supervisor_rejects_candidate_that_never_raises_required_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["max_retries"] = 0
+            payload["tasks"][0]["invariants"] = ["Raise ValueError for non-positive input."]
+            graph_path.write_text(json.dumps(payload))
+            response = json.dumps({"files": {"src/answer.py": "def answer(value: int) -> int:\n    return value + 1\n"}})
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "FAILED")
+            self.assertIn("AST gate failed", result["tasks"]["TASK-001"]["failure"])
+            self.assertIn("raising ValueError", result["tasks"]["TASK-001"]["failure"])
+
+    def test_supervisor_accepts_candidate_that_raises_required_exception(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            graph_path = self._project(root)
+            payload = json.loads(graph_path.read_text())
+            payload["tasks"][0]["max_retries"] = 0
+            payload["tasks"][0]["invariants"] = ["Raise ValueError for non-positive input."]
+            graph_path.write_text(json.dumps(payload))
+            body = (
+                "def answer(value: int) -> int:\n"
+                "    if value < 0:\n"
+                "        raise ValueError('negative input')\n"
+                "    return value + 1\n"
+            )
+            response = json.dumps({"files": {"src/answer.py": body}})
+
+            result = Supervisor(graph_path, MockProvider([response])).run()
+
+            self.assertEqual(result["tasks"]["TASK-001"]["status"], "COMPLETED")
 
 
 if __name__ == "__main__":

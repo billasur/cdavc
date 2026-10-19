@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .graph import Task, TaskGraph
+from .invariants import has_raise_statement, required_exception
 from .providers import Provider, ProviderUnavailableError
 
 
@@ -137,6 +138,12 @@ class Supervisor:
             missing = set(task.symbols) - declared
             if missing:
                 raise VerificationFailure(f"AST gate failed: missing symbols {sorted(missing)}")
+            required = required_exception(task.invariants)
+            if required and not has_raise_statement(tree):
+                raise VerificationFailure(
+                    f"AST gate failed: Task invariant requires input validation raising {required}, "
+                    "but no Raise statements were found in implementation."
+                )
         self._run_command(task.test_command, "targeted test")
         if task.negative_test_command:
             self._run_command(task.negative_test_command, "negative test")

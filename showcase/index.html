@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0e0d">
-  <meta name="description" content="CD-AVC: a scroll-driven 3D story about making local model patches earn their way into the source tree.">
-  <title>CD-AVC / Make every patch earn its way in</title>
+  <meta name="description" content="CD-AVC: a scroll-driven 3D story about one model-written patch passing through a contract, hard gates and a receipt.">
+  <title>CD-AVC / A patch has to earn the write</title>
   <link rel="stylesheet" href="./story.css">
   <script src="./vendor/gsap.min.js"></script>
   <script src="./vendor/ScrollTrigger.min.js"></script>
@@ -18,59 +18,59 @@
   </nav>
 
   <main id="top">
-    <section class="task-story" id="task-story" aria-label="A CD-AVC task patch, from contract to merge">
+    <section class="task-story" id="task-story" aria-label="One CD-AVC task patch, from contract to verified copy-back">
       <div class="story-pin">
-        <canvas id="task-canvas" aria-label="Three-dimensional CD-AVC task patch story"></canvas>
+        <canvas id="task-canvas" aria-label="Three-dimensional CD-AVC verification cage"></canvas>
         <div class="story-wash" aria-hidden="true"></div>
 
         <div class="story-meta" aria-hidden="true">
-          <span>one task patch</span>
+          <span>task_001 · count vowels</span>
           <span id="story-stage">01 / 07</span>
         </div>
 
         <div class="story-copy" aria-live="polite">
           <div class="story-panels">
             <article class="story-panel is-current" data-step="0">
-              <p class="story-kicker">The contract</p>
-              <h1>Start with the boundary.</h1>
-              <p class="story-body">Before a local model writes, CD-AVC fixes the file, symbol and retry budget. The task cannot widen while it runs.</p>
-              <ul class="story-facts"><li>one file</li><li>one symbol</li><li>bounded retries</li></ul>
+              <p class="story-kicker">01 / The contract</p>
+              <h1>The task is a closed set.</h1>
+              <p class="story-body">Before the model writes anything, the task declares one implementation file, the symbols that file must expose, the invariants to preserve and a retry budget. Everything else is out of scope by construction.</p>
+              <ul class="story-facts"><li>solution.py</li><li>count_vowels</li><li>max_retries: 2</li></ul>
             </article>
             <article class="story-panel" data-step="1">
-              <p class="story-kicker">The bounded patch</p>
-              <h2>Give the model one opening.</h2>
-              <p class="story-body">A local model drops one implementation block into the frame. Everything outside it stays untouched.</p>
-              <ul class="story-facts"><li>local endpoint</li><li>temporary workspace</li><li>patch only</li></ul>
+              <p class="story-kicker">02 / The bounded patch</p>
+              <h2>One file comes back.</h2>
+              <p class="story-body">The model answers with a file map. CD-AVC writes only the paths the task declared; test files and everything else in the response are refused at the boundary.</p>
+              <ul class="story-facts"><li>{ files: … }</li><li>declared paths only</li><li>tests untouched</li></ul>
             </article>
             <article class="story-panel" data-step="2">
-              <p class="story-kicker">Gate one / locked tests</p>
-              <h2>Seal the tests.</h2>
-              <p class="story-body">The locked-test hash must match. If it drifts, the candidate is rejected before it can move on.</p>
-              <ul class="story-facts"><li>sealed test set</li><li>hash must match</li><li>reject on drift</li></ul>
+              <p class="story-kicker">03 / Gate one · locked tests</p>
+              <h2>Seal the tests first.</h2>
+              <p class="story-body">CD-AVC hashes every locked test file before the run and again after it. If a single byte moved, the task fails before an assertion is allowed to run.</p>
+              <ul class="story-facts"><li>sha-256</li><li>before = after</li><li>drift → reject</li></ul>
             </article>
             <article class="story-panel" data-step="3">
-              <p class="story-kicker">Gate two / AST contract</p>
-              <h2>Check the symbol.</h2>
-              <p class="story-body">AST inspection confirms that only the allowed symbol changed. Hidden file edits do not pass.</p>
-              <ul class="story-facts"><li>allowed symbol</li><li>syntax intact</li><li>no hidden edits</li></ul>
+              <p class="story-kicker">04 / Gate two · AST contract</p>
+              <h2>Parse is not proof.</h2>
+              <p class="story-body">The candidate must parse, and every symbol named in the contract must exist in the implementation file. A file that only looks plausible does not get past the check.</p>
+              <ul class="story-facts"><li>ast.parse</li><li>count_vowels required</li><li>fail → restore</li></ul>
             </article>
             <article class="story-panel" data-step="4">
-              <p class="story-kicker">Gate three / isolated worktree</p>
-              <h2>Run the patch alone.</h2>
-              <p class="story-body">The candidate runs inside an isolated git worktree. The active source tree stays protected.</p>
-              <ul class="story-facts"><li>clean worktree</li><li>declared command</li><li>source protected</li></ul>
+              <p class="story-kicker">05 / Execution · git worktree</p>
+              <h2>Run it somewhere else.</h2>
+              <p class="story-body">The candidate runs in a fresh git worktree with the declared commands. The source tree is not the thing under test, and a failed attempt is thrown away.</p>
+              <ul class="story-facts"><li>git worktree</li><li>declared command</li><li>source untouched</li></ul>
             </article>
             <article class="story-panel" data-step="5">
-              <p class="story-kicker">Gate four / regression</p>
-              <h2>Let the suite decide.</h2>
-              <p class="story-body">The existing regression suite runs after the targeted check. Green is evidence, not a guess.</p>
-              <ul class="story-facts"><li>targeted test</li><li>regression suite</li><li>report written</li></ul>
+              <p class="story-kicker">06 / Gates three and four · the suite</p>
+              <h2>Four gates, in order.</h2>
+              <p class="story-body">The targeted test runs first, then the optional hidden and negative checks, then the existing regression suite. A failure restores the original file and hands the error back to the model, inside the retry budget.</p>
+              <ul class="story-facts"><li>targeted</li><li>hidden · negative</li><li>regression · retry ≤ 2</li></ul>
             </article>
             <article class="story-panel" data-step="6">
-              <p class="story-kicker">Verified result</p>
-              <h2>Only green code merges.</h2>
-              <p class="story-body">The verified block locks into the main tree. A rejected block falls away; the cage has done its job.</p>
-              <ul class="story-facts"><li>all gates green</li><li>one patch merged</li><li>receipt retained</li></ul>
+              <p class="story-kicker">07 / Verified copy-back</p>
+              <h2>The receipt outlives the run.</h2>
+              <p class="story-body">Only implementation files that passed every gate are copied into the working tree. The run leaves execution_log.json and execution_report.md behind — evidence you can diff.</p>
+              <ul class="story-facts"><li>verified files only</li><li>execution_log.json</li><li>execution_report.md</li></ul>
             </article>
           </div>
         </div>
@@ -80,24 +80,33 @@
           <ol>
             <li class="is-current"><span>01</span><b>contract</b></li>
             <li><span>02</span><b>patch</b></li>
-            <li><span>03</span><b>hash</b></li>
-            <li><span>04</span><b>AST</b></li>
+            <li><span>03</span><b>sha-256</b></li>
+            <li><span>04</span><b>ast</b></li>
             <li><span>05</span><b>worktree</b></li>
-            <li><span>06</span><b>regression</b></li>
-            <li><span>07</span><b>merge</b></li>
+            <li><span>06</span><b>gates</b></li>
+            <li><span>07</span><b>copy-back</b></li>
           </ol>
         </div>
 
         <p class="story-disclaimer">Interactive state visualization · simulated / illustrative · no benchmark claim</p>
 
         <div class="static-visual" data-step="0" aria-hidden="true">
-          <svg viewBox="0 0 500 420" role="presentation">
-            <rect class="static-ground" x="40" y="330" width="420" height="1" />
-            <rect class="static-cage" x="125" y="95" width="250" height="180" />
-            <rect class="static-patch" x="205" y="155" width="90" height="62" rx="2" />
-            <rect class="static-rejected" x="300" y="228" width="64" height="42" rx="2" />
-            <path class="static-tree" d="M390 294v-110m0 0-58 38m58-38 58 38m-58-38V90" />
-            <circle class="static-gate" cx="250" cy="186" r="82" />
+          <svg viewBox="0 0 640 420" role="presentation">
+            <rect class="static-ground" x="24" y="360" width="592" height="1" />
+            <rect class="static-contract" x="34" y="36" width="184" height="80" rx="2" />
+            <path class="static-contract-line" d="M50 58h90M50 76h128M50 94h70" />
+            <rect class="static-cage" x="20" y="112" width="586" height="248" />
+            <rect class="static-gate" x="206" y="132" width="92" height="196" />
+            <rect class="static-gate" x="338" y="132" width="92" height="196" />
+            <rect class="static-gate" x="470" y="132" width="92" height="196" />
+            <rect class="static-patch" x="84" y="186" width="66" height="80" rx="2" />
+            <path class="static-code" d="M96 204h34M96 218h42M96 232h28M96 246h38" />
+            <path class="static-hash" d="M206 350h92M338 350h92M470 350h92" />
+            <rect class="static-rejected" x="152" y="310" width="42" height="50" rx="2" />
+            <path class="static-retry" d="M172 300c-36-38-18-86 24-100" />
+            <rect class="static-repo" x="566" y="178" width="40" height="150" rx="2" />
+            <path class="static-repo-lines" d="M574 198h24M574 214h24M574 230h24M574 246h24" />
+            <path class="static-verified" d="M558 156l14 14 24-30" />
           </svg>
         </div>
       </div>
