@@ -104,7 +104,7 @@ class BenchmarkTests(unittest.TestCase):
             line_count = len(records_path.read_text().splitlines())
             with patch.object(BenchmarkRunner, "_provider_for", side_effect=AssertionError("resumed")):
                 resumed = runner.run()
-            self.assertEqual(len(resumed), 3)
+            self.assertEqual(len(resumed), len(ARMS))
             self.assertEqual(len(records_path.read_text().splitlines()), line_count)
 
             (root / "tests" / "test_answer.py").write_text("changed\n")
@@ -186,7 +186,7 @@ class BenchmarkTests(unittest.TestCase):
             )
             bad = self._response("def answer() -> int:\n    return 0\n")
             good = self._response("def answer() -> int:\n    return 42\n")
-            prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
+            prompts = {"baseline_single": [], "baseline_retry": [], "baseline_fresh": [], "cdavc": []}
 
             class SequenceProvider:
                 available = True
@@ -219,6 +219,67 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(retry["attempts"], 2)
             self.assertIn("hidden assertion failed", prompts["baseline_retry"][1])
             self.assertNotIn("hidden assertion failed", prompts["baseline_single"][0])
+
+    def test_baseline_fresh_resamples_independently_without_failure_feedback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            hidden = root / "hidden_check.py"
+            hidden.write_text(
+                "from src.answer import answer\n"
+                "assert answer() == 42, 'hidden assertion failed'\n"
+            )
+            subprocess.run(["git", "add", "hidden_check.py"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "hidden check"], cwd=root, check=True)
+            task = self._task(
+                max_retries=1,
+                test_files=("tests/test_answer.py", "hidden_check.py"),
+                hidden_test_command=("python", "hidden_check.py"),
+            )
+            bad = self._response("def answer() -> int:\n    return 0\n")
+            good = self._response("def answer() -> int:\n    return 42\n")
+            prompts = {"baseline_single": [], "baseline_retry": [], "baseline_fresh": [], "cdavc": []}
+            seeds = {"baseline_fresh": [], "baseline_retry": []}
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self, responses, arm):
+                    self.responses = iter(responses)
+                    self.arm = arm
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    prompts[self.arm].append(messages[0]["content"])
+                    if self.arm in seeds:
+                        seeds[self.arm].append(seed)
+                    return next(self.responses)
+
+            def provider_factory(arm, _task):
+                if arm == "baseline_single":
+                    return SequenceProvider([bad], arm)
+                if arm in ("baseline_retry", "baseline_fresh"):
+                    return SequenceProvider([bad, good], arm)
+                return SequenceProvider([good], arm)
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+                seed=17,
+            ).run()
+            fresh = next(record for record in records if record["arm"] == "baseline_fresh")
+            retry = next(record for record in records if record["arm"] == "baseline_retry")
+            # Equal attempt budget to the feedback arm, and both recover here.
+            self.assertTrue(fresh["pass"])
+            self.assertEqual(fresh["attempts"], 2)
+            self.assertEqual(retry["attempts"], 2)
+            # Fresh retries get the identical first-attempt prompt: no failure trace.
+            self.assertEqual(prompts["baseline_fresh"][0], prompts["baseline_fresh"][1])
+            self.assertNotIn("hidden assertion failed", prompts["baseline_fresh"][1])
+            self.assertIn("hidden assertion failed", prompts["baseline_retry"][1])
+            # Independence comes from the seed, not the prompt: attempt n uses seed + n - 1.
+            self.assertEqual(seeds["baseline_fresh"], [17, 18])
+            self.assertEqual(seeds["baseline_retry"], [17, 17])
 
     def test_cage_enforces_ast_hash_hidden_and_regression_gates_without_leaking_hidden_content(self):
         with tempfile.TemporaryDirectory() as directory:

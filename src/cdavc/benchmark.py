@@ -42,7 +42,7 @@ from .providers import (
 )
 
 
-ARMS = ("baseline_single", "baseline_retry", "cdavc")
+ARMS = ("baseline_single", "baseline_retry", "baseline_fresh", "cdavc")
 """The stable order and names used in benchmark records."""
 
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
@@ -213,7 +213,7 @@ class _Attempt:
 
 
 class BenchmarkRunner:
-    """Run the three benchmark arms and append resumable JSONL records."""
+    """Run the benchmark arms and append resumable JSONL records."""
 
     def __init__(
         self,
@@ -422,6 +422,10 @@ class BenchmarkRunner:
             try:
                 return self.provider[arm]
             except KeyError as exc:
+                if arm == "baseline_fresh" and "baseline_retry" in self.provider:
+                    # The fresh-sample control reuses the retry arm's provider;
+                    # both arms must sample the same model at equal budget.
+                    return self.provider["baseline_retry"]
                 raise BenchmarkError(f"provider mapping has no arm: {arm}") from exc
         if hasattr(self.provider, "complete") or hasattr(self.provider, "complete_with_metadata"):
             return self.provider
@@ -442,15 +446,18 @@ class BenchmarkRunner:
         return self.provider(arm)
 
     def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, attempt: int) -> ProviderCompletion:
-        del task, arm, attempt
+        del task
         messages = [{"role": "user", "content": prompt}]
+        # baseline_fresh must draw an INDEPENDENT sample per attempt: the prompt
+        # never changes in that arm, so a fixed seed would replay attempt 1.
+        seed = self.seed + attempt - 1 if arm == "baseline_fresh" else self.seed
         method = getattr(provider, "complete_with_metadata", None)
         if method is None:
             method = getattr(provider, "complete_with_usage", None)
         if method is not None:
-            result = _call_with_optional_seed(method, messages, self.seed)
+            result = _call_with_optional_seed(method, messages, seed)
         else:
-            result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
+            result = _call_with_optional_seed(getattr(provider, "complete"), messages, seed)
         return _normalise_completion(result)
 
     def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:

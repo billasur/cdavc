@@ -1,0 +1,145 @@
+diff --git a/src/cdavc/benchmark.py b/src/cdavc/benchmark.py
+index ea64923..289a037 100644
+--- a/src/cdavc/benchmark.py
++++ b/src/cdavc/benchmark.py
+@@ -42,7 +42,7 @@ from .providers import (
+ )
+ 
+ 
+-ARMS = ("baseline_single", "baseline_retry", "cdavc")
++ARMS = ("baseline_single", "baseline_retry", "baseline_fresh", "cdavc")
+ """The stable order and names used in benchmark records."""
+ 
+ DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
+@@ -213,7 +213,7 @@ class _Attempt:
+ 
+ 
+ class BenchmarkRunner:
+-    """Run the three benchmark arms and append resumable JSONL records."""
++    """Run the benchmark arms and append resumable JSONL records."""
+ 
+     def __init__(
+         self,
+@@ -422,6 +422,10 @@ class BenchmarkRunner:
+             try:
+                 return self.provider[arm]
+             except KeyError as exc:
++                if arm == "baseline_fresh" and "baseline_retry" in self.provider:
++                    # The fresh-sample control reuses the retry arm's provider;
++                    # both arms must sample the same model at equal budget.
++                    return self.provider["baseline_retry"]
+                 raise BenchmarkError(f"provider mapping has no arm: {arm}") from exc
+         if hasattr(self.provider, "complete") or hasattr(self.provider, "complete_with_metadata"):
+             return self.provider
+@@ -442,15 +446,18 @@ class BenchmarkRunner:
+         return self.provider(arm)
+ 
+     def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, attempt: int) -> ProviderCompletion:
+-        del task, arm, attempt
++        del task
+         messages = [{"role": "user", "content": prompt}]
++        # baseline_fresh must draw an INDEPENDENT sample per attempt: the prompt
++        # never changes in that arm, so a fixed seed would replay attempt 1.
++        seed = self.seed + attempt - 1 if arm == "baseline_fresh" else self.seed
+         method = getattr(provider, "complete_with_metadata", None)
+         if method is None:
+             method = getattr(provider, "complete_with_usage", None)
+         if method is not None:
+-            result = _call_with_optional_seed(method, messages, self.seed)
++            result = _call_with_optional_seed(method, messages, seed)
+         else:
+-            result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
++            result = _call_with_optional_seed(getattr(provider, "complete"), messages, seed)
+         return _normalise_completion(result)
+ 
+     def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
+diff --git a/tests/test_benchmark.py b/tests/test_benchmark.py
+index 547e444..74603d7 100644
+--- a/tests/test_benchmark.py
++++ b/tests/test_benchmark.py
+@@ -104,7 +104,7 @@ class BenchmarkTests(unittest.TestCase):
+             line_count = len(records_path.read_text().splitlines())
+             with patch.object(BenchmarkRunner, "_provider_for", side_effect=AssertionError("resumed")):
+                 resumed = runner.run()
+-            self.assertEqual(len(resumed), 3)
++            self.assertEqual(len(resumed), len(ARMS))
+             self.assertEqual(len(records_path.read_text().splitlines()), line_count)
+ 
+             (root / "tests" / "test_answer.py").write_text("changed\n")
+@@ -186,7 +186,7 @@ class BenchmarkTests(unittest.TestCase):
+             )
+             bad = self._response("def answer() -> int:\n    return 0\n")
+             good = self._response("def answer() -> int:\n    return 42\n")
+-            prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
++            prompts = {"baseline_single": [], "baseline_retry": [], "baseline_fresh": [], "cdavc": []}
+ 
+             class SequenceProvider:
+                 available = True
+@@ -220,6 +220,67 @@ class BenchmarkTests(unittest.TestCase):
+             self.assertIn("hidden assertion failed", prompts["baseline_retry"][1])
+             self.assertNotIn("hidden assertion failed", prompts["baseline_single"][0])
+ 
++    def test_baseline_fresh_resamples_independently_without_failure_feedback(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            hidden = root / "hidden_check.py"
++            hidden.write_text(
++                "from src.answer import answer\n"
++                "assert answer() == 42, 'hidden assertion failed'\n"
++            )
++            subprocess.run(["git", "add", "hidden_check.py"], cwd=root, check=True)
++            subprocess.run(["git", "commit", "-qm", "hidden check"], cwd=root, check=True)
++            task = self._task(
++                max_retries=1,
++                test_files=("tests/test_answer.py", "hidden_check.py"),
++                hidden_test_command=("python", "hidden_check.py"),
++            )
++            bad = self._response("def answer() -> int:\n    return 0\n")
++            good = self._response("def answer() -> int:\n    return 42\n")
++            prompts = {"baseline_single": [], "baseline_retry": [], "baseline_fresh": [], "cdavc": []}
++            seeds = {"baseline_fresh": [], "baseline_retry": []}
++
++            class SequenceProvider:
++                available = True
++
++                def __init__(self, responses, arm):
++                    self.responses = iter(responses)
++                    self.arm = arm
++
++                def complete_with_metadata(self, messages, *, seed=None):
++                    prompts[self.arm].append(messages[0]["content"])
++                    if self.arm in seeds:
++                        seeds[self.arm].append(seed)
++                    return next(self.responses)
++
++            def provider_factory(arm, _task):
++                if arm == "baseline_single":
++                    return SequenceProvider([bad], arm)
++                if arm in ("baseline_retry", "baseline_fresh"):
++                    return SequenceProvider([bad, good], arm)
++                return SequenceProvider([good], arm)
++
++            records = BenchmarkRunner(
++                root,
++                provider_factory,
++                tasks=[task],
++                records_path=root / "records.jsonl",
++                seed=17,
++            ).run()
++            fresh = next(record for record in records if record["arm"] == "baseline_fresh")
++            retry = next(record for record in records if record["arm"] == "baseline_retry")
++            # Equal attempt budget to the feedback arm, and both recover here.
++            self.assertTrue(fresh["pass"])
++            self.assertEqual(fresh["attempts"], 2)
++            self.assertEqual(retry["attempts"], 2)
++            # Fresh retries get the identical first-attempt prompt: no failure trace.
++            self.assertEqual(prompts["baseline_fresh"][0], prompts["baseline_fresh"][1])
++            self.assertNotIn("hidden assertion failed", prompts["baseline_fresh"][1])
++            self.assertIn("hidden assertion failed", prompts["baseline_retry"][1])
++            # Independence comes from the seed, not the prompt: attempt n uses seed + n - 1.
++            self.assertEqual(seeds["baseline_fresh"], [17, 18])
++            self.assertEqual(seeds["baseline_retry"], [17, 17])
++
+     def test_cage_enforces_ast_hash_hidden_and_regression_gates_without_leaking_hidden_content(self):
+         with tempfile.TemporaryDirectory() as directory:
+             root = self._git_project(Path(directory))
