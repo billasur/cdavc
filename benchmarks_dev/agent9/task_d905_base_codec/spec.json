@@ -1,0 +1,16 @@
+{
+  "task_id": "task_d905_base_codec",
+  "title": "Integer base encode/decode round trip",
+  "description": "Implement to_base(number, base) and from_base(text, base) for bases 2 through 36 with digits '0'-'9' then 'a'-'z' (digit value 10..35). to_base(number, base): number must be an int that is not a bool (else TypeError) and must be >= 0 (else ValueError); returns the canonical lowercase representation with no leading zeros, so to_base(0, b) == '0' and to_base(255, 16) == 'ff'. from_base(text, base): text must be a str (else TypeError); it is stripped of surrounding whitespace and matched case-insensitively; the remaining string must be non-empty and contain only digits valid for the base (each digit's value must be < base), else ValueError; leading zeros are accepted ('007' -> 7); '+'/'-' signs are not accepted. base must be an int that is not a bool (else TypeError) in the range 2..36 inclusive (else ValueError) for both functions.",
+  "implementation_files": ["benchmarks_dev/agent9/task_d905_base_codec/solution_stub.py"],
+  "symbols": ["to_base", "from_base"],
+  "invariants": [
+    "Round trip: from_base(to_base(n, b), b) == n for every int n >= 0 and every base b in 2..36.",
+    "Canonical output: to_base never emits leading zeros (except the single '0' for zero) and always uses lowercase letters.",
+    "from_base accepts surrounding whitespace, mixed case, and leading zeros; it rejects empty/blank strings, signs, and any digit whose value >= base ('2' in base 2, 'z' in base 35).",
+    "base is validated identically in both functions: non-int or bool is TypeError, outside 2..36 is ValueError.",
+    "bool numbers are TypeError even though bool subclasses int; float and str numbers are TypeError too.",
+    "Digit 'z' (value 35) is valid only in base 36."
+  ],
+  "max_retries": 2
+}

@@ -1,0 +1,16 @@
+{
+  "task_id": "task_d903_kv_record_codec",
+  "title": "Key/value record dump/parse round trip",
+  "description": "Implement dump_record(record) and parse_record(text), a one-line serialization for dict[str, str]. dump_record joins entries as 'key=value' pairs separated by ';', with entries sorted by their raw (unescaped) key. Inside keys and values, '%' is escaped as '%25', '=' as '%3D', ';' as '%3B' (uppercase hex, applied to '%' first). Empty dict dumps to ''. parse_record reverses it: '' parses to {}, entries are split on ';', each entry must contain '=', key and value are split on the first '=' and then unescaped. Unescaping accepts only '%' followed by two uppercase hex digits from the set 0-9A-F; any other '%' usage (lone '%', one digit, lowercase hex, non-hex digits) raises ValueError. A duplicate key (after unescaping) raises ValueError. record must be a dict with str keys and str values (else TypeError); text must be a str (else TypeError). Empty keys and empty values are allowed.",
+  "implementation_files": ["benchmarks_dev/agent9/task_d903_kv_record_codec/solution_stub.py"],
+  "symbols": ["dump_record", "parse_record"],
+  "invariants": [
+    "Round trip: parse_record(dump_record(record)) == record for every dict with str keys and str values, including keys/values containing '=', ';', '%', spaces, or empty strings.",
+    "dump_record output is deterministic: entries sorted by raw key, escapes uppercase ('%3B', not '%3b').",
+    "Escaping order matters: '%' is escaped first, so a literal '%3B' in the input survives the round trip unchanged.",
+    "Split on the FIRST '=' only: an escaped '=' never acts as the separator, and the separator is the first raw '='.",
+    "parse_record rejects an entry with no '=', a lone or malformed '%' escape, lowercase hex escapes, and duplicate keys: all ValueError.",
+    "dump_record({}) == '' and parse_record('') == ''."
+  ],
+  "max_retries": 2
+}

@@ -1,0 +1,25 @@
+{
+  "task_id": "task_d904_undo_history",
+  "title": "Undo/redo history with consistent current value",
+  "description": "Implement an undo/redo history as a dict {'past': [...], 'future': [...]}. new_history() returns {'past': [], 'future': []}. push(hist, value) appends value as the newest entry and clears the redo stack; it returns None. Both lists are used as stacks with the newest entry at the END: undo(hist) pops the last entry of 'past', appends it to 'future', and returns the value that was undone; redo(hist) pops the last entry of 'future', appends it back to 'past', and returns it. So after pushing 1 then 2 and one undo, hist == {'past': [1], 'future': [2]}. undo returns the undone value; if 'past' is empty it returns None and changes nothing. redo(hist) re-applies the most recently undone value (making it current again); if the redo stack is empty it returns None and changes nothing. current(hist) returns the newest value that is still applied, or None if nothing is applied. Every function takes the hist dict as produced by new_history; a non-dict, a dict missing 'past'/'future', or one where they are not lists raises TypeError. Values may be of any type, including None.",
+  "implementation_files": [
+    "benchmarks_dev/agent9/task_d904_undo_history/solution_stub.py"
+  ],
+  "symbols": [
+    "new_history",
+    "push",
+    "undo",
+    "redo",
+    "current"
+  ],
+  "invariants": [
+    "push always empties the redo stack: after push, redo returns None.",
+    "undo on an empty past returns None and changes nothing; redo on an empty redo stack returns None and changes nothing.",
+    "The value returned by undo becomes the value returned by the next redo, and current() then equals it again.",
+    "After undoing every push, current() is None and the history is back to its initial state {'past': [], 'future': []} (plus whatever remains redoable).",
+    "current() is always the newest applied value; undo/redo never reorder values.",
+    "hist must be a dict with 'past' and 'future' lists; anything else is TypeError. Values of any type (including None) may be pushed.",
+    "undo/redo return values, never raise, on empty stacks."
+  ],
+  "max_retries": 2
+}

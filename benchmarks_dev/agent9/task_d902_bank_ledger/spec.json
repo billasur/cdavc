@@ -1,0 +1,17 @@
+{
+  "task_id": "task_d902_bank_ledger",
+  "title": "Bank ledger with atomic transfers",
+  "description": "Implement a tiny ledger stored as a plain dict mapping owner names to integer balances (cents). Functions: open_account(ledger, owner) creates the owner with balance 0 and raises ValueError if the owner already exists; deposit(ledger, owner, amount) adds amount; withdraw(ledger, owner, amount) subtracts amount; transfer(ledger, from_owner, to_owner, amount) moves amount between two accounts; total(ledger) returns the sum of all balances. owner must be a str (else TypeError) and not empty or whitespace-only (else ValueError); touching an unknown owner raises KeyError. amount must be an int that is not a bool (else TypeError) and must be > 0 (else ValueError). withdraw and transfer raise ValueError on insufficient funds, and transfer with from_owner == to_owner raises ValueError. A failed operation must leave every balance unchanged.",
+  "implementation_files": ["benchmarks_dev/agent9/task_d902_bank_ledger/solution_stub.py"],
+  "symbols": ["open_account", "deposit", "withdraw", "transfer", "total"],
+  "invariants": [
+    "Atomicity: a failed withdraw or transfer (insufficient funds, bad amount, unknown owner) leaves all balances unchanged.",
+    "Conservation: transfer never changes total(ledger); deposit increases and withdraw decreases it by exactly amount.",
+    "Balances never go negative; zero and negative amounts are ValueError, never applied.",
+    "bool amounts are TypeError even though bool subclasses int; float and str amounts are TypeError too.",
+    "Opening an existing owner is ValueError; unknown owners are KeyError on deposit, withdraw, transfer; unknown owner never gets created as a side effect.",
+    "owner must be a str: non-str is TypeError; empty or whitespace-only is ValueError.",
+    "transfer with from_owner == to_owner is ValueError and changes nothing."
+  ],
+  "max_retries": 2
+}

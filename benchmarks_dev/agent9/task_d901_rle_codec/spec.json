@@ -1,0 +1,16 @@
+{
+  "task_id": "task_d901_rle_codec",
+  "title": "Run-length encode/decode round trip",
+  "description": "Implement rle_encode(text) and rle_decode(data). rle_encode compresses a string into run-length form: every maximal run of k identical characters is written as the decimal count k (no leading zeros), then a ':' separator, then the single character, so 'aaab' becomes '3:a1:b' and '1111' becomes '4:1'. The ':' separator is what makes digit characters in the input unambiguous. rle_decode reverses it: the input is a concatenation of groups, each group a decimal count >= 1, a ':', then exactly one character (which may be any character, including a digit or ':'). Both functions take a str (anything else raises TypeError). rle_encode('') == '' and rle_decode('') == ''. rle_decode raises ValueError on a group with no digits, a count of 0, a missing ':', or a count and ':' with no following character.",
+  "implementation_files": ["benchmarks_dev/agent9/task_d901_rle_codec/solution_stub.py"],
+  "symbols": ["rle_encode", "rle_decode"],
+  "invariants": [
+    "Round trip: rle_decode(rle_encode(text)) == text for every str text, including text containing digits or ':' characters.",
+    "rle_encode output is canonical: every group carries its count (even 1), counts have no leading zeros, and no two adjacent groups repeat the same character.",
+    "The ':' separator makes digit data unambiguous: '1111' encodes to '4:1', and '4:1' decodes to '1111'.",
+    "rle_decode raises ValueError for a bare character with no count, a zero count ('0:a'), a count with no ':' ('3'), and a count and ':' with no character ('1:a2:').",
+    "Empty string maps to empty string in both directions.",
+    "Non-str input raises TypeError in both functions."
+  ],
+  "max_retries": 2
+}
