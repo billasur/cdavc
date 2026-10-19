@@ -53,6 +53,7 @@ HIDDEN_GATE_LABEL = "hidden test"
 
 BOUNDARY_PROBE = """\
 import importlib.util
+import inspect
 import json
 import sys
 
@@ -65,9 +66,19 @@ for path in spec["files"]:
         function = getattr(module, symbol, None)
         if not callable(function):
             continue
+        try:
+            required = sum(
+                1
+                for parameter in inspect.signature(function).parameters.values()
+                if parameter.default is parameter.empty
+                and parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+            )
+        except (TypeError, ValueError):
+            required = 1
+        required = max(required, 1)
         for argument in ("", [], 0):
             try:
-                function(argument)
+                function(*[argument] * required)
             except (IndexError, ZeroDivisionError) as exc:
                 print(f"{symbol}({argument!r}) raised {type(exc).__name__}: {exc}", file=sys.stderr)
                 raise SystemExit(1)

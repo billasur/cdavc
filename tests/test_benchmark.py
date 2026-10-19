@@ -540,6 +540,22 @@ class BenchmarkTests(unittest.TestCase):
             self.assertIn("IndexError", cage["failure"])
             self.assertNotIn("targeted test", cage["failure"])
 
+    def test_cage_boundary_probe_fills_every_required_argument(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0, boundary_probe=True, regression_command=None)
+            candidate = self._response("def answer(items, size) -> int:\n    return items[0]\n")
+
+            records = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn("IndexError", cage["failure"])
+
 
 if __name__ == "__main__":
     unittest.main()
