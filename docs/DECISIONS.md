@@ -42,7 +42,8 @@ the corpus as measured for REPORT90.
 
 **Keep or revert.** Keep.
 
-**Commit.** `COMMIT_D1`
+**Commit.** `f65417c` (code) — this entry was appended afterwards, so the
+hash it names is already in history.
 
 ---
 
@@ -61,6 +62,60 @@ prompt.
 
 **Dev result.** Pending — measured on the dev baseline run.
 
-**Keep or revert.** Pending.
+**Keep or revert.** Keep the split (it is required to report honestly). The
+budget equalisation still needs a dev reading before it is kept as a method
+change.
 
-**Commit.** `COMMIT_D2`
+**Commit.** `3deface` (code)
+
+---
+
+## D3 — Iterate on a disjoint 40-task dev corpus
+
+**Hypothesis.** A corpus that is disjoint from the reported 30 can expose
+levers (selection, repair context, sampling schedule) without turning the
+held-out number into a fit. Forty tasks is enough to rank failure modes and
+to keep the 3-task noise floor meaningful.
+
+**Change.** `benchmarks/dev/` with 40 single-function tasks, its own public,
+hidden and regression modules, a frozen reference implementation per task,
+and `benchmarks/dev/properties.json` pinned by `MANIFEST.sha256`.
+`tools/build_dev_corpus.py` renders the corpus from `tools/dev_specs.py` and
+refuses to emit it unless every reference passes all three test modules and
+its property check, and every unsolved stub fails the public tests.
+`--properties` and `--only` select the dev table and the per-iteration
+subset.
+
+**Known transfer risk.** Dev properties are differential against the
+reference implementation, which is a stronger oracle than the held-out
+metamorphic checks. A lever that only works because the gate can compare to
+a reference will not transfer; any such result is labelled and not promoted.
+
+**Dev result.** n/a — corpus construction. 109 unit tests pass; no model
+calls.
+
+**Keep or revert.** Keep.
+
+**Commit.** `46462e6` (code)
+
+---
+
+## D4 — Characterise the dev corpus before any lever (pre-registered)
+
+**Hypothesis.** At the current method, the blind retry arm and the cage are
+within 3/40 of each other on dev, and the cage is slower. This establishes
+the noise floor and the five hardest tasks used by every later iteration.
+
+**Change.** None — this is a measurement run of all 40 dev tasks with the
+current code, 3 draws per sampling arm, seed 20261020.
+
+**Kill criterion.** If the dev corpus is at ceiling for both blind retry and
+the cage (>= 38/40 each), it cannot discriminate levers and must be made
+harder before any experiment; a set of 5 hardest tasks drawn from a ceiling
+corpus is meaningless.
+
+**Dev result.** Pending.
+
+**Keep or revert.** n/a — measurement.
+
+**Commit.** pending
