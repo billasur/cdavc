@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h06_iso_duration",
+  "title": "ISO 8601 duration to seconds",
+  "description": "Implement parse_duration(text). Parse an ISO 8601 duration such as 'P1DT2H30M' or 'PT0.5S' and return the total number of seconds as a float. Supported designators: W, D (before T) and H, M, S (after T). Raise ValueError for anything else.",
+  "source": "CD-AVC-heldout-agent2-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent2/task_h06_iso_duration/solution.py"
+  ],
+  "symbols": [
+    "parse_duration"
+  ],
+  "invariants": [
+    "Years and months (Y, or M before T) are rejected with ValueError.",
+    "'P' alone, 'PT' alone, a missing 'P', empty text and a 'T' with nothing after it are ValueError.",
+    "Only the seconds field may be fractional (dot decimal).",
+    "Designators must appear in order W, D, then T then H, M, S."
+  ],
+  "max_retries": 2
+}

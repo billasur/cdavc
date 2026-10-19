@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h07_business_days",
+  "title": "Count business days",
+  "description": "Implement business_days(start, end, holidays=()). start, end and each holiday are ISO dates 'YYYY-MM-DD'. Return the number of Monday-Friday days in the half-open range [start, end) that are not listed in holidays. If end < start raise ValueError. Invalid dates raise ValueError.",
+  "source": "CD-AVC-heldout-agent2-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent2/task_h07_business_days/solution.py"
+  ],
+  "symbols": [
+    "business_days"
+  ],
+  "invariants": [
+    "start is counted, end is not.",
+    "start == end gives 0.",
+    "Holidays that fall on a weekend or outside the range are ignored and must not be double-subtracted; duplicate holidays count once.",
+    "end earlier than start raises ValueError."
+  ],
+  "max_retries": 2
+}

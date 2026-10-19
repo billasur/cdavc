@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h08_add_months",
+  "title": "Add months with end-of-month clamping",
+  "description": "Implement add_months(day, months). day is an ISO date 'YYYY-MM-DD'; months is an int (may be negative or zero). Return the ISO date that many calendar months later. If the target month is shorter than the day of month, clamp to the last day of that month. Invalid input dates raise ValueError.",
+  "source": "CD-AVC-heldout-agent2-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent2/task_h08_add_months/solution.py"
+  ],
+  "symbols": [
+    "add_months"
+  ],
+  "invariants": [
+    "Jan 31 plus one month is the last day of February (28 or 29 depending on leap year).",
+    "Negative months move backward and cross year boundaries.",
+    "Leap rules: divisible by 4, except centuries not divisible by 400.",
+    "Result is always zero-padded 'YYYY-MM-DD'."
+  ],
+  "max_retries": 2
+}

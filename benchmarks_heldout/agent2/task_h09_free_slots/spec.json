@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h09_free_slots",
+  "title": "Free time slots in a day",
+  "description": "Implement free_slots(busy, day_start, day_end). All times are 'HH:MM' 24-hour strings. busy is a list of (start, end) pairs that may be unsorted, overlapping, touching, or extend outside the working window. Return the free gaps inside [day_start, day_end] as a sorted list of (start, end) 'HH:MM' tuples. Zero-length gaps are omitted. If day_end <= day_start raise ValueError; a malformed time or a busy pair with end < start raises ValueError.",
+  "source": "CD-AVC-heldout-agent2-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent2/task_h09_free_slots/solution.py"
+  ],
+  "symbols": [
+    "free_slots"
+  ],
+  "invariants": [
+    "Overlapping and touching busy intervals merge.",
+    "Busy time outside the window is clipped, not an error.",
+    "Empty busy list returns the whole window as one slot.",
+    "Output times are zero-padded 'HH:MM'."
+  ],
+  "max_retries": 2
+}

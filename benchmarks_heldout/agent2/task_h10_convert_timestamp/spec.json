@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h10_convert_timestamp",
+  "title": "Convert an ISO timestamp to another UTC offset",
+  "description": "Implement convert_timestamp(ts, offset). ts is an ISO 8601 timestamp 'YYYY-MM-DDTHH:MM:SS' followed by a UTC designator: 'Z' or '+HH:MM' or '-HH:MM'. offset is the target designator in the same form. Return the same instant expressed in the target offset as 'YYYY-MM-DDTHH:MM:SS+HH:MM' (use '+00:00', never 'Z', in output). Raise ValueError for malformed input, a missing designator, or offsets beyond +/-23:59.",
+  "source": "CD-AVC-heldout-agent2-v1",
+  "implementation_files": [
+    "benchmarks_heldout/agent2/task_h10_convert_timestamp/solution.py"
+  ],
+  "symbols": [
+    "convert_timestamp"
+  ],
+  "invariants": [
+    "'Z' is accepted on input and means +00:00.",
+    "The date rolls over correctly in both directions, including month, year and leap-day boundaries.",
+    "Half-hour and 45-minute offsets (e.g. +05:30, +05:45) are supported.",
+    "A timestamp with no designator (naive) is ValueError."
+  ],
+  "max_retries": 2
+}
