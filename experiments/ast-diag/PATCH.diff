@@ -1,0 +1,23 @@
+diff --git a/src/cdavc/benchmark.py b/src/cdavc/benchmark.py
+index ea64923..c331671 100644
+--- a/src/cdavc/benchmark.py
++++ b/src/cdavc/benchmark.py
+@@ -545,7 +545,8 @@ class BenchmarkRunner:
+                 source = source_path.read_text()
+                 tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
+             except (OSError, SyntaxError) as exc:
+-                raise _GateFailure("AST contract failed") from exc
++                detail = f"{relative}:{exc.lineno}: {exc.msg}" if isinstance(exc, SyntaxError) else f"{relative}: could not read file"
++                raise _GateFailure(f"AST contract failed: {detail}") from exc
+             declared = {
+                 node.name
+                 for node in ast.walk(tree)
+@@ -553,7 +554,7 @@ class BenchmarkRunner:
+             }
+             missing = set(task.symbols) - declared
+             if missing:
+-                raise _GateFailure("AST contract is missing a required symbol")
++                raise _GateFailure(f"AST contract failed: missing required symbols {sorted(missing)}")
+             required = required_exception(task.invariants)
+             if required and not has_raise_statement(tree):
+                 raise _GateFailure(
