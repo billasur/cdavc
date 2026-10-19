@@ -487,6 +487,64 @@ class BenchmarkTests(unittest.TestCase):
             self.assertIn("duplicate values, empty inputs, boundary ranges, and explicit exception raising", prompts[1])
             self.assertNotIn(secret, "\n".join(prompts))
 
+    def test_cage_escalates_invariant_guidance_on_repeat_hidden_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            secret = "hidden-secret-that-must-not-be-prompted"
+            hidden = root / "hidden_check.py"
+            hidden.write_text(
+                "from src.answer import answer\n"
+                f"assert answer() == 7, {secret!r}\n"
+            )
+            subprocess.run(["git", "add", "hidden_check.py"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "hidden check"], cwd=root, check=True)
+            invariants = (
+                "Preserve duplicate values when merging two sorted lists.",
+                "Return an empty list when either input is empty.",
+            )
+            task = self._task(
+                max_retries=2,
+                invariants=invariants,
+                test_files=("tests/test_answer.py", "hidden_check.py"),
+                hidden_test_command=("python", "hidden_check.py"),
+            )
+            candidate = self._response("def answer() -> int:\n    return 42\n")
+            prompts = []
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self):
+                    self.responses = iter([candidate, candidate, candidate])
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    prompts.append(messages[0]["content"])
+                    return next(self.responses)
+
+            def provider_factory(arm, _task):
+                if arm == "cdavc":
+                    return SequenceProvider()
+                return MockProvider([candidate, candidate, candidate])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertEqual(cage["attempts"], 3)
+            self.assertEqual(len(prompts), 3)
+            self.assertIn("Verification Gate Failed: Invariant check or edge-case boundary violation.", prompts[1])
+            self.assertIn("Verification Gate Failed: Invariant check or edge-case boundary violation.", prompts[2])
+            self.assertNotIn("Repeated hidden-gate rejection", prompts[0])
+            self.assertNotIn("Repeated hidden-gate rejection", prompts[1])
+            self.assertIn("Repeated hidden-gate rejection", prompts[2])
+            for invariant in invariants:
+                self.assertIn(f"- {invariant}", prompts[2])
+            self.assertNotIn(secret, "\n".join(prompts))
+
     def test_cage_rejects_missing_required_exception_before_running_public_tests(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self._git_project(Path(directory))

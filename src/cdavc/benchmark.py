@@ -328,7 +328,7 @@ class BenchmarkRunner:
             with self._execution_directory(arm) as workspace:
                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
                 for attempt_number in range(1, max_attempts + 1):
-                    prompt = self._prompt(task, arm, failure)
+                    prompt = self._prompt(task, arm, failure, hidden_streak=_consecutive_hidden_failures(attempts))
                     completion: ProviderCompletion | None = None
                     try:
                         completion = self._complete(provider, prompt, task, arm, attempt_number)
@@ -453,14 +453,14 @@ class BenchmarkRunner:
             result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
         return _normalise_completion(result)
 
-    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
+    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str, *, hidden_streak: int = 0) -> str:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
         repair = ""
         if previous_failure:
             if arm == "baseline_retry":
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
             elif arm == "cdavc":
-                repair = self._cage_repair(task, previous_failure)
+                repair = self._cage_repair(task, previous_failure, hidden_streak=hidden_streak)
         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
@@ -475,19 +475,21 @@ class BenchmarkRunner:
             + repair
         )
 
-    def _cage_repair(self, task: BenchmarkTask, failure: str) -> str:
+    def _cage_repair(self, task: BenchmarkTask, failure: str, *, hidden_streak: int = 0) -> str:
         """Build cage repair context that never carries hidden assertions.
 
         Targeted, negative and regression tests are public repository assets,
         so their sanitised traceback is forwarded like a human engineer would
         see it.  A hidden-gate rejection stays categorical and is answered with
-        the task's declared invariants instead of the failing assertion.
+        the task's declared invariants instead of the failing assertion.  When the
+        hidden gate has already rejected consecutive repairs, the guidance escalates
+        to a strategy shift because repeating identical text adds no new signal.
         """
 
         category = _failure_category(failure)
         context = f"\nPrevious deterministic failure category: {category}\n"
         if _is_hidden_failure(category):
-            return context + _invariant_guidance(task)
+            return context + _invariant_guidance(task, escalate=hidden_streak >= 2)
         detail = failure.split(":", 1)[1].strip() if ":" in failure else ""
         if detail:
             return context + f"Public gate output:\n{detail}\n"
@@ -1262,19 +1264,45 @@ def _is_hidden_failure(category: str) -> bool:
     return category.startswith(HIDDEN_GATE_LABEL)
 
 
-def _invariant_guidance(task: BenchmarkTask) -> str:
-    """Restate declared invariants when a hidden gate rejects a candidate."""
+def _invariant_guidance(task: BenchmarkTask, *, escalate: bool = False) -> str:
+    """Restate declared invariants when a hidden gate rejects a candidate.
+
+    On a repeated hidden rejection the same checklist is kept and a strategy
+    shift is appended: every sentence still comes from the contract or from
+    generic debugging advice, so no hidden-test content can leak.
+    """
 
     checklist = "\n".join(f"- {invariant}" for invariant in task.invariants)
     if not checklist:
         checklist = "- (the contract declares no explicit invariants; re-read the specification)"
-    return (
+    guidance = (
         "\nVerification Gate Failed: Invariant check or edge-case boundary violation.\n"
         "Ensure your implementation satisfies all declared invariants:\n"
         f"{checklist}\n"
         "Check edge-case handling: duplicate values, empty inputs, boundary ranges, "
         "and explicit exception raising.\n"
     )
+    if escalate:
+        guidance += (
+            "Repeated hidden-gate rejection: a minimal edit of the previous candidate is not converging.\n"
+            "Rebuild the implementation from the specification and every invariant above "
+            "instead of patching the last candidate.\n"
+            "Before returning code, trace it by hand on one input per edge-case category - "
+            "duplicate or repeated values, empty input, zero or negative values, boundary values - "
+            "then return a complete corrected implementation.\n"
+        )
+    return guidance
+
+
+def _consecutive_hidden_failures(attempts: Sequence[_Attempt]) -> int:
+    """Count the trailing run of failed attempts rejected by the hidden gate."""
+
+    streak = 0
+    for attempt in reversed(attempts):
+        if attempt.passed or not _is_hidden_failure(_failure_category(attempt.failure)):
+            break
+        streak += 1
+    return streak
 
 
 def _arm_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[str, float | int | None]:
