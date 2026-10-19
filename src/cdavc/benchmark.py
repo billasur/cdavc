@@ -33,6 +33,7 @@ from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
+from . import properties as property_gate
 from .invariants import has_raise_statement, required_exception
 from .providers import (
     MockProvider,
@@ -46,10 +47,24 @@ ARMS = ("baseline_single", "baseline_retry", "cdavc")
 """The stable order and names used in benchmark records."""
 
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
-BENCHMARK_VERSION = "1"
+BENCHMARK_VERSION = "2"
 
 HIDDEN_GATE_LABEL = "hidden test"
 """Gate label whose diagnostics must never reach a repair prompt."""
+
+PROPERTY_TABLE = Path("benchmarks") / "properties.json"
+"""Frozen public metamorphic table; hashed before any candidate is drawn."""
+
+STDLIB_ONLY_HINT = (
+    "The evaluation environment has no third-party packages: use the Python standard library only.\n"
+)
+"""Prompt constraint that removes import-time failures from the sample budget."""
+
+JSON_REASK_PROMPT = "Return only the JSON object requested above, with no prose and no markdown fence."
+"""Single corrective turn issued when a provider reply cannot be parsed as JSON."""
+
+DEFAULT_SAMPLES = 4
+"""Independent draws for the CD-AVC arm when ``--samples`` is not given."""
 
 BOUNDARY_PROBE = """\
 import importlib.util
@@ -210,6 +225,8 @@ class _Attempt:
     prompt_tokens: int | None
     completion_tokens: int | None
     failure: str = ""
+    seed: int | None = None
+    draw: int = 0
 
 
 class BenchmarkRunner:
@@ -230,6 +247,8 @@ class BenchmarkRunner:
         hardware: str | None = None,
         timeout_seconds: float = 30.0,
         retry_cap: int = 3,
+        samples: int | Mapping[str, int] | None = None,
+        mutants: int = 0,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -258,6 +277,10 @@ class BenchmarkRunner:
         self.hardware = hardware
         self.timeout_seconds = timeout_seconds
         self.retry_cap = retry_cap
+        self.samples = _sample_budget(samples)
+        if isinstance(mutants, bool) or not isinstance(mutants, int) or mutants < 0:
+            raise BenchmarkError("mutants must be a non-negative integer")
+        self.mutants = mutants
         if records_path is None:
             output_path = self.root / "results" / "benchmark.jsonl"
         else:
@@ -322,43 +345,69 @@ class BenchmarkRunner:
         reported_model: str | None = None
         provider = self._provider_for(arm, task)
         self._ensure_local_provider(provider)
-        max_attempts = 1 if arm == "baseline_single" else min(task.max_retries, self.retry_cap) + 1
+        budget = self._samples_for(arm, task)
         execution_mode = "git-worktree" if arm == "cdavc" else "temporary-copy"
+        digest: dict[tuple[str, str], Mapping[str, Any]] = {}
+        signatures: list[str] = []
+        json_reasks = 0
+        hidden_rejections = 0
+        public_gate_passes = 0
+        properties: dict[str, Any] = {}
+        candidate: Mapping[str, str] = {}
         try:
             with self._execution_directory(arm) as workspace:
                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
-                for attempt_number in range(1, max_attempts + 1):
+                for draw in range(1, budget + 1):
                     prompt = self._prompt(task, arm, failure)
+                    seed = _sample_seed(self.seed, draw)
                     completion: ProviderCompletion | None = None
+                    prompt_tokens: int | None = None
+                    completion_tokens: int | None = None
                     try:
-                        completion = self._complete(provider, prompt, task, arm, attempt_number)
+                        completion = self._complete(provider, prompt, task, arm, draw)
                         if completion.model:
                             reported_model = completion.model
-                        self._apply_response(task, completion.text, workspace)
+                        prompt_tokens = completion.prompt_tokens
+                        completion_tokens = completion.completion_tokens
+                        try:
+                            self._apply_response(task, completion.text, workspace)
+                        except _GateFailure as exc:
+                            if not _is_json_parse_failure(exc):
+                                raise
+                            completion = self._reask_json(provider, prompt, completion, task, arm, draw)
+                            json_reasks += 1
+                            prompt_tokens = _add_usage(prompt_tokens, completion.prompt_tokens)
+                            completion_tokens = _add_usage(completion_tokens, completion.completion_tokens)
+                            if completion.model:
+                                reported_model = completion.model
+                            self._apply_response(task, completion.text, workspace)
+                        candidate = self._store_candidate(arm, task, workspace)
                         if arm == "cdavc":
-                            gates = self._run_cage_gates(task, workspace, hashes)
+                            gates = self._run_cage_gates(
+                                task, workspace, hashes, digest=digest, properties=properties
+                            )
+                            public_gate_passes += 1
                         else:
                             self._run_baseline_test(task, workspace)
                         attempts.append(
-                            _Attempt(
-                                True,
-                                completion.prompt_tokens,
-                                completion.completion_tokens,
-                            )
+                            _Attempt(True, prompt_tokens, completion_tokens, seed=seed, draw=draw)
                         )
                         failure = ""
                         break
                     except Exception as exc:  # bounded candidate failures become data, not runner crashes
                         failure = _safe_failure(exc)
                         attempts.append(
-                            _Attempt(
-                                False,
-                                completion.prompt_tokens if completion is not None else None,
-                                completion.completion_tokens if completion is not None else None,
-                                failure,
-                            )
+                            _Attempt(False, prompt_tokens, completion_tokens, failure, seed=seed, draw=draw)
                         )
+                        if _is_hidden_failure(_failure_category(failure)):
+                            hidden_rejections += 1
+                        signatures.append(_failure_signature(failure))
                         _restore_files(workspace, original)
+                        # A byte-identical failure signature twice means the next
+                        # draw would replay the same defect.  The rule is shared
+                        # by every arm so the sample budgets stay comparable.
+                        if len(signatures) >= 2 and signatures[-1] == signatures[-2]:
+                            break
         except BenchmarkError:
             raise
         except Exception as exc:
@@ -395,9 +444,33 @@ class BenchmarkRunner:
             "hardware": self.hardware or platform.platform(),
             "seed": self.seed,
             "attempt_log": [
-                {"attempt": index, "status": "ACCEPTED" if item.passed else "REJECTED", **({"failure": item.failure} if item.failure else {})}
+                {
+                    "attempt": index,
+                    "draw": item.draw,
+                    "seed": item.seed,
+                    "status": "ACCEPTED" if item.passed else "REJECTED",
+                    **({"failure": item.failure} if item.failure else {}),
+                }
                 for index, item in enumerate(attempts, 1)
             ],
+            "samples_budget": budget,
+            "samples_drawn": len(attempts),
+            "samples_to_accept": len(attempts) if passed else None,
+            "distinct_failure_signatures": len(set(signatures)),
+            "failure_signatures": list(signatures),
+            "json_reasks": json_reasks,
+            "public_gate_passes": public_gate_passes,
+            "hidden_rejections": hidden_rejections,
+            "property_table_hash": properties.get("table_hash") or self._property_table_hash(),
+            "properties_checked": properties.get("checked"),
+            "properties_replayed": properties.get("replayed"),
+            "property_failures": list(properties.get("failures", ())),
+            "mutant_kill_rate": (properties.get("mutants") or {}).get("kill_rate"),
+            "mutants_generated": (properties.get("mutants") or {}).get("generated"),
+            "mutants_killed": (properties.get("mutants") or {}).get("killed"),
+            "failure_digest": list(digest.values())[:20],
+            "candidate_sha": candidate.get("sha"),
+            "candidate_dir": candidate.get("dir"),
             "failure": "" if passed else failure,
             "execution_mode": execution_mode,
             "cage_gates_run": arm == "cdavc",
@@ -441,17 +514,62 @@ class BenchmarkRunner:
             return self.provider(arm, task)
         return self.provider(arm)
 
+    def _samples_for(self, arm: str, task: BenchmarkTask) -> int:
+        """Return the number of independent draws this arm may spend on a task."""
+
+        if isinstance(self.samples, Mapping):
+            if arm in self.samples:
+                return max(1, int(self.samples[arm]))
+        elif self.samples is not None:
+            return int(self.samples)
+        if arm == "baseline_single":
+            return 1
+        retries = min(task.max_retries, self.retry_cap) + 1
+        if arm == "baseline_retry":
+            return retries
+        # The cage spends its budget on independent draws rather than on
+        # repairs, but it never outspends what the task allows.
+        return max(1, min(retries, DEFAULT_SAMPLES))
+
     def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, attempt: int) -> ProviderCompletion:
-        del task, arm, attempt
-        messages = [{"role": "user", "content": prompt}]
+        del task, arm
+        messages: list[Mapping[str, str]] = [{"role": "user", "content": prompt}]
+        return self._complete_messages(provider, messages, seed=_sample_seed(self.seed, attempt))
+
+    def _complete_messages(
+        self,
+        provider: Any,
+        messages: Sequence[Mapping[str, str]],
+        *,
+        seed: int,
+    ) -> ProviderCompletion:
         method = getattr(provider, "complete_with_metadata", None)
         if method is None:
             method = getattr(provider, "complete_with_usage", None)
         if method is not None:
-            result = _call_with_optional_seed(method, messages, self.seed)
+            result = _call_with_optional_seed(method, list(messages), seed)
         else:
-            result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
+            result = _call_with_optional_seed(getattr(provider, "complete"), list(messages), seed)
         return _normalise_completion(result)
+
+    def _reask_json(
+        self,
+        provider: Any,
+        prompt: str,
+        completion: ProviderCompletion,
+        task: BenchmarkTask,
+        arm: str,
+        draw: int,
+    ) -> ProviderCompletion:
+        """Spend one corrective turn when a reply is not a parseable JSON object."""
+
+        del task, arm
+        messages: list[Mapping[str, str]] = [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": completion.text},
+            {"role": "user", "content": JSON_REASK_PROMPT},
+        ]
+        return self._complete_messages(provider, messages, seed=_sample_seed(self.seed, draw))
 
     def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
@@ -467,6 +585,7 @@ class BenchmarkRunner:
             f"Benchmark arm: {arm}.\n"
             f"Deterministic seed: {self.seed}.\n"
             + specification
+            + STDLIB_ONLY_HINT
             + f"Allowed implementation files: {', '.join(task.implementation_files)}\n"
             f"Required symbols: {', '.join(task.symbols) or '(none)'}\n"
             f"Public invariants: {', '.join(task.invariants) or '(see tests)'}\n"
@@ -535,10 +654,21 @@ class BenchmarkRunner:
         label = "baseline hidden test" if task.hidden_test_command else "baseline evaluation test"
         self._run_command(command, workspace, label, include_output=True)
 
-    def _run_cage_gates(self, task: BenchmarkTask, workspace: Path, hashes: Mapping[str, str]) -> list[str]:
+    def _run_cage_gates(
+        self,
+        task: BenchmarkTask,
+        workspace: Path,
+        hashes: Mapping[str, str],
+        *,
+        digest: dict[tuple[str, str], Mapping[str, Any]] | None = None,
+        properties: dict[str, Any] | None = None,
+    ) -> list[str]:
         results: list[str] = []
+        if properties is None:
+            properties = {}
         _assert_test_hashes(workspace, hashes)
         results.append("locked_test_hashes")
+        local_modules = self._local_module_names(task, workspace)
         for relative in task.implementation_files:
             source_path = workspace / relative
             try:
@@ -554,6 +684,12 @@ class BenchmarkRunner:
             missing = set(task.symbols) - declared
             if missing:
                 raise _GateFailure("AST contract is missing a required symbol")
+            imported = property_gate.non_stdlib_imports(tree, allowed=local_modules)
+            if imported:
+                raise _GateFailure(
+                    f"AST Contract Failed: candidate imports the non-stdlib module {imported[0]!r}; "
+                    "the evaluation environment has no third-party packages."
+                )
             required = required_exception(task.invariants)
             if required and not has_raise_statement(tree):
                 raise _GateFailure(
@@ -561,6 +697,9 @@ class BenchmarkRunner:
                     "but no Raise statements were found in implementation."
                 )
         results.append("ast_contract")
+        property_info = self._run_property_gate(task, workspace, digest if digest is not None else {}, properties)
+        if property_info:
+            results.append("property_gate")
         if task.boundary_probe:
             self._run_boundary_probe(task, workspace)
             results.append("boundary_probe")
@@ -578,6 +717,117 @@ class BenchmarkRunner:
             results.append("regression")
         _assert_test_hashes(workspace, hashes)
         return results
+
+    def _local_module_names(self, task: BenchmarkTask, workspace: Path) -> tuple[str, ...]:
+        """Modules a candidate may legitimately import from its own repository."""
+
+        names = {Path(relative).stem for relative in task.implementation_files}
+        for base in (workspace, workspace / "src"):
+            if base.is_dir():
+                names.update(path.stem for path in base.glob("*.py"))
+        return tuple(sorted(names))
+
+    def _property_table_hash(self) -> str | None:
+        path = self.root / PROPERTY_TABLE
+        return _sha256(path) if path.is_file() else None
+
+    def _run_property_gate(
+        self,
+        task: BenchmarkTask,
+        workspace: Path,
+        digest: dict[tuple[str, str], Mapping[str, Any]],
+        properties: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run the frozen metamorphic table against the candidate in a subprocess."""
+
+        table_path = self.root / PROPERTY_TABLE
+        if not table_path.is_file():
+            return {}
+        try:
+            table = property_gate.load_table(table_path)
+        except (OSError, ValueError, property_gate.PropertyTableError) as exc:
+            raise BenchmarkError(f"property table is not readable: {table_path}") from exc
+        if not property_gate.entries_for(table, task.task_id):
+            return {}
+        replay_path: Path | None = None
+        if digest:
+            try:
+                handle = tempfile.NamedTemporaryFile(
+                    "w", suffix=".json", delete=False, prefix="cdavc-replay-", encoding="utf-8"
+                )
+                with handle:
+                    json.dump(list(digest.values()), handle)
+                replay_path = Path(handle.name)
+            except OSError:
+                replay_path = None
+        command = [
+            sys.executable,
+            "-m",
+            "cdavc.properties",
+            "--table",
+            str(table_path),
+            "--task",
+            task.task_id,
+            "--seed",
+            str(self.seed),
+        ]
+        if replay_path is not None:
+            command += ["--replay", str(replay_path)]
+        if self.mutants:
+            command += ["--mutants", str(self.mutants)]
+        for relative in task.implementation_files:
+            command += ["--file", str((workspace / relative).resolve())]
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(Path(__file__).resolve().parent.parent), str(workspace / "src"), env.get("PYTHONPATH", "")]
+        )
+        # Property inputs must be identical across machines and runs, so the
+        # probe never inherits the caller's hash randomisation.
+        env["PYTHONHASHSEED"] = "0"
+        try:
+            result = subprocess.run(
+                command,
+                cwd=workspace,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise _GateFailure("property gate timed out") from exc
+        except OSError as exc:
+            raise _GateFailure("property gate could not start") from exc
+        finally:
+            if replay_path is not None:
+                replay_path.unlink(missing_ok=True)
+        payload = _json_payload(result.stdout)
+        if payload is None:
+            raise _GateFailure("property gate could not report a result")
+        failures = [item for item in payload.get("failures", ()) if isinstance(item, Mapping)]
+        for failure in failures:
+            key = (str(failure.get("property")), json.dumps(failure.get("args", []), sort_keys=True))
+            digest.setdefault(key, {"property": failure.get("property"), "args": failure.get("args", [])})
+        properties.clear()
+        properties.update(
+            {
+                "table_hash": _sha256(table_path),
+                "checked": payload.get("checked"),
+                "replayed": payload.get("replayed"),
+                "failures": [dict(item) for item in failures][:5],
+                "mutants": payload.get("mutants") if isinstance(payload.get("mutants"), Mapping) else {},
+            }
+        )
+        if result.returncode:
+            detail = "\n".join(
+                property_gate.PropertyFailure(
+                    str(item.get("property")),
+                    tuple(item.get("args", ())),
+                    str(item.get("message", "property failed")),
+                ).render()
+                for item in failures
+            )[:4000] or (result.stdout + result.stderr)[-2000:]
+            raise _GateFailure(f"property gate failed:\n{detail}")
+        return properties
 
     def _run_boundary_probe(self, task: BenchmarkTask, workspace: Path) -> None:
         """Fuzz every declared symbol with empty and zero inputs."""
@@ -649,6 +899,82 @@ class BenchmarkRunner:
             if actual[relative] != expected_hash:
                 raise BenchmarkError(f"locked test hash mismatch: {relative}")
         return actual
+
+    def _store_candidate(self, arm: str, task: BenchmarkTask, workspace: Path) -> dict[str, str]:
+        """Persist one drawn candidate so verification can be replayed offline."""
+
+        digest = hashlib.sha256()
+        contents: dict[str, str] = {}
+        for relative in task.implementation_files:
+            path = workspace / relative
+            if not path.is_file():
+                return {}
+            try:
+                text = path.read_text()
+            except OSError:
+                return {}
+            contents[relative] = text
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(text.encode("utf-8"))
+        sha = digest.hexdigest()[:16]
+        base = self.records_path.parent / "candidates" / arm / task.task_id / sha
+        try:
+            for relative, text in contents.items():
+                target = base / relative
+                if target.is_file() and target.read_text() == text:
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text)
+        except OSError:
+            return {}
+        return {"sha": sha, "dir": base.relative_to(self.records_path.parent).as_posix()}
+
+    def verify_candidate(
+        self,
+        task: BenchmarkTask | Mapping[str, Any] | Any,
+        candidate_dir: Path | str,
+    ) -> dict[str, Any]:
+        """Re-run every verification gate on a stored candidate without a model call.
+
+        The candidate is overlaid on a fresh copy of the project root, so the
+        replay sees exactly the tests the original run was locked to.
+        """
+
+        resolved = BenchmarkTask.from_task(task)
+        stored = Path(candidate_dir)
+        if not stored.is_absolute():
+            stored = self.records_path.parent / stored
+        if not stored.is_dir():
+            raise BenchmarkError(f"candidate directory does not exist: {stored}")
+        missing = [relative for relative in resolved.implementation_files if not (stored / relative).is_file()]
+        if missing:
+            raise BenchmarkError(f"candidate is missing implementation file: {missing[0]}")
+        hashes = self._lock_test_hashes(resolved)
+        digest: dict[tuple[str, str], Mapping[str, Any]] = {}
+        properties: dict[str, Any] = {}
+        with self._execution_directory("baseline_single") as workspace:
+            for relative in resolved.implementation_files:
+                target = workspace / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text((stored / relative).read_text())
+            try:
+                gates = self._run_cage_gates(resolved, workspace, hashes, digest=digest, properties=properties)
+            except Exception as exc:  # a replay failure is data, not a crash
+                return {
+                    "passed": False,
+                    "failure": _safe_failure(exc),
+                    "gate_results": [],
+                    "properties": dict(properties),
+                    "digest": list(digest.values()),
+                }
+        return {
+            "passed": True,
+            "failure": "",
+            "gate_results": gates,
+            "properties": dict(properties),
+            "digest": list(digest.values()),
+        }
 
     def _append_record(self, record: dict[str, Any]) -> None:
         key = (record["task_id"], record["arm"])
@@ -881,13 +1207,15 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         "",
         "All values below are measured records from this run. An em dash means the local provider did not report a value; no value is estimated.",
         "",
-        "| Arm | Records | Passed | Pass rate | Mean attempts | Mean wall (s) | Mean token in | Mean token out |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Arm | Records | Passed | Pass rate | 95% CI | Mean attempts | Mean wall (s) | Mean token in | Mean token out |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for arm in ARMS:
         summary = summaries[arm]
+        interval = wilson_interval(int(summary["passed"]), int(summary["records"]))
         lines.append(
             f"| `{arm}` | {summary['records']} | {summary['passed']} | {_percent(summary['pass_rate'])} | "
+            f"{_wilson_text(interval)} | "
             f"{_number(summary['mean_attempts'])} | {_number(summary['mean_wall_time'])} | "
             f"{_number(summary['mean_token_in'])} | {_number(summary['mean_token_out'])} |"
         )
@@ -926,6 +1254,35 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         overhead = _overhead(rows, arm, "baseline_single")
         lines.append(
             f"| `{arm}` | {overhead['n']} | {_number(overhead['time_seconds'])} | {_percent(overhead['time_ratio'])} | {_number(overhead['tokens'])} |"
+        )
+
+    lines.extend(["", "## Sampling and gate metrics", ""])
+    lines.append("| Arm | Mean samples drawn | Mean samples to accept | Mean distinct failure signatures | JSON re-asks | Mean properties checked |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    sampling = {arm: _sampling_summary(rows, arm) for arm in ARMS}
+    for arm in ARMS:
+        item = sampling[arm]
+        lines.append(
+            f"| `{arm}` | {_number(item['mean_samples_drawn'])} | {_number(item['mean_samples_to_accept'])} | "
+            f"{_number(item['mean_distinct_signatures'])} | {item['json_reasks']} | "
+            f"{_number(item['mean_properties_checked'])} |"
+        )
+    cage_sampling = sampling["cdavc"]
+    lines.append("")
+    if cage_sampling["public_gate_passes"]:
+        lines.append(
+            f"Measured false-accept rate on the hidden gate: {cage_sampling['hidden_rejections']} of "
+            f"{cage_sampling['public_gate_passes']} public-gate passes were rejected by a hidden gate "
+            f"({_percent(cage_sampling['false_accept_rate'])})."
+        )
+    else:
+        lines.append("Measured false-accept rate on the hidden gate: no public-gate passes were recorded.")
+    if cage_sampling["mean_mutant_kill_rate"] is None:
+        lines.append("Measured mutant kill rate: not requested (run with `--mutants N` to measure gate strength).")
+    else:
+        lines.append(
+            f"Measured mutant kill rate: {_percent(cage_sampling['mean_mutant_kill_rate'])} of generated defects "
+            "were rejected by the property gate."
         )
 
     lines.extend(["", "## Measured cage-hurt cases", ""])
@@ -969,6 +1326,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=None,
+        help=f"independent draws per arm; default keeps single=1, retry=retry_cap+1, cdavc=min(retry_cap+1,{DEFAULT_SAMPLES})",
+    )
+    parser.add_argument("--mutants", type=int, default=0, help="generated mutants per candidate for the kill-rate metric")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
@@ -1009,6 +1373,8 @@ def main(argv: list[str] | None = None) -> int:
             hardware=args.hardware,
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
+            samples=args.samples,
+            mutants=args.mutants,
         )
         records = runner.run()
         output = render_report(records)
@@ -1025,6 +1391,12 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, BenchmarkError, ProviderUnavailableError) as exc:
         print(f"cdavc benchmark: {exc}", file=sys.stderr)
         return 2
+
+
+def load_tasks(tasks: Iterable[BenchmarkTask | Mapping[str, Any] | Any] | Path | str) -> list[BenchmarkTask]:
+    """Load a task corpus from a JSON file, a mapping or dataclass objects."""
+
+    return _load_tasks(tasks)
 
 
 def _load_tasks(tasks: Iterable[BenchmarkTask | Mapping[str, Any] | Any] | Path | str) -> list[BenchmarkTask]:
@@ -1051,7 +1423,7 @@ def _snapshot_mock_provider(root: Path, task: BenchmarkTask) -> MockProvider:
             raise BenchmarkError(f"mock snapshot file does not exist for {task.task_id}: {relative}")
         files[relative] = path.read_text()
     response = json.dumps({"files": files})
-    return MockProvider([response] * (task.max_retries + 1))
+    return MockProvider([response] * max(task.max_retries + 1, DEFAULT_SAMPLES))
 
 
 def _paths(value: Iterable[str], label: str) -> tuple[str, ...]:
@@ -1249,6 +1621,80 @@ def _safe_failure(exc: Exception) -> str:
     return f"{type(exc).__name__} during candidate execution"
 
 
+def _sample_budget(samples: int | Mapping[str, int] | None) -> int | dict[str, int] | None:
+    """Validate a draw budget expressed as one count or a per-arm mapping."""
+
+    if samples is None:
+        return None
+    if isinstance(samples, Mapping):
+        unknown = sorted(str(arm) for arm in samples if str(arm) not in ARMS)
+        if unknown:
+            raise BenchmarkError(f"unknown benchmark arm in sample budget: {unknown[0]}")
+        budget: dict[str, int] = {}
+        for arm, value in samples.items():
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise BenchmarkError("sample budget values must be integers >= 1")
+            budget[str(arm)] = int(value)
+        return budget
+    if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+        raise BenchmarkError("samples must be an integer >= 1")
+    return int(samples)
+
+
+def _sample_seed(seed: int, draw: int) -> int:
+    """Derive a distinct provider seed for each draw of a task.
+
+    A fixed seed restarts the server's random stream, so a retry replays the
+    same defect instead of exploring.  Draw 1 keeps the run seed, so
+    single-shot arms stay directly comparable with earlier results.
+    """
+
+    if draw <= 1:
+        return int(seed)
+    return (int(seed) * 1_000_003 + (draw - 1)) % (2**31 - 1)
+
+
+def _is_json_parse_failure(exc: Exception) -> bool:
+    """True when a provider reply could not be read as a JSON files object."""
+
+    if not isinstance(exc, _GateFailure):
+        return False
+    return str(exc).startswith(("provider response is not a JSON", "provider files object is empty"))
+
+
+def _add_usage(left: int | None, right: int | None) -> int | None:
+    """Add two optional token counts, preserving 'the provider did not say'."""
+
+    if left is None and right is None:
+        return None
+    return (left or 0) + (right or 0)
+
+
+def _failure_signature(text: str) -> str:
+    """Normalise a failure so repeated draws of one defect collapse together."""
+
+    signature = re.sub(r"0x[0-9a-fA-F]+", "0xADDR", text)
+    signature = re.sub(r'File "[^"]*"', 'File "$PATH"', signature)
+    signature = re.sub(r"line \d+", "line N", signature)
+    return " ".join(signature.split())[:200]
+
+
+def _json_payload(output: str) -> Mapping[str, Any] | None:
+    """Return the last JSON object printed on stdout, ignoring prose lines."""
+
+    for line in reversed(output.splitlines()):
+        candidate = line.strip()
+        if not candidate.startswith("{"):
+            continue
+        try:
+            payload = json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(payload, Mapping):
+            return payload
+    return None
+
+
 def _failure_category(failure: str) -> str:
     """Keep cage repair context categorical and out of hidden-test output."""
 
@@ -1275,6 +1721,58 @@ def _invariant_guidance(task: BenchmarkTask) -> str:
         "Check edge-case handling: duplicate values, empty inputs, boundary ranges, "
         "and explicit exception raising.\n"
     )
+
+
+def _sampling_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[str, float | int | None]:
+    """Aggregate draw budgets, gate strength and repair behaviour for one arm."""
+
+    selected = [record for record in records if record.get("arm") == arm]
+    public_passes = sum(int(record.get("public_gate_passes") or 0) for record in selected)
+    hidden_rejections = sum(int(record.get("hidden_rejections") or 0) for record in selected)
+    accepted = [record for record in selected if _record_passed(record)]
+    return {
+        "records": len(selected),
+        "mean_samples_drawn": _mean([record.get("samples_drawn", record.get("attempts")) for record in selected]),
+        "mean_samples_to_accept": _mean([record.get("samples_to_accept") for record in accepted]),
+        "mean_distinct_signatures": _mean(
+            [record.get("distinct_failure_signatures") for record in selected]
+        ),
+        "json_reasks": sum(int(record.get("json_reasks") or 0) for record in selected),
+        "public_gate_passes": public_passes,
+        "hidden_rejections": hidden_rejections,
+        "false_accept_rate": (hidden_rejections / public_passes) if public_passes else None,
+        "mean_properties_checked": _mean([record.get("properties_checked") for record in selected]),
+        "mean_mutant_kill_rate": _mean([record.get("mutant_kill_rate") for record in selected]),
+    }
+
+
+def wilson_interval(successes: int, n: int, z: float = 1.96) -> dict[str, float | int | None]:
+    """Wilson score interval for a binomial pass rate.
+
+    At n=30 one task is worth 3.3 percentage points, so a point estimate alone
+    overstates what a small corpus has measured.
+    """
+
+    if n <= 0:
+        return {"successes": max(0, int(successes)), "n": 0, "rate": None, "low": None, "high": None}
+    successes = min(max(int(successes), 0), int(n))
+    rate = successes / n
+    denominator = 1.0 + z * z / n
+    centre = (rate + z * z / (2 * n)) / denominator
+    margin = z * ((rate * (1 - rate) / n + z * z / (4 * n * n)) ** 0.5) / denominator
+    return {
+        "successes": successes,
+        "n": int(n),
+        "rate": rate,
+        "low": max(0.0, centre - margin),
+        "high": min(1.0, centre + margin),
+    }
+
+
+def _wilson_text(value: Mapping[str, Any]) -> str:
+    if value.get("low") is None:
+        return "—"
+    return f"[{float(value['low']):.3f}, {float(value['high']):.3f}]"
 
 
 def _arm_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[str, float | int | None]:
@@ -1366,10 +1864,12 @@ __all__ = [
     "BenchmarkRunner",
     "BenchmarkTask",
     "cage_hurt_cases",
+    "load_tasks",
     "paired_pass_rate_difference",
     "read_records",
     "render_report",
     "run_benchmark",
+    "wilson_interval",
 ]
 
 

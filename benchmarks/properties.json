@@ -1,0 +1,397 @@
+{
+  "version": 1,
+  "description": "Frozen metamorphic property table. Hashed with the lock step; edit before a run, never after a failure.",
+  "tasks": {
+    "task_001": [
+      {
+        "property": "count_vowels_identity",
+        "cases": 24
+      }
+    ],
+    "task_002": [
+      {
+        "property": "palindrome_normal_form",
+        "cases": 20
+      }
+    ],
+    "task_003": [
+      {
+        "property": "reverse_words_reference",
+        "cases": 20
+      }
+    ],
+    "task_004": [
+      {
+        "property": "run_length_round_trip",
+        "cases": 20
+      }
+    ],
+    "task_005": [
+      {
+        "property": "chunk_partition",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_006": [
+      {
+        "property": "merge_sorted_multiset",
+        "cases": 24,
+        "pure": true
+      }
+    ],
+    "task_007": [
+      {
+        "property": "rotate_reference",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_008": [
+      {
+        "property": "unique_first_occurrence",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_009": [
+      {
+        "property": "flatten_once_concatenation",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_010": [
+      {
+        "property": "group_anagrams_signature",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_011": [
+      {
+        "property": "top_k_order",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_012": [
+      {
+        "property": "balanced_brackets_reference",
+        "cases": 24
+      }
+    ],
+    "task_013": [
+      {
+        "property": "camel_to_snake_normal_form",
+        "cases": 20
+      }
+    ],
+    "task_014": [
+      {
+        "property": "parse_query_reference",
+        "cases": 20
+      }
+    ],
+    "task_015": [
+      {
+        "property": "roman_parse_corpus",
+        "corpus": [
+          [
+            "I",
+            1
+          ],
+          [
+            "II",
+            2
+          ],
+          [
+            "III",
+            3
+          ],
+          [
+            "IV",
+            4
+          ],
+          [
+            "V",
+            5
+          ],
+          [
+            "IX",
+            9
+          ],
+          [
+            "X",
+            10
+          ],
+          [
+            "XIV",
+            14
+          ],
+          [
+            "XIX",
+            19
+          ],
+          [
+            "XL",
+            40
+          ],
+          [
+            "XLIV",
+            44
+          ],
+          [
+            "XLIX",
+            49
+          ],
+          [
+            "XC",
+            90
+          ],
+          [
+            "XCIX",
+            99
+          ],
+          [
+            "CD",
+            400
+          ],
+          [
+            "CDXLIV",
+            444
+          ],
+          [
+            "D",
+            500
+          ],
+          [
+            "CM",
+            900
+          ],
+          [
+            "M",
+            1000
+          ],
+          [
+            "MCMXCIV",
+            1994
+          ],
+          [
+            "MMXXIV",
+            2024
+          ],
+          [
+            "MMMCMXCIX",
+            3999
+          ]
+        ],
+        "invalid": [
+          "IIII",
+          "IC",
+          "VX",
+          "IL",
+          "MMMM",
+          "abc",
+          "IIX",
+          "VV",
+          "CMCM"
+        ]
+      }
+    ],
+    "task_016": [
+      {
+        "property": "roman_format_corpus",
+        "corpus": [
+          [
+            "I",
+            1
+          ],
+          [
+            "II",
+            2
+          ],
+          [
+            "III",
+            3
+          ],
+          [
+            "IV",
+            4
+          ],
+          [
+            "V",
+            5
+          ],
+          [
+            "IX",
+            9
+          ],
+          [
+            "X",
+            10
+          ],
+          [
+            "XIV",
+            14
+          ],
+          [
+            "XIX",
+            19
+          ],
+          [
+            "XL",
+            40
+          ],
+          [
+            "XLIV",
+            44
+          ],
+          [
+            "XLIX",
+            49
+          ],
+          [
+            "XC",
+            90
+          ],
+          [
+            "XCIX",
+            99
+          ],
+          [
+            "CD",
+            400
+          ],
+          [
+            "CDXLIV",
+            444
+          ],
+          [
+            "D",
+            500
+          ],
+          [
+            "CM",
+            900
+          ],
+          [
+            "M",
+            1000
+          ],
+          [
+            "MCMXCIV",
+            1994
+          ],
+          [
+            "MMXXIV",
+            2024
+          ],
+          [
+            "MMMCMXCIX",
+            3999
+          ]
+        ],
+        "out_of_range": [
+          0,
+          4000,
+          -1
+        ]
+      }
+    ],
+    "task_017": [
+      {
+        "property": "gcd_reference",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_018": [
+      {
+        "property": "lcm_reference",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_019": [
+      {
+        "property": "prime_reference",
+        "cases": 16
+      }
+    ],
+    "task_020": [
+      {
+        "property": "fibonacci_reference",
+        "cases": 16
+      }
+    ],
+    "task_021": [
+      {
+        "property": "binary_search_first_index",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_022": [
+      {
+        "property": "longest_common_prefix_reference",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_023": [
+      {
+        "property": "levenshtein_metric",
+        "cases": 20
+      }
+    ],
+    "task_024": [
+      {
+        "property": "transpose_involution",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_025": [
+      {
+        "property": "spiral_permutation",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_026": [
+      {
+        "property": "matrix_multiply_reference",
+        "cases": 16,
+        "pure": true
+      }
+    ],
+    "task_027": [
+      {
+        "property": "merge_intervals_reference",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_028": [
+      {
+        "property": "rpn_reference",
+        "cases": 20,
+        "pure": true
+      }
+    ],
+    "task_029": [
+      {
+        "property": "format_duration_reference",
+        "cases": 16
+      }
+    ],
+    "task_030": [
+      {
+        "property": "stable_sort_reference",
+        "cases": 20,
+        "pure": true
+      }
+    ]
+  }
+}
