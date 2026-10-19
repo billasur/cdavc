@@ -1,0 +1,1372 @@
+{
+  "tasks": [
+    {
+      "task_id": "dev_001",
+      "title": "second largest",
+      "description": "Implement second_largest(values). Return the second largest element after sorting, counting duplicates, or None when fewer than two elements are given.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_001/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "second_largest"
+      ],
+      "invariants": [
+        "Return None instead of raising when the list is short."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_001"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_001"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_001"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_002",
+      "title": "caesar shift",
+      "description": "Implement caesar_shift(text, k). Shift ASCII letters by k positions, wrapping within a-z and A-Z and preserving case; leave every other character unchanged.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_002/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "caesar_shift"
+      ],
+      "invariants": [
+        "Non-letters are copied unchanged."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_002"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_002"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_002"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_003",
+      "title": "title case",
+      "description": "Implement title_case(text). Upper-case the first letter of every whitespace-separated word, lower-case the rest, and join words with a single space.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_003/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "title_case"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_003"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_003"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_003"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_004",
+      "title": "collapse spaces",
+      "description": "Implement collapse_spaces(text). Replace every run of whitespace with one space and strip leading and trailing whitespace.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_004/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "collapse_spaces"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_004"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_004"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_004"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_005",
+      "title": "count substring",
+      "description": "Implement count_substring(text, needle). Count non-overlapping occurrences; an empty needle counts zero.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_005/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "count_substring"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_005"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_005"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_005"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_006",
+      "title": "truncate",
+      "description": "Implement truncate(text, width). Return text unchanged when it fits; otherwise cut to width characters, ending with three dots when width is at least 4, and strip the trailing space before the dots.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_006/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "truncate"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_006"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_006"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_006"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_007",
+      "title": "snake to camel",
+      "description": "Implement snake_to_camel(text). Convert underscore-separated lower-case words to camelCase; ignore empty segments and return an empty string for an empty input.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_007/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "snake_to_camel"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_007"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_007"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_007"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_008",
+      "title": "is anagram",
+      "description": "Implement is_anagram(a, b). Compare case-insensitively after dropping every non-alphanumeric character.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_008/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "is_anagram"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_008"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_008"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_008"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_009",
+      "title": "digit sum",
+      "description": "Implement digit_sum(n). Return the sum of the decimal digits of the absolute value; zero sums to zero.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_009/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "digit_sum"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_009"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_009"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_009"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_010",
+      "title": "is armstrong",
+      "description": "Implement is_armstrong(n). Return True when n equals the sum of its digits each raised to the number of digits; n is non-negative.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_010/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "is_armstrong"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_010"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_010"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_010"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_011",
+      "title": "factorial",
+      "description": "Implement factorial(n). Return n! for a non-negative integer and raise ValueError for a negative input.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_011/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "factorial"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_011"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_011"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_011"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_012",
+      "title": "binomial",
+      "description": "Implement binomial(n, k). Return the binomial coefficient, and 0 when k is outside 0..n.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_012/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "binomial"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_012"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_012"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_012"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_013",
+      "title": "is perfect square",
+      "description": "Implement is_perfect_square(n). Return True only for non-negative perfect squares.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_013/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "is_perfect_square"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_013"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_013"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_013"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_014",
+      "title": "clamp",
+      "description": "Implement clamp(value, low, high). Return value limited to the inclusive range; raise ValueError when low is greater than high.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_014/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "clamp"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_014"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_014"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_014"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_015",
+      "title": "sign",
+      "description": "Implement sign(n). Return -1 for negative numbers, 0 for zero and 1 for positive numbers.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_015/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "sign"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_015"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_015"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_015"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_016",
+      "title": "mean",
+      "description": "Implement mean(values). Return the arithmetic mean rounded to six decimal places; raise ValueError for an empty list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_016/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "mean"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_016"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_016"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_016"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_017",
+      "title": "median",
+      "description": "Implement median(values). Return the middle value, or the mean of the two middle values, rounded to six decimals; raise ValueError for an empty list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_017/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "median"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_017"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_017"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_017"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_018",
+      "title": "variance population",
+      "description": "Implement variance_population(values). Return the population variance rounded to six decimals; raise ValueError for an empty list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_018/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "variance_population"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_018"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_018"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_018"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_019",
+      "title": "normalize vector",
+      "description": "Implement normalize_vector(values). Divide each value by the Euclidean norm and round to six decimals; a zero vector keeps its zeros as floats.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_019/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "normalize_vector"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_019"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_019"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_019"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_020",
+      "title": "dot product",
+      "description": "Implement dot_product(a, b). Return the sum of products; raise ValueError when the lengths differ.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_020/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "dot_product"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_020"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_020"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_020"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_021",
+      "title": "cumulative sum",
+      "description": "Implement cumulative_sum(values). Return the running totals, starting with the first element.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_021/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "cumulative_sum"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_021"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_021"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_021"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_022",
+      "title": "pairwise differences",
+      "description": "Implement pairwise_differences(values). Return next minus current for every adjacent pair; a list shorter than two gives an empty list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_022/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "pairwise_differences"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_022"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_022"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_022"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_023",
+      "title": "interleave",
+      "description": "Implement interleave(a, b). Alternate elements starting with a, appending any leftovers of the longer list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_023/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "interleave"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_023"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_023"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_023"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_024",
+      "title": "take while positive",
+      "description": "Implement take_while_positive(values). Return the longest prefix whose elements are greater than zero.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_024/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "take_while_positive"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_024"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_024"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_024"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_025",
+      "title": "drop while negative",
+      "description": "Implement drop_while_negative(values). Remove the longest prefix whose elements are below zero and return the rest.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_025/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "drop_while_negative"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_025"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_025"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_025"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_026",
+      "title": "partition parity",
+      "description": "Implement partition_parity(values). Return a tuple of two lists, even values first and odd values second, both in their original order.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_026/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "partition_parity"
+      ],
+      "invariants": [
+        "Return a tuple, not a list, and do not reorder within each group."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_026"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_026"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_026"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_027",
+      "title": "count by name",
+      "description": "Implement count_by_name(records). Return a dict mapping each name to how many records carry it; records without a name are skipped.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_027/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "count_by_name"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_027"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_027"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_027"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_028",
+      "title": "invert mapping",
+      "description": "Implement invert_mapping(mapping). Swap keys and values; when several keys share a value, the last one in iteration order wins.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_028/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "invert_mapping"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_028"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_028"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_028"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_029",
+      "title": "filter by score",
+      "description": "Implement filter_by_score(records, minimum). Return the records whose score is at least minimum, preserving order; a missing score counts as zero.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_029/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "filter_by_score"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_029"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_029"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_029"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_030",
+      "title": "sort records",
+      "description": "Implement sort_records(records). Return the records sorted by score ascending, then by name ascending; do not mutate the input.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_030/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "sort_records"
+      ],
+      "invariants": [
+        "Sorting is stable and the input list is left unchanged."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_030"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_030"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_030"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_031",
+      "title": "pluck",
+      "description": "Implement pluck(records). Return the name of every record in order, using None where a record has no name.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_031/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "pluck"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_031"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_031"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_031"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_032",
+      "title": "bucket counts",
+      "description": "Implement bucket_counts(values, width). Return bucket sizes for buckets [0, width), [width, 2*width), ...; an empty input gives an empty list. Width is positive.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_032/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "bucket_counts"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_032"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_032"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_032"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_033",
+      "title": "binary to int",
+      "description": "Implement binary_to_int(text). Parse a non-empty string of 0 and 1 characters; raise ValueError for an empty string or any other character.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_033/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "binary_to_int"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_033"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_033"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_033"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_034",
+      "title": "int to binary",
+      "description": "Implement int_to_binary(n). Return the binary representation of a non-negative integer without a prefix; raise ValueError for negatives.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_034/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "int_to_binary"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_034"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_034"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_034"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_035",
+      "title": "hex to rgb",
+      "description": "Implement hex_to_rgb(text). Accept an optional leading # followed by six hex digits and return a tuple of three integers; raise ValueError for any other shape.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_035/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "hex_to_rgb"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_035"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_035"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_035"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_036",
+      "title": "rgb to hex",
+      "description": "Implement rgb_to_hex(r, g, b). Return a lowercase #rrggbb string; raise ValueError when any channel is outside 0..255.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_036/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "rgb_to_hex"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_036"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_036"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_036"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_037",
+      "title": "is valid ipv4",
+      "description": "Implement is_valid_ipv4(text). Return True only for four dot-separated decimal parts in 0..255 with no leading zeros (a single 0 is fine).",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_037/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "is_valid_ipv4"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_037"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_037"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_037"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_038",
+      "title": "weekday abbrev",
+      "description": "Implement weekday_abbrev(name). Return the three-letter abbreviation Mon..Sun for a case-insensitive English weekday name; raise ValueError for anything else.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_038/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "weekday_abbrev"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_038"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_038"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_038"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_039",
+      "title": "parse ints",
+      "description": "Implement parse_ints(text). Split on commas, strip whitespace, skip empty fields and return integers; raise ValueError when a field is not an integer.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_039/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_ints"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_039"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_039"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_039"
+      ],
+      "max_retries": 2
+    },
+    {
+      "task_id": "dev_040",
+      "title": "wrap text",
+      "description": "Implement wrap_text(text, width). Greedily pack whitespace-separated words into lines of at most width characters, keeping a word longer than width on its own line; an empty input gives an empty list.",
+      "source": "CD-AVC-dev-v1",
+      "implementation_files": [
+        "benchmarks/dev/tasks/dev_040/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/dev/public_tests.py",
+        "benchmarks/dev/hidden_tests.py",
+        "benchmarks/dev/regression_tests.py"
+      ],
+      "symbols": [
+        "wrap_text"
+      ],
+      "invariants": [],
+      "test_command": [
+        "python",
+        "benchmarks/dev/public_tests.py",
+        "dev_040"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/dev/hidden_tests.py",
+        "dev_040"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/dev/regression_tests.py",
+        "dev_040"
+      ],
+      "max_retries": 2
+    }
+  ]
+}

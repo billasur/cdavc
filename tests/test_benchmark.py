@@ -15,11 +15,29 @@ from cdavc.benchmark import (
     BenchmarkTask,
     _canonical_target,
     _sample_seed,
+    select_tasks,
     paired_pass_rate_difference,
     render_report,
 )
 from cdavc.benchmark import main as benchmark_main
 from cdavc.providers import MockProvider, OpenAICompatibleProvider, ProviderCompletion
+
+
+def _sha256_for_test(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _task_with_id(task_id: str) -> BenchmarkTask:
+    return BenchmarkTask(
+        task_id=task_id,
+        source="test-fixture-v1",
+        implementation_files=(f"benchmarks/dev/tasks/{task_id}/solution.py",),
+        test_files=("benchmarks/dev/public_tests.py",),
+        symbols=("answer",),
+        test_command=("python", "benchmarks/dev/public_tests.py", task_id),
+    )
 
 
 class BenchmarkTests(unittest.TestCase):
@@ -118,6 +136,36 @@ class BenchmarkTests(unittest.TestCase):
                     tasks=[task],
                     records_path=records_path,
                 ).run()
+
+    def test_properties_path_selects_a_dev_table_and_stays_repository_relative(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            (root / "benchmarks" / "dev").mkdir(parents=True)
+            table = root / "benchmarks" / "dev" / "properties.json"
+            table.write_text('{"tasks": {}}')
+            task = self._task()
+            runner = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([]),
+                tasks=[task],
+                properties_path=Path("benchmarks/dev/properties.json"),
+            )
+            self.assertEqual(runner._property_table_hash(), _sha256_for_test(table))
+            with self.assertRaises(BenchmarkError):
+                BenchmarkRunner(
+                    root,
+                    lambda _arm, _task: MockProvider([]),
+                    tasks=[task],
+                    properties_path=table,
+                )
+
+    def test_only_flag_limits_a_run_to_the_named_tasks(self):
+        tasks = [_task_with_id(item) for item in ("dev_001", "dev_002", "dev_003")]
+        selected = select_tasks(tasks, "dev_003,dev_001")
+        self.assertEqual([task.task_id for task in selected], ["dev_001", "dev_003"])
+        self.assertEqual(len(select_tasks(tasks, None)), 3)
+        with self.assertRaises(BenchmarkError):
+            select_tasks(tasks, "dev_001,dev_999")
 
     def test_resume_rejects_mixed_experiment_metadata(self):
         with tempfile.TemporaryDirectory() as directory:

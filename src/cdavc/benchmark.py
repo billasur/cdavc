@@ -266,6 +266,7 @@ class BenchmarkRunner:
         retry_cap: int = 3,
         samples: int | Mapping[str, int] | None = None,
         mutants: int = 0,
+        properties_path: Path | str | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -298,6 +299,11 @@ class BenchmarkRunner:
         if isinstance(mutants, bool) or not isinstance(mutants, int) or mutants < 0:
             raise BenchmarkError("mutants must be a non-negative integer")
         self.mutants = mutants
+        # Dev iteration uses its own frozen table; the held-out table is the
+        # default so a run without the flag can only score the reported corpus.
+        self.property_table = PROPERTY_TABLE if properties_path is None else Path(properties_path)
+        if self.property_table.is_absolute() or ".." in self.property_table.parts:
+            raise BenchmarkError("properties_path must be repository-relative")
         if records_path is None:
             output_path = self.root / "results" / "benchmark.jsonl"
         else:
@@ -904,7 +910,7 @@ class BenchmarkRunner:
         return tuple(sorted(names))
 
     def _property_table_hash(self) -> str | None:
-        path = self.root / PROPERTY_TABLE
+        path = self.root / self.property_table
         return _sha256(path) if path.is_file() else None
 
     def _run_property_gate(
@@ -916,7 +922,7 @@ class BenchmarkRunner:
     ) -> dict[str, Any]:
         """Run the frozen metamorphic table against the candidate in a subprocess."""
 
-        table_path = self.root / PROPERTY_TABLE
+        table_path = self.root / self.property_table
         if not table_path.is_file():
             return {}
         try:
@@ -1503,6 +1509,25 @@ def cage_hurt_cases(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
     return result
 
 
+def select_tasks(tasks: Sequence[BenchmarkTask], only: str | None) -> list[BenchmarkTask]:
+    """Keep only the task ids named by ``only`` (comma-separated), preserving order.
+
+    The per-iteration dev loop runs five hard tasks plus five canaries, so the
+    filter has to fail loudly on a typo rather than silently running a
+    different subset.
+    """
+
+    if not only:
+        return list(tasks)
+    wanted = [item.strip() for item in only.split(",") if item.strip()]
+    known = {task.task_id for task in tasks}
+    unknown = [item for item in wanted if item not in known]
+    if unknown:
+        raise BenchmarkError(f"--only names unknown task ids: {', '.join(unknown)}")
+    selected = set(wanted)
+    return [task for task in tasks if task.task_id in selected]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the CD-AVC local benchmark arms")
     parser.add_argument("root", type=Path, help="trusted git project root")
@@ -1524,7 +1549,18 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"independent draws per arm; default keeps single=1, retry=retry_cap+1, cdavc=min(retry_cap+1,{DEFAULT_SAMPLES})",
     )
     parser.add_argument("--mutants", type=int, default=0, help="generated mutants per candidate for the kill-rate metric")
+    parser.add_argument(
+        "--properties",
+        type=Path,
+        default=None,
+        help=f"metamorphic table (default: {PROPERTY_TABLE}); dev runs pass their own frozen table",
+    )
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
+    parser.add_argument(
+        "--only",
+        default=None,
+        help="comma-separated task ids; the per-iteration harness runs only these",
+    )
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
     return parser
@@ -1538,6 +1574,7 @@ def main(argv: list[str] | None = None) -> int:
         tasks = _load_tasks(raw_tasks or [])
         if args.limit is not None and args.limit > 0:
             tasks = tasks[: args.limit]
+        tasks = select_tasks(tasks, args.only)
         if args.mock or args.mock_response:
             if args.mock_response:
                 responses = [path.read_text() for path in args.mock_response]
@@ -1566,6 +1603,7 @@ def main(argv: list[str] | None = None) -> int:
             retry_cap=args.retry_cap,
             samples=args.samples,
             mutants=args.mutants,
+            properties_path=args.properties,
         )
         records = runner.run()
         output = render_report(records)
