@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h6_03_circuit_breaker",
+  "title": "Circuit breaker",
+  "description": "Implement class CircuitBreaker(failure_threshold, reset_timeout, half_open_successes=1) driven by caller-supplied times. Methods: state(now) -> 'closed'|'open'|'half_open', allow(now) -> bool, record_success(now), record_failure(now). Closed: failure_threshold consecutive failures open the breaker at that time; a success resets the failure count. Open: allow is False until now - opened_at >= reset_timeout, after which the state is half_open. Half_open: allow is True; half_open_successes successes close the breaker, any failure reopens it with opened_at = now.",
+  "implementation_files": [
+    "benchmarks_heldout/agent6/task_h6_03_circuit_breaker/solution.py"
+  ],
+  "symbols": [
+    "CircuitBreaker"
+  ],
+  "invariants": [
+    "Constructor raises ValueError if failure_threshold < 1, reset_timeout < 0 or half_open_successes < 1.",
+    "Only consecutive failures count in closed state.",
+    "Exactly reset_timeout elapsed time is enough to enter half_open.",
+    "A failure in half_open restarts the full reset_timeout wait.",
+    "When the breaker closes again the failure count is zero."
+  ],
+  "max_retries": 2
+}

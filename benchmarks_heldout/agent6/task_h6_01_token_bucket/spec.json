@@ -1,0 +1,19 @@
+{
+  "task_id": "task_h6_01_token_bucket",
+  "title": "Token bucket rate limiter",
+  "description": "Implement class TokenBucket(capacity, refill_per_sec) with method allow(now, cost=1) -> bool. The bucket starts full. On each call, first add (now - last_seen_time) * refill_per_sec tokens, capped at capacity, then consume cost tokens and return True if enough are available, else return False and consume nothing. The first call sets last_seen_time to its now value with no refill.",
+  "implementation_files": [
+    "benchmarks_heldout/agent6/task_h6_01_token_bucket/solution.py"
+  ],
+  "symbols": [
+    "TokenBucket"
+  ],
+  "invariants": [
+    "Constructor raises ValueError if capacity <= 0 or refill_per_sec < 0.",
+    "allow raises ValueError if cost <= 0.",
+    "A cost larger than capacity always returns False and consumes nothing.",
+    "If now is earlier than the last seen time, add no tokens and do not move last_seen_time backwards.",
+    "A refused request must not consume tokens."
+  ],
+  "max_retries": 2
+}

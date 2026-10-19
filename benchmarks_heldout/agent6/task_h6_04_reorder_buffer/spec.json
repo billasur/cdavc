@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h6_04_reorder_buffer",
+  "title": "Packet reorder buffer",
+  "description": "Implement reorder(packets, start=0). packets is a list of (seq, payload) pairs arriving in any order. Return (delivered, pending) where delivered is the payloads for seq start, start+1, ... up to the first gap, in order, and pending is the sorted list of buffered seq numbers that could not be delivered yet.",
+  "implementation_files": [
+    "benchmarks_heldout/agent6/task_h6_04_reorder_buffer/solution.py"
+  ],
+  "symbols": [
+    "reorder"
+  ],
+  "invariants": [
+    "Duplicate seq numbers: the first payload seen wins.",
+    "Packets with seq < start are dropped.",
+    "A gap stops delivery; later packets stay in pending.",
+    "Empty input returns ([], [])."
+  ],
+  "max_retries": 2
+}

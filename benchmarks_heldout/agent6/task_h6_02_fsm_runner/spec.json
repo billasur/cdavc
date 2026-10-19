@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h6_02_fsm_runner",
+  "title": "Finite state machine runner",
+  "description": "Implement run_machine(transitions, start, events). transitions maps (state, event) tuples to the next state. Process events in order and return (final_state, trace) where trace is the list of states after each event.",
+  "implementation_files": [
+    "benchmarks_heldout/agent6/task_h6_02_fsm_runner/solution.py"
+  ],
+  "symbols": [
+    "run_machine"
+  ],
+  "invariants": [
+    "An event with no transition from the current state is ignored: the state stays and the unchanged state is still appended to trace.",
+    "Raise ValueError if start does not appear as a state in any key or value of transitions.",
+    "Empty events returns (start, []).",
+    "Do not mutate transitions."
+  ],
+  "max_retries": 2
+}

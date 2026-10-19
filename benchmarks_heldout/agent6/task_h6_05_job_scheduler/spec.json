@@ -1,0 +1,18 @@
+{
+  "task_id": "task_h6_05_job_scheduler",
+  "title": "Dependency job scheduler",
+  "description": "Implement schedule_jobs(durations, deps, workers). durations maps job name to a positive integer duration. deps maps a job name to a list of jobs that must finish first (missing key means no deps). Simulate from time 0: whenever a worker is free, start ready jobs in alphabetical name order. A job is ready when all dependencies have finished at or before the current time. Return (schedule, makespan) where schedule maps job to (start, end) and makespan is the largest end time (0 if no jobs).",
+  "implementation_files": [
+    "benchmarks_heldout/agent6/task_h6_05_job_scheduler/solution.py"
+  ],
+  "symbols": [
+    "schedule_jobs"
+  ],
+  "invariants": [
+    "Raise ValueError if workers < 1, any duration <= 0, deps mention an unknown job, or there is a dependency cycle.",
+    "A job that finishes at time t frees its worker and unblocks dependants at time t.",
+    "Ties are broken alphabetically by job name.",
+    "Empty durations returns ({}, 0)."
+  ],
+  "max_retries": 2
+}
