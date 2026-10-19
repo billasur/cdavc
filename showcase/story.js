@@ -2,26 +2,209 @@ import * as THREE from './vendor/three.module.min.js';
 
 const { gsap, ScrollTrigger } = window;
 const Lenis = window.Lenis;
-document.body.classList.add('story-module-loaded');
 
+document.body.classList.add('story-module-loaded');
 gsap.registerPlugin(ScrollTrigger);
 
+/* ------------------------------------------------------------------ *
+ * DOM Selectors & State
+ * ------------------------------------------------------------------ */
 const body = document.body;
 const story = document.querySelector('#task-story');
 const pin = document.querySelector('.story-pin');
 const canvas = document.querySelector('#task-canvas');
 const panels = [...document.querySelectorAll('.story-panel')];
 const railItems = [...document.querySelectorAll('.story-rail li')];
+const railScrubber = document.querySelector('#rail-scrubber');
 const stageReadout = document.querySelector('#story-stage');
+const chamberReadout = document.querySelector('#hud-chamber');
+const breachBanner = document.querySelector('#breach-banner');
+const breachTitle = document.querySelector('#breach-title');
+const breachDetail = document.querySelector('#breach-detail');
+const btnDrift = document.querySelector('#btn-drift');
+const btnSound = document.querySelector('#btn-sound');
+const soundStateLabel = btnSound?.querySelector('.sound-state');
 const staticVisual = document.querySelector('.static-visual');
+
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 let isReduced = reduced.matches;
+
 let scene = null;
 let storyTrigger = null;
 let lenis = null;
-const lenisTicker = (time) => lenis?.raf(time * 1000);
-let lastStep = -1;
+const STAGE_CHAMBERS = [
+  'STAGE 01 / THE TASK BOUNDARY',
+  'STAGE 02 / BOUNDARY FILE SELECTION',
+  'STAGE 03 / SEALED TEST COLLAR',
+  'STAGE 04 / AST CONTRACT SCANNER',
+  'STAGE 05 / ISOLATED WORKTREE CONDUIT',
+  'STAGE 06 / QUARANTINE GATE ARENA',
+  'STAGE 07 / MASTER REPO COPY-BACK',
+];
 
+const courierHeroTag = document.querySelector('#courier-hero-tag');
+const courierHudStatus = document.querySelector('#courier-hud-status');
+const HERO_STAGE_STATUSES = [
+  'STAGE 01 · BORN IN TASK BOUNDARY',
+  'STAGE 02 · BOUNDED FILE PERMITTED',
+  'STAGE 03 · TEST SUITE SEALED (SHA-256)',
+  'STAGE 04 · AST CONTRACT VALIDATED',
+  'STAGE 05 · ISOLATED IN GIT WORKTREE',
+  'STAGE 06 · QUALIFYING 4/4 GATES',
+  'STAGE 07 · MERGED TO MAIN REPO',
+];
+
+const initParams = new URLSearchParams(window.location.search);
+let initStep = -1;
+if (initParams.has('step')) {
+  const parsed = parseInt(initParams.get('step'), 10);
+  if (!isNaN(parsed) && parsed >= 0 && parsed <= 6) {
+    initStep = parsed;
+    panels.forEach((p, idx) => {
+      p.classList.toggle('is-current', idx === initStep);
+      p.setAttribute('aria-hidden', String(idx !== initStep));
+    });
+    if (stageReadout) stageReadout.textContent = `${String(initStep + 1).padStart(2, '0')} / 07`;
+    if (chamberReadout) chamberReadout.textContent = STAGE_CHAMBERS[initStep];
+    railItems.forEach((item, index) => {
+      item.classList.toggle('is-current', index === initStep);
+    });
+    if (railScrubber) {
+      railScrubber.style.transform = `translateY(${initStep * 32}px)`;
+    }
+  }
+}
+let lastStep = -1;
+let scrollVelocity = 0;
+
+/* ------------------------------------------------------------------ *
+ * Text Scrambler on Stage Entry
+ * ------------------------------------------------------------------ */
+function scrambleElement(el) {
+  if (!el) return;
+  const targetText = el.dataset.text || el.textContent;
+  if (!targetText) return;
+  el.dataset.text = targetText;
+  const chars = '01#_./!%><[]{}*~';
+  const len = targetText.length;
+  let frame = 0;
+  const totalFrames = 12;
+
+  const timer = setInterval(() => {
+    frame++;
+    const progress = frame / totalFrames;
+    const revealedIndex = Math.floor(progress * len);
+    let str = '';
+    for (let i = 0; i < len; i++) {
+      if (targetText[i] === ' ') {
+        str += ' ';
+      } else if (i < revealedIndex) {
+        str += targetText[i];
+      } else {
+        str += chars[Math.floor(Math.random() * chars.length)];
+      }
+    }
+    el.textContent = str;
+    if (frame >= totalFrames) {
+      clearInterval(timer);
+      el.textContent = targetText;
+    }
+  }, 24);
+}
+
+/* ------------------------------------------------------------------ *
+ * Procedural Web Audio Engine (Zero External Audio Assets)
+ * ------------------------------------------------------------------ */
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.enabled = false;
+    this.masterGain = null;
+  }
+
+  init() {
+    if (this.ctx) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    this.ctx = new AudioCtx();
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+    this.masterGain.connect(this.ctx.destination);
+  }
+
+  toggle() {
+    this.init();
+    if (!this.ctx) return false;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+    this.enabled = !this.enabled;
+    if (this.masterGain) {
+      this.masterGain.gain.setValueAtTime(this.enabled ? 0.2 : 0, this.ctx.currentTime);
+    }
+    return this.enabled;
+  }
+
+  playGateChime() {
+    if (!this.enabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.33);
+  }
+
+  playAlarm() {
+    if (!this.enabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.linearRampToValueAtTime(160, now + 0.35);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }
+
+  playDock() {
+    if (!this.enabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.28);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+}
+
+const audio = new SoundEngine();
+
+btnSound?.addEventListener('click', () => {
+  const active = audio.toggle();
+  btnSound.classList.toggle('is-active', active);
+  if (soundStateLabel) soundStateLabel.textContent = active ? 'ON' : 'OFF';
+});
+
+/* ------------------------------------------------------------------ *
+ * UI & Step Sync
+ * ------------------------------------------------------------------ */
 function setReducedState() {
   isReduced = reduced.matches;
   body.classList.toggle('is-reduced-motion', isReduced);
@@ -34,56 +217,1888 @@ function setReducedState() {
 function setStep(step) {
   const safeStep = Math.min(6, Math.max(0, step));
   if (safeStep === lastStep && !isReduced) return;
+  const prevStep = lastStep;
   lastStep = safeStep;
-  stageReadout.textContent = `${String(safeStep + 1).padStart(2, '0')} / 07`;
-  staticVisual.dataset.step = String(safeStep);
+
+  if (stageReadout) stageReadout.textContent = `${String(safeStep + 1).padStart(2, '0')} / 07`;
+  if (chamberReadout) chamberReadout.textContent = STAGE_CHAMBERS[safeStep];
+  if (staticVisual) staticVisual.dataset.step = String(safeStep);
+
   panels.forEach((panel, index) => {
     const active = index === safeStep;
     panel.classList.toggle('is-current', active);
     panel.setAttribute('aria-hidden', String(!active));
+    if (active) {
+      const heading = panel.querySelector('h1, h2');
+      scrambleElement(heading);
+    }
   });
-  railItems.forEach((item, index) => item.classList.toggle('is-current', index === safeStep));
+
+  railItems.forEach((item, index) => {
+    item.classList.toggle('is-current', index === safeStep);
+  });
+
+  if (railScrubber) {
+    railScrubber.style.transform = `translateY(${safeStep * 32}px)`;
+  }
+
+  if (prevStep !== -1 && safeStep > prevStep) {
+    audio.playGateChime();
+  }
 }
 
+// Rail click navigation
+railItems.forEach((item, index) => {
+  const btn = item.querySelector('button');
+  btn?.addEventListener('click', () => {
+    if (lenis && story) {
+      const targetScroll = story.offsetTop + (index / 6) * (story.offsetHeight - window.innerHeight);
+      lenis.scrollTo(targetScroll, { duration: 1.1 });
+    } else {
+      window.scrollTo({
+        top: story.offsetTop + (index / 6) * (story.offsetHeight - window.innerHeight),
+        behavior: 'smooth',
+      });
+    }
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Interactive [ ⚡ Simulate Test Drift ] Action
+ * ------------------------------------------------------------------ */
+let isDrifting = false;
+
+function triggerDriftSimulation() {
+  if (isDrifting || !scene) return;
+  isDrifting = true;
+  audio.playAlarm();
+  btnDrift?.classList.add('is-breached');
+  breachBanner?.classList.add('is-active');
+
+  scene.triggerDrift();
+
+  setTimeout(() => {
+    if (breachTitle) breachTitle.textContent = 'CD-AVC REJECTION PROTOCOL COMPLETE';
+    if (breachDetail) breachDetail.textContent = 'Untrusted patch ejected. Original test and implementation restored. Zero residue in working tree.';
+  }, 1600);
+
+  setTimeout(() => {
+    breachBanner?.classList.remove('is-active');
+    btnDrift?.classList.remove('is-breached');
+    isDrifting = false;
+    scene.resetDrift();
+    setTimeout(() => {
+      if (breachTitle) breachTitle.textContent = 'TEST DRIFT DETECTED: LOCKED SUITE COMPROMISED';
+      if (breachDetail) breachDetail.textContent = 'Locked SHA-256 mismatch detected. CD-AVC isolation active. Candidate write refused, worktree discarded.';
+    }, 500);
+  }, 3800);
+}
+
+btnDrift?.addEventListener('click', triggerDriftSimulation);
+
+/* ------------------------------------------------------------------ *
+ * Procedural Dynamic Canvas Textures (2x Retina with Mipmaps & Anisotropy 8)
+ * ------------------------------------------------------------------ */
+function createTexture(width, height, draw) {
+  const scale = 2;
+  const c = document.createElement('canvas');
+  c.width = width * scale;
+  c.height = height * scale;
+  const ctx = c.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.clearRect(0, 0, width, height);
+  draw(ctx, width, height);
+
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function courierFaceTexture(faceType = 'front') {
+  return createTexture(512, 512, (ctx, w, h) => {
+    // High-tech deep obsidian substrate
+    ctx.fillStyle = '#040b07';
+    ctx.fillRect(0, 0, w, h);
+
+    // Subtle background micro-grid
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.08)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 32) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 32) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Outer double-bezel border with corner chamfers
+    ctx.strokeStyle = '#d8ff64';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(8, 8, w - 16, h - 16);
+    ctx.strokeStyle = 'rgba(94, 243, 210, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(16, 16, w - 32, h - 32);
+
+    // Corner crosshairs
+    const corners = [[8, 8], [w - 8, 8], [8, h - 8], [w - 8, h - 8]];
+    ctx.strokeStyle = '#d8ff64';
+    ctx.lineWidth = 3;
+    corners.forEach(([cx, cy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx - 12, cy); ctx.lineTo(cx + 12, cy);
+      ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12);
+      ctx.stroke();
+    });
+
+    if (faceType === 'front' || faceType === 'back') {
+      // Top Status Bar
+      ctx.fillStyle = 'rgba(216, 255, 100, 0.25)';
+      ctx.fillRect(24, 24, w - 48, 48);
+      ctx.strokeStyle = '#d8ff64';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(24, 24, w - 48, 48);
+
+      ctx.fillStyle = '#d8ff64';
+      ctx.font = '700 23px monospace';
+      ctx.fillText('[ HERO :: solution.py ]', 36, 56);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 16px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('SHA:9c1f', w - 36, 56);
+      ctx.textAlign = 'left';
+
+      // Python Implementation Code Lines
+      const code = [
+        { t: 'def count_vowels(text: str) -> int:', kw: true },
+        { t: '    """Count vowels in input."""', c: true },
+        { t: '    vowels = "aeiouAEIOU"', kw: false },
+        { t: '    count = 0', kw: false },
+        { t: '    for ch in text:', kw: true },
+        { t: '        if ch in vowels:', kw: true },
+        { t: '            count += 1', kw: false },
+        { t: '    return count', kw: true },
+      ];
+
+      code.forEach((item, i) => {
+        const y = 120 + i * 36;
+        if (item.c) {
+          ctx.fillStyle = '#72a882';
+          ctx.font = 'italic 19px monospace';
+        } else if (item.kw) {
+          ctx.fillStyle = '#d8ff64';
+          ctx.font = '700 21px monospace';
+        } else {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '600 21px monospace';
+        }
+        ctx.fillText(item.t, 36, y);
+      });
+
+      // Bottom Hardware Telemetry Bar
+      ctx.strokeStyle = 'rgba(216, 255, 100, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(24, h - 64);
+      ctx.lineTo(w - 24, h - 64);
+      ctx.stroke();
+
+      ctx.fillStyle = '#d8ff64';
+      ctx.font = '700 16px monospace';
+      ctx.fillText('SCOPE: BOUNDED · VERIFIED PAYLOAD', 36, h - 36);
+    } else if (faceType === 'side') {
+      // Memory Bus & Logic Circuits
+      ctx.fillStyle = '#d8ff64';
+      ctx.font = '700 23px monospace';
+      ctx.fillText('[ LOGIC REGISTERS 0x00A4 ]', 36, 60);
+
+      ctx.strokeStyle = 'rgba(216, 255, 100, 0.55)';
+      ctx.lineWidth = 2.5;
+      for (let i = 0; i < 6; i++) {
+        const y = 112 + i * 50;
+        ctx.beginPath();
+        ctx.moveTo(36, y);
+        ctx.lineTo(130, y);
+        ctx.lineTo(160, y + 20);
+        ctx.lineTo(w - 36, y + 20);
+        ctx.stroke();
+
+        ctx.fillStyle = i % 2 === 0 ? '#d8ff64' : '#5ef3d2';
+        ctx.fillRect(w - 80, y + 10, 42, 18);
+        ctx.fillStyle = '#06110a';
+        ctx.font = '700 12px monospace';
+        ctx.fillText('BUS', w - 72, y + 24);
+      }
+
+      ctx.fillStyle = '#8fffa8';
+      ctx.font = '700 16px monospace';
+      ctx.fillText('HASH: 9c1f…b2e7 · IMMUTABLE CORE', 36, h - 36);
+    } else {
+      // Top / Bottom Concentric Microprocessor Socket
+      ctx.strokeStyle = '#d8ff64';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 140, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#5ef3d2';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 85, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (let i = 0; i < 8; i++) {
+        const rad = (i / 8) * Math.PI * 2;
+        ctx.strokeStyle = 'rgba(216, 255, 100, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(w / 2 + Math.cos(rad) * 85, h / 2 + Math.sin(rad) * 85);
+        ctx.lineTo(w / 2 + Math.cos(rad) * 140, h / 2 + Math.sin(rad) * 140);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#d8ff64';
+      ctx.font = '700 22px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('QUANTUM PATCH CORE', w / 2, h / 2 - 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('solution.py', w / 2, h / 2 + 20);
+      ctx.textAlign = 'left';
+    }
+  });
+}
+
+function gatePlacardTexture(id, title, metric) {
+  return createTexture(256, 96, (ctx, w, h) => {
+    ctx.fillStyle = 'rgba(6, 14, 10, 0.95)';
+    ctx.fillRect(2, 2, w - 4, h - 4);
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, w - 4, h - 4);
+
+    ctx.fillStyle = '#d8ff64';
+    ctx.font = '700 15px monospace';
+    ctx.fillText(`GATE ${id} //`, 16, 30);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 22px monospace';
+    ctx.fillText(title, 16, 58);
+
+    ctx.fillStyle = '#8fffa8';
+    ctx.font = '600 14px monospace';
+    ctx.fillText(metric, 16, 82);
+  });
+}
+
+function courierFloorGlowTexture() {
+  return createTexture(256, 256, (ctx, w, h) => {
+    const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    grad.addColorStop(0, 'rgba(216, 255, 100, 0.55)');
+    grad.addColorStop(0.35, 'rgba(216, 255, 100, 0.28)');
+    grad.addColorStop(0.7, 'rgba(216, 255, 100, 0.08)');
+    grad.addColorStop(1, 'rgba(216, 255, 100, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  });
+}
+
+function gridFloorTexture() {
+  return createTexture(2048, 2048, (ctx, w, h) => {
+    ctx.strokeStyle = 'rgba(150, 180, 160, 0.16)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += 64) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += 64) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(216, 255, 100, 0.28)';
+    ctx.lineWidth = 2;
+    for (let x = 0; x <= w; x += 256) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += 256) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'destination-in';
+    const fade = ctx.createRadialGradient(w / 2, h / 2, w * 0.05, w / 2, h / 2, w * 0.52);
+    fade.addColorStop(0, 'rgba(0,0,0,1)');
+    fade.addColorStop(0.65, 'rgba(0,0,0,0.6)');
+    fade.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, w, h);
+  });
+}
+
+function statusPlateTexture({ title, code, detail, color = '#d8ff64' }) {
+  return createTexture(512, 180, (ctx, w, h) => {
+    ctx.fillStyle = 'rgba(5, 11, 7, 0.96)';
+    ctx.fillRect(4, 4, w - 8, h - 8);
+    ctx.strokeStyle = color === '#ff4747' ? 'rgba(255, 71, 71, 0.75)' : 'rgba(216, 255, 100, 0.65)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(4, 4, w - 8, h - 8);
+
+    ctx.strokeStyle = 'rgba(94, 243, 210, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(10, 10, w - 20, h - 20);
+
+    ctx.fillStyle = color;
+    ctx.fillRect(18, 18, 6, h - 36);
+
+    ctx.font = '700 18px monospace';
+    ctx.fillStyle = color;
+    ctx.fillText(title.toUpperCase(), 36, 48);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 32px monospace';
+    ctx.fillText(code, 36, 98);
+
+    ctx.fillStyle = '#8fffa8';
+    ctx.font = '600 18px monospace';
+    ctx.fillText(detail, 36, 144);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Three.js 3D Protagonist Pipeline Engine
+ * ------------------------------------------------------------------ */
+class TaskScene {
+  constructor(targetCanvas) {
+    this.canvas = targetCanvas;
+    this.width = targetCanvas.clientWidth || window.innerWidth;
+    this.height = targetCanvas.clientHeight || window.innerHeight;
+
+    // Detect capabilities & initialize Performance Tier
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const isPhone = window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    this.isMobile = isPhone || (isCoarse && window.innerWidth < 900);
+    this.tier = this.isMobile ? 'LOW' : 'HIGH';
+    this.slowFrameAccumulator = 0;
+
+    const dpr = this.tier === 'HIGH' ? Math.min(window.devicePixelRatio || 1, 1.75) : 1;
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: this.tier !== 'LOW',
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(this.width, this.height, false);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.45; // Enhanced exposure for maximum visibility
+
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.FogExp2(0x060908, 0.0006);
+
+    this.camera = new THREE.PerspectiveCamera(34, this.width / Math.max(1, this.height), 1, 5000);
+    this.timer = new THREE.Timer();
+    this.time = 0;
+    this.progress = 0;
+    this.alertIntensity = 0;
+
+    // Pointer Parallax & Raycasting
+    this.pointer = new THREE.Vector2(0, 0);
+    this.pointerTarget = new THREE.Vector2(0, 0);
+    this.raycaster = new THREE.Raycaster();
+    this.interactiveObjects = [];
+
+    this.buildProceduralEnvironment();
+    this.buildLighting();
+    this.buildSplineCameraTrack();
+    this.buildSceneWorld();
+    this.setupPostProcessing();
+    this.setupPointerEvents();
+    this.resize();
+  }
+
+  buildProceduralEnvironment() {
+    if (this.tier === 'LOW') return;
+    try {
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      pmrem.compileEquirectangularShader();
+
+      const envScene = new THREE.Scene();
+      const limeLight = new THREE.Mesh(
+        new THREE.PlaneGeometry(800, 800),
+        new THREE.MeshBasicMaterial({ color: 0xd8ff64 }),
+      );
+      limeLight.position.set(-200, 500, 300);
+      limeLight.rotation.x = Math.PI / 2.5;
+      envScene.add(limeLight);
+
+      const cyanFill = new THREE.Mesh(
+        new THREE.PlaneGeometry(700, 700),
+        new THREE.MeshBasicMaterial({ color: 0x5ef3d2 }),
+      );
+      cyanFill.position.set(500, 200, -300);
+      cyanFill.rotation.y = -Math.PI / 3;
+      envScene.add(cyanFill);
+
+      const darkGround = new THREE.Mesh(
+        new THREE.PlaneGeometry(2000, 2000),
+        new THREE.MeshBasicMaterial({ color: 0x030504 }),
+      );
+      darkGround.position.y = -400;
+      darkGround.rotation.x = -Math.PI / 2;
+      envScene.add(darkGround);
+
+      const envTarget = pmrem.fromScene(envScene, 0.04);
+      this.scene.environment = envTarget.texture;
+      pmrem.dispose();
+    } catch (e) {
+      console.warn('Procedural PMREM environment bypassed:', e);
+    }
+  }
+
+  buildLighting() {
+    this.scene.add(new THREE.HemisphereLight(0xe0ece4, 0x060908, 1.4));
+
+    const mainKey = new THREE.DirectionalLight(0xffffff, 3.8);
+    mainKey.position.set(-280, 520, 580);
+    this.scene.add(mainKey);
+
+    const rimLight = new THREE.DirectionalLight(0xd8ff64, 2.8);
+    rimLight.position.set(500, 320, -380);
+    this.scene.add(rimLight);
+
+    const fillLight = new THREE.DirectionalLight(0x5ef3d2, 1.6);
+    fillLight.position.set(-420, -80, 420);
+    this.scene.add(fillLight);
+
+    // Dedicated phosphor green point rim light following right behind the courier
+    this.courierRimLight = new THREE.PointLight(0xd8ff64, 5.2, 400, 1.2);
+    this.scene.add(this.courierRimLight);
+  }
+
+  buildSplineCameraTrack() {
+    // 7 Spatial Camera Waypoints: Optimized focal distance so Courier is large, prominent, and framed in the right-center
+    const cameraWaypoints = [
+      new THREE.Vector3(-460, 105, 500),  // 01 Contract: Clean glass pod + large Courier
+      new THREE.Vector3(-260, 105, 480),  // 02 Patch: Iris portal + deflected shards
+      new THREE.Vector3(-80, 35, 470),    // 03 Tests: Sealed vault collar
+      new THREE.Vector3(75, 25, 430),     // 04 AST: Scan gantry & syntax tree
+      new THREE.Vector3(260, -35, 550),   // 05 Worktree: Dual space & conduit tube
+      new THREE.Vector3(480, -10, 490),   // 06 Gates: 4 portal arena
+      new THREE.Vector3(590, 25, 490),    // 07 Copy-back: Master dock & receipt plate
+    ];
+
+    const lookWaypoints = [
+      new THREE.Vector3(-460, 100, 0),
+      new THREE.Vector3(-260, 100, 0),
+      new THREE.Vector3(-80, 25, 0),
+      new THREE.Vector3(75, 25, 0),
+      new THREE.Vector3(260, -45, 0),
+      new THREE.Vector3(480, -20, 0),
+      new THREE.Vector3(590, 25, 0),
+    ];
+
+    this.cameraSpline = new THREE.CatmullRomCurve3(cameraWaypoints, false, 'centripetal', 0.5);
+    this.lookSpline = new THREE.CatmullRomCurve3(lookWaypoints, false, 'centripetal', 0.5);
+  }
+
+  buildSceneWorld() {
+    this.world = new THREE.Group();
+    this.scene.add(this.world);
+
+    // Floor Grid
+    const floorGeo = new THREE.PlaneGeometry(4800, 4800);
+    const floorMat = new THREE.MeshBasicMaterial({
+      map: gridFloorTexture(),
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.85,
+    });
+    this.floor = new THREE.Mesh(floorGeo, floorMat);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.position.y = -220;
+    this.world.add(this.floor);
+
+    // Atmospheric Floating Dust Particles
+    const dustCount = this.tier === 'LOW' ? 120 : 280;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3] = -900 + Math.random() * 2100;
+      dustPos[i * 3 + 1] = -220 + Math.random() * 700;
+      dustPos[i * 3 + 2] = -400 + Math.random() * 800;
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    this.dust = new THREE.Points(
+      dustGeo,
+      new THREE.PointsMaterial({
+        color: 0xd8ff64,
+        size: 2.2,
+        transparent: true,
+        opacity: 0.35,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    this.world.add(this.dust);
+
+    // 1. Protagonist: THE COURIER (Code Cube)
+    this.buildProtagonistCourier();
+
+    // 2. Stage 1: Task Boundary Glass Cage (Birth Chamber)
+    this.buildTaskBoundaryCage();
+
+    // 3. Stage 2: Boundary Opening & Rogue Shard Deflector
+    this.buildBoundaryOpening();
+
+    // 4. Stage 3: Sealed Test Vault Collar & Gimbal Laser Rings
+    this.buildSealedVaultCollar();
+
+    // 5. Stage 4: AST Scan Blade & 3D Syntax Tree Network
+    this.buildASTScanZone();
+
+    // 6. Stage 5: Dual Space (Pristine Source Tree, Conduit Tube & Worktree Pod)
+    this.buildDualWorktreeSpace();
+
+    // 7. Stage 6: Quarantine Gate Arena & Failure/Retry Arc
+    this.buildGateArena();
+
+    // 8. Stage 7: Master Working Tree Dock & Evidence Plates
+    this.buildMasterDock();
+  }
+
+  buildProtagonistCourier() {
+    this.courier = new THREE.Group();
+    this.courier.position.set(-460, 100, 0);
+
+    // 1. Inner Hyper-Luminous Quantum Core (Octahedron)
+    const coreGeo = new THREE.OctahedronGeometry(26, 0);
+    this.courierCoreMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 2.8,
+      roughness: 0.08,
+      metalness: 0.9,
+    });
+    this.courierCore = new THREE.Mesh(coreGeo, this.courierCoreMat);
+    this.courier.add(this.courierCore);
+
+    // 2. Kinetic Matrix Lattice (Icosahedron wireframe)
+    const latticeGeo = new THREE.IcosahedronGeometry(34, 0);
+    this.courierLatticeMat = new THREE.MeshBasicMaterial({
+      color: 0x5ef3d2,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.7,
+    });
+    this.courierLattice = new THREE.Mesh(latticeGeo, this.courierLatticeMat);
+    this.courier.add(this.courierLattice);
+
+    // 3. High-Gloss Cyber-Beveled Translucent Armor Casing (56x56x56)
+    const shellGeo = new THREE.BoxGeometry(56, 56, 56);
+    const frontTex = courierFaceTexture('front');
+    const sideTex = courierFaceTexture('side');
+    const topTex = courierFaceTexture('top');
+
+    const frontMat = new THREE.MeshStandardMaterial({
+      map: frontTex,
+      roughness: 0.1,
+      metalness: 0.5,
+      transparent: true,
+      opacity: 0.96,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.35,
+    });
+    const sideMat = new THREE.MeshStandardMaterial({
+      map: sideTex,
+      roughness: 0.12,
+      metalness: 0.5,
+      transparent: true,
+      opacity: 0.94,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.25,
+    });
+    const topMat = new THREE.MeshStandardMaterial({
+      map: topTex,
+      roughness: 0.12,
+      metalness: 0.55,
+      transparent: true,
+      opacity: 0.94,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.25,
+    });
+
+    // Material order for BoxGeometry: [+X, -X, +Y, -Y, +Z, -Z]
+    this.courierShell = new THREE.Mesh(shellGeo, [sideMat, sideMat, topMat, topMat, frontMat, frontMat]);
+    this.courier.add(this.courierShell);
+
+    // 4. Machined Titanium Corner Bracket Clamps (8 corners)
+    this.courierBrackets = new THREE.Group();
+    const bracketGeo = new THREE.BoxGeometry(8, 8, 8);
+    const bracketMat = new THREE.MeshStandardMaterial({
+      color: 0x111c16,
+      metalness: 0.95,
+      roughness: 0.15,
+    });
+    const bOffset = 28;
+    [
+      [-bOffset, -bOffset, -bOffset],
+      [bOffset, -bOffset, -bOffset],
+      [-bOffset, bOffset, -bOffset],
+      [bOffset, bOffset, -bOffset],
+      [-bOffset, -bOffset, bOffset],
+      [bOffset, -bOffset, bOffset],
+      [-bOffset, bOffset, bOffset],
+      [bOffset, bOffset, bOffset],
+    ].forEach((pos) => {
+      const bMesh = new THREE.Mesh(bracketGeo, bracketMat);
+      bMesh.position.set(...pos);
+      this.courierBrackets.add(bMesh);
+    });
+    this.courier.add(this.courierBrackets);
+
+    // 5. Beveled Wireframe Highlight Edge
+    const wireGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(56.5, 56.5, 56.5));
+    this.courierWireMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.95 });
+    this.courierWire = new THREE.LineSegments(wireGeo, this.courierWireMat);
+    this.courier.add(this.courierWire);
+
+    // 6. Gimbal Orbital Laser Rings (Gyroscopic)
+    this.orbitalRing1 = new THREE.Mesh(
+      new THREE.TorusGeometry(48, 1.2, 16, 64),
+      new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.85 }),
+    );
+    this.orbitalRing1.rotation.x = Math.PI / 4;
+    this.courier.add(this.orbitalRing1);
+
+    this.orbitalRing2 = new THREE.Mesh(
+      new THREE.TorusGeometry(54, 1.0, 16, 64),
+      new THREE.MeshBasicMaterial({ color: 0x5ef3d2, transparent: true, opacity: 0.7 }),
+    );
+    this.orbitalRing2.rotation.y = -Math.PI / 3;
+    this.courier.add(this.orbitalRing2);
+
+    // Set render orders to guarantee proper transparent layering
+    this.courierCore.renderOrder = 1;
+    this.courierLattice.renderOrder = 2;
+    this.courierShell.renderOrder = 3;
+    this.courierBrackets.renderOrder = 4;
+    this.courierWire.renderOrder = 5;
+    this.orbitalRing1.renderOrder = 6;
+    this.orbitalRing2.renderOrder = 6;
+
+    // 7. Orbiting Code Satellites (4 Floating Rune Badges)
+    this.orbitingGlyphs = new THREE.Group();
+    this.orbitingGlyphs.renderOrder = 7;
+    const glyphTokens = ['def count_vowels', 'vowels="aeiou"', 'SHA: 9c1f', 'pytest: PASS'];
+    this.glyphSprites = [];
+    glyphTokens.forEach((token, idx) => {
+      const tex = createTexture(200, 48, (ctx) => {
+        ctx.fillStyle = 'rgba(6, 14, 9, 0.92)';
+        ctx.fillRect(2, 2, 196, 44);
+        ctx.strokeStyle = '#d8ff64';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(2, 2, 196, 44);
+        ctx.fillStyle = '#d8ff64';
+        ctx.font = '700 18px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(token, 100, 24);
+      });
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 }));
+      sprite.scale.set(34, 8, 1);
+      this.orbitingGlyphs.add(sprite);
+      this.glyphSprites.push({
+        sprite,
+        angle: (idx / glyphTokens.length) * Math.PI * 2,
+        radius: 56,
+        speed: 1.2 + (idx % 2) * 0.3,
+      });
+    });
+    this.courier.add(this.orbitingGlyphs);
+
+    // 8. Red Crack Overlay Mesh for Failure State
+    const crackGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(35, 1));
+    this.crackMat = new THREE.LineBasicMaterial({ color: 0xff4747, transparent: true, opacity: 0 });
+    this.crackMesh = new THREE.LineSegments(crackGeo, this.crackMat);
+    this.courier.add(this.crackMesh);
+
+    // 9. Internal Point Light
+    this.courierGlow = new THREE.PointLight(0xd8ff64, 5.0, 240, 1.0);
+    this.courier.add(this.courierGlow);
+
+    // 10. Soft emissive floor glow under the courier
+    const glowGeo = new THREE.PlaneGeometry(260, 260);
+    this.courierFloorGlowMat = new THREE.MeshBasicMaterial({
+      map: courierFloorGlowTexture(),
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.courierFloorGlow = new THREE.Mesh(glowGeo, this.courierFloorGlowMat);
+    this.courierFloorGlow.rotation.x = -Math.PI / 2;
+    this.courierFloorGlow.position.set(-460, -219, 0);
+    this.world.add(this.courierFloorGlow);
+
+    this.courier.userData = {
+      name: 'THE_COURIER',
+      file: 'solution.py',
+      symbols: 'count_vowels(text)',
+    };
+    this.interactiveObjects.push(this.courierShell);
+
+    this.world.add(this.courier);
+  }
+
+  buildTaskBoundaryCage() {
+    this.boundaryCage = new THREE.Group();
+    this.boundaryCage.position.set(-460, 100, 0);
+
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x0c1611,
+      roughness: 0.2,
+      metalness: 0.9,
+    });
+    const neonMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64 });
+
+    // 1. Sleek Beveled Circular Base Dais
+    const baseGeo = new THREE.CylinderGeometry(76, 82, 8, 32);
+    const baseMesh = new THREE.Mesh(baseGeo, metalMat);
+    baseMesh.position.y = -70;
+    this.boundaryCage.add(baseMesh);
+
+    // Glowing Phosphor Levitation Core Emitter
+    const emitterCore = new THREE.Mesh(
+      new THREE.RingGeometry(10, 48, 32),
+      new THREE.MeshBasicMaterial({ color: 0xd8ff64, side: THREE.DoubleSide }),
+    );
+    emitterCore.rotation.x = -Math.PI / 2;
+    emitterCore.position.y = -65.8;
+    this.boundaryCage.add(emitterCore);
+
+    // Circular Base Laser Ring
+    const baseRing = new THREE.Mesh(new THREE.TorusGeometry(78, 1.2, 16, 64), neonMat);
+    baseRing.rotation.x = Math.PI / 2;
+    baseRing.position.y = -66;
+    this.boundaryCage.add(baseRing);
+
+    // 2. Top Magnetic Containment Ring
+    const topRing = new THREE.Mesh(new THREE.TorusGeometry(78, 2, 16, 64), metalMat);
+    topRing.rotation.x = Math.PI / 2;
+    topRing.position.y = 75;
+    this.boundaryCage.add(topRing);
+
+    const topLaser = new THREE.Mesh(new THREE.TorusGeometry(76, 1.2, 16, 64), neonMat);
+    topLaser.rotation.x = Math.PI / 2;
+    topLaser.position.y = 75;
+    this.boundaryCage.add(topLaser);
+
+    // 3. Ultra-Slim Carbon Fiber Tri-Pylons with Vertical Laser Strands (120° apart)
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2;
+      const x = Math.cos(angle) * 78;
+      const z = Math.sin(angle) * 78;
+
+      const pylon = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 145, 12), metalMat);
+      pylon.position.set(x, 4.5, z);
+      this.boundaryCage.add(pylon);
+
+      // Glowing emitter beacon on top of each pylon
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(2.5, 12, 12), neonMat);
+      beacon.position.set(x, 77, z);
+      this.boundaryCage.add(beacon);
+    }
+
+    // 4. Luminous Holographic Glass Containment Sheath
+    const glassGeo = new THREE.CylinderGeometry(72, 72, 140, 32, 1, true);
+    this.cageMat = new THREE.MeshStandardMaterial({
+      color: 0x071b10,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.12,
+      roughness: 0.05,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const glassMesh = new THREE.Mesh(glassGeo, this.cageMat);
+    this.boundaryCage.add(glassMesh);
+
+    // 5. Dual Horizontal Scanning Laser Rings
+    this.scanRing1 = new THREE.Mesh(
+      new THREE.TorusGeometry(72.5, 0.8, 12, 64),
+      new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.75 }),
+    );
+    this.scanRing1.rotation.x = Math.PI / 2;
+    this.scanRing1.position.y = 20;
+    this.boundaryCage.add(this.scanRing1);
+
+    this.scanRing2 = new THREE.Mesh(
+      new THREE.TorusGeometry(72.5, 0.8, 12, 64),
+      new THREE.MeshBasicMaterial({ color: 0x5ef3d2, transparent: true, opacity: 0.6 }),
+    );
+    this.scanRing2.rotation.x = Math.PI / 2;
+    this.scanRing2.position.y = -20;
+    this.boundaryCage.add(this.scanRing2);
+
+    this.world.add(this.boundaryCage);
+  }
+
+  buildBoundaryOpening() {
+    this.boundaryZone = new THREE.Group();
+    this.boundaryZone.position.set(-260, 100, 0);
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x0c1611, roughness: 0.2, metalness: 0.9 });
+    const neonMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64 });
+
+    // 1. Sleek Toroidal Aperture Outer Housing
+    const housing = new THREE.Mesh(new THREE.TorusGeometry(78, 5, 16, 48), metalMat);
+    this.boundaryZone.add(housing);
+
+    const housingLaser = new THREE.Mesh(new THREE.TorusGeometry(84, 1.2, 16, 64), neonMat);
+    this.boundaryZone.add(housingLaser);
+
+    // 2. Overlapping Mechanical Iris Blades (parted open in center)
+    this.irisBlades = new THREE.Group();
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const bladeShape = new THREE.Shape();
+      bladeShape.moveTo(0, 0);
+      bladeShape.lineTo(40, 12);
+      bladeShape.lineTo(62, 0);
+      bladeShape.lineTo(40, -12);
+      bladeShape.closePath();
+
+      const bladeGeo = new THREE.ShapeGeometry(bladeShape);
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0x122419,
+        emissive: 0xd8ff64,
+        emissiveIntensity: 0.2,
+        roughness: 0.3,
+        metalness: 0.8,
+        side: THREE.DoubleSide,
+      });
+      const blade = new THREE.Mesh(bladeGeo, bladeMat);
+      blade.position.set(Math.cos(angle) * 58, Math.sin(angle) * 58, 0);
+      blade.rotation.z = angle + Math.PI / 2;
+      this.irisBlades.add(blade);
+    }
+    this.boundaryZone.add(this.irisBlades);
+
+    // 3. Cyan Permeable Boundary Energy Membrane in Center
+    const membraneGeo = new THREE.RingGeometry(0, 48, 32);
+    const membraneMat = new THREE.MeshBasicMaterial({
+      color: 0x5ef3d2,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.boundaryZone.add(new THREE.Mesh(membraneGeo, membraneMat));
+
+    // 4. Deflected Rogue Shards with Animated Spark Streaks
+    this.rogueShards = [];
+    const shardNames = ['test_tamper.py', 'evil.sh', 'secrets.env', 'override.config'];
+    for (let i = 0; i < 4; i++) {
+      const sGeo = new THREE.TetrahedronGeometry(13, 0);
+      const sMat = new THREE.MeshStandardMaterial({
+        color: 0x220909,
+        emissive: 0xff3b30,
+        emissiveIntensity: 0.9,
+        roughness: 0.2,
+        metalness: 0.7,
+      });
+      const shard = new THREE.Mesh(sGeo, sMat);
+      const angle = -Math.PI / 4 + (i / 3) * Math.PI / 2;
+      shard.position.set(
+        Math.cos(angle) * 88,
+        Math.sin(angle) * 58,
+        25 + (i % 2) * 20,
+      );
+      shard.userData = { name: shardNames[i], basePos: shard.position.clone() };
+
+      // Deflection spark arc
+      const sparkGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(shard.position.x > 0 ? 14 : -14, -12, -8),
+      ]);
+      const spark = new THREE.Line(sparkGeo, new THREE.LineBasicMaterial({ color: 0xff4747 }));
+      shard.add(spark);
+
+      this.boundaryZone.add(shard);
+      this.rogueShards.push(shard);
+    }
+
+    this.world.add(this.boundaryZone);
+  }
+
+  buildSealedVaultCollar() {
+    this.vaultCollar = new THREE.Group();
+    this.vaultCollar.position.set(-80, 45, 0);
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x0c1611, roughness: 0.2, metalness: 0.9 });
+    const neonMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64 });
+
+    // 1. Heavy Cylindrical Collar Frame
+    const frameGeo = new THREE.CylinderGeometry(82, 82, 38, 32, 1, true);
+    const frame = new THREE.Mesh(frameGeo, metalMat);
+    frame.rotation.z = Math.PI / 2;
+    this.vaultCollar.add(frame);
+
+    // Dual Machined Flange Clamps with Teeth
+    [-19, 19].forEach((xPos) => {
+      const flange = new THREE.Mesh(new THREE.TorusGeometry(84, 4, 16, 48), metalMat);
+      flange.rotation.y = Math.PI / 2;
+      flange.position.x = xPos;
+      this.vaultCollar.add(flange);
+
+      const flangeLaser = new THREE.Mesh(new THREE.TorusGeometry(86, 1.0, 16, 64), neonMat);
+      flangeLaser.rotation.y = Math.PI / 2;
+      flangeLaser.position.x = xPos;
+      this.vaultCollar.add(flangeLaser);
+    });
+
+    // 2. Triple Counter-Rotating Cryptographic Laser Rings
+    this.gimbalR1 = new THREE.Mesh(new THREE.TorusGeometry(76, 2.5, 16, 64), metalMat);
+    this.gimbalR2 = new THREE.Mesh(new THREE.TorusGeometry(64, 2.2, 16, 64), metalMat);
+    this.gimbalR3 = new THREE.Mesh(
+      new THREE.TorusGeometry(52, 2.0, 16, 64),
+      new THREE.MeshStandardMaterial({ color: 0xd8ff64, emissive: 0xd8ff64, emissiveIntensity: 0.8 }),
+    );
+
+    this.vaultCollar.add(this.gimbalR1);
+    this.vaultCollar.add(this.gimbalR2);
+    this.vaultCollar.add(this.gimbalR3);
+
+    // 3. Laser Locking Crosshairs
+    const laserGeo = new THREE.BufferGeometry();
+    laserGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+      -75, 0, 0, 75, 0, 0,
+      0, -75, 0, 0, 75, 0,
+      0, 0, -75, 0, 0, 75,
+    ], 3));
+    this.laserMat = new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.9 });
+    this.lasers = new THREE.LineSegments(laserGeo, this.laserMat);
+    this.vaultCollar.add(this.lasers);
+
+    this.world.add(this.vaultCollar);
+  }
+
+  buildASTScanZone() {
+    this.astZone = new THREE.Group();
+    this.astZone.position.set(75, 25, 0);
+
+    // 1. Overhead Gantry Scanner Frame
+    const gantryMat = new THREE.MeshStandardMaterial({ color: 0x0c1611, roughness: 0.2, metalness: 0.9 });
+    const gantryBar = new THREE.Mesh(new THREE.BoxGeometry(6, 170, 8), gantryMat);
+    gantryBar.position.set(-42, 0, 0);
+    this.astZone.add(gantryBar);
+
+    // 2. Horizontal Planar Laser Scan Blade (sweeps vertically across courier)
+    const bladeGeo = new THREE.PlaneGeometry(80, 5);
+    this.bladeMat = new THREE.MeshBasicMaterial({
+      color: 0x5ef3d2,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.scanBlade = new THREE.Mesh(bladeGeo, this.bladeMat);
+    this.scanBlade.position.set(0, 0, 0);
+    this.astZone.add(this.scanBlade);
+
+    // 3. 3D Branching Syntax Tree Network
+    this.astBranchNodes = [];
+    const astCoords = [
+      { name: 'Module (task_001)', pos: [45, 50, 0], col: 0x5ef3d2, r: 8.5 },
+      { name: 'FunctionDef: count_vowels', pos: [45, 24, 0], col: 0xd8ff64, r: 9.5 },
+      { name: 'arg: text (str)', pos: [18, -4, 15], col: 0x8fffa8, r: 7 },
+      { name: 'For: ch in text', pos: [70, -6, -10], col: 0x8fffa8, r: 7 },
+      { name: 'If: ch in vowels', pos: [45, -34, 15], col: 0xffd864, r: 7.5 },
+      { name: 'Return: count', pos: [45, -58, -10], col: 0x5ef3d2, r: 8 },
+    ];
+
+    astCoords.forEach((node) => {
+      const mesh = new THREE.Mesh(
+        new THREE.OctahedronGeometry(node.r, 0),
+        new THREE.MeshStandardMaterial({
+          color: node.col,
+          emissive: node.col,
+          emissiveIntensity: 0.6,
+          roughness: 0.15,
+          metalness: 0.8,
+          transparent: true,
+          opacity: 0.85,
+        }),
+      );
+      mesh.position.set(...node.pos);
+      mesh.userData = { name: node.name };
+
+      const nodeWire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: node.col }),
+      );
+      mesh.add(nodeWire);
+
+      this.astZone.add(mesh);
+      this.astBranchNodes.push(mesh);
+    });
+
+    // Connecting Branches
+    const branchGeo = new THREE.BufferGeometry();
+    branchGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+      45, 50, 0, 45, 24, 0,
+      45, 24, 0, 18, -4, 15,
+      45, 24, 0, 70, -6, -10,
+      70, -6, -10, 45, -34, 15,
+      45, -34, 15, 45, -58, -10,
+    ], 3));
+    this.branchLines = new THREE.LineSegments(
+      branchGeo,
+      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.65 }),
+    );
+    this.astZone.add(this.branchLines);
+
+    this.world.add(this.astZone);
+  }
+
+  buildDualWorktreeSpace() {
+    this.dualSpace = new THREE.Group();
+    this.dualSpace.visible = false;
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x0c1611, roughness: 0.25, metalness: 0.85 });
+
+    // 1. Pristine Main Source Repository Tower
+    this.sourceTree = new THREE.Group();
+    this.sourceTree.position.set(260, 30, -35);
+
+    const towerGeo = new THREE.BoxGeometry(110, 90, 50);
+    const tower = new THREE.Mesh(towerGeo, metalMat);
+    this.sourceTree.add(tower);
+
+    // Glowing Fiber Lines on Repository Tower
+    const fiberGeo = new THREE.EdgesGeometry(towerGeo);
+    const fiberMesh = new THREE.LineSegments(fiberGeo, new THREE.LineBasicMaterial({ color: 0x5ef3d2, opacity: 0.8 }));
+    this.sourceTree.add(fiberMesh);
+
+    // Protective Sealed Glass Shroud around Source Tree
+    const shroudGeo = new THREE.BoxGeometry(120, 100, 60);
+    const shroudMat = new THREE.MeshStandardMaterial({
+      color: 0x5ef3d2,
+      roughness: 0.05,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    });
+    this.sourceTree.add(new THREE.Mesh(shroudGeo, shroudMat));
+    this.dualSpace.add(this.sourceTree);
+
+    // 2. Curved Quantum Transit Conduit Tube
+    const conduitPoints = [
+      new THREE.Vector3(260, 30, -35),
+      new THREE.Vector3(260, -15, 20),
+      new THREE.Vector3(260, -65, 0),
+      new THREE.Vector3(260, -115, 0),
+    ];
+    this.conduitCurve = new THREE.CatmullRomCurve3(conduitPoints);
+    const tubeGeo = new THREE.TubeGeometry(this.conduitCurve, 48, 12, 16, false);
+    this.tubeMat = new THREE.MeshStandardMaterial({
+      color: 0x183b2a,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.25,
+      roughness: 0.15,
+      metalness: 0.7,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false,
+    });
+    this.conduitTube = new THREE.Mesh(tubeGeo, this.tubeMat);
+    this.dualSpace.add(this.conduitTube);
+
+    // 3. Isolated Worktree Execution Pod
+    this.quarantinePod = new THREE.Group();
+    this.quarantinePod.position.set(260, -115, 0);
+
+    const podShellGeo = new THREE.CylinderGeometry(72, 72, 120, 32, 1, true);
+    const podShellMat = new THREE.MeshStandardMaterial({
+      color: 0x09140e,
+      emissive: 0xd8ff64,
+      emissiveIntensity: 0.15,
+      roughness: 0.1,
+      metalness: 0.3,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.podMesh = new THREE.Mesh(podShellGeo, podShellMat);
+    this.quarantinePod.add(this.podMesh);
+
+    // Magnetic levitation rings on pod
+    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(74, 1.5, 16, 64), new THREE.MeshBasicMaterial({ color: 0xd8ff64 }));
+    ring1.rotation.x = Math.PI / 2;
+    ring1.position.y = 50;
+    this.quarantinePod.add(ring1);
+
+    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(74, 1.5, 16, 64), new THREE.MeshBasicMaterial({ color: 0xd8ff64 }));
+    ring2.rotation.x = Math.PI / 2;
+    ring2.position.y = -50;
+    this.quarantinePod.add(ring2);
+
+    this.dualSpace.add(this.quarantinePod);
+    this.world.add(this.dualSpace);
+  }
+
+  buildGateArena() {
+    this.gateArena = new THREE.Group();
+    this.gateArena.position.set(480, -20, 0);
+    this.gateArena.visible = false;
+
+    const gateSpecs = [
+      { id: '1', name: 'TARGETED', pass: '4/4' },
+      { id: '2', name: 'HIDDEN', pass: 'PASS' },
+      { id: '3', name: 'NEGATIVE', pass: 'SAFE' },
+      { id: '4', name: 'REGRESSION', pass: '12/12' },
+    ];
+
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x0c1611, roughness: 0.2, metalness: 0.9 });
+
+    this.arenaGates = [];
+    gateSpecs.forEach((g, idx) => {
+      const gGroup = new THREE.Group();
+      gGroup.position.set(-90 + idx * 60, 0, 0);
+
+      // Gate Arch Frame: Left Pylon, Right Pylon, Top Crossbeam
+      const pylonGeo = new THREE.BoxGeometry(6, 160, 10);
+      const leftPylon = new THREE.Mesh(pylonGeo, metalMat);
+      leftPylon.position.x = -24;
+      gGroup.add(leftPylon);
+
+      const rightPylon = new THREE.Mesh(pylonGeo, metalMat);
+      rightPylon.position.x = 24;
+      gGroup.add(rightPylon);
+
+      const beamGeo = new THREE.BoxGeometry(54, 8, 12);
+      const topBeam = new THREE.Mesh(beamGeo, metalMat);
+      topBeam.position.y = 80;
+      gGroup.add(topBeam);
+
+      // Overhead Placard Signage
+      const placardTex = gatePlacardTexture(g.id, g.name, g.pass);
+      const placard = new THREE.Mesh(
+        new THREE.PlaneGeometry(36, 14),
+        new THREE.MeshBasicMaterial({ map: placardTex, transparent: true, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      placard.position.set(0, 92, 0);
+      gGroup.add(placard);
+
+      // Gate Laser Curtains
+      const curtain = new THREE.Mesh(
+        new THREE.PlaneGeometry(44, 148),
+        new THREE.MeshBasicMaterial({
+          color: 0xd8ff64,
+          transparent: true,
+          opacity: 0.18,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      );
+      curtain.position.set(0, 0, 0);
+      gGroup.add(curtain);
+
+      // Status Beacon Lamp with metallic bezel
+      const lamp = new THREE.Mesh(
+        new THREE.SphereGeometry(4.8, 16, 16),
+        new THREE.MeshStandardMaterial({
+          color: 0x142018,
+          emissive: 0x243329,
+          emissiveIntensity: 0.6,
+          roughness: 0.25,
+          metalness: 0.7,
+        }),
+      );
+      lamp.position.set(0, 80, 8);
+      gGroup.add(lamp);
+
+      const bezel = new THREE.Mesh(
+        new THREE.TorusGeometry(5.8, 1.2, 8, 20),
+        new THREE.MeshStandardMaterial({ color: 0x223328, roughness: 0.3, metalness: 0.8 }),
+      );
+      bezel.position.set(0, 80, 7.5);
+      gGroup.add(bezel);
+
+      this.arenaGates.push({ lamp, curtain });
+      this.gateArena.add(gGroup);
+    });
+
+    // Red Retry Curve Arc on drift
+    const retryCurve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(-30, 10, 0),
+      new THREE.Vector3(-60, -20, 35),
+      new THREE.Vector3(-90, -5, 0),
+    );
+    const retryGeo = new THREE.BufferGeometry().setFromPoints(retryCurve.getPoints(32));
+    this.retryArcMat = new THREE.LineDashedMaterial({
+      color: 0xff4747,
+      dashSize: 5,
+      gapSize: 3.5,
+      transparent: true,
+      opacity: 0,
+    });
+    this.retryArc = new THREE.Line(retryGeo, this.retryArcMat);
+    this.retryArc.computeLineDistances();
+    this.gateArena.add(this.retryArc);
+
+    this.world.add(this.gateArena);
+  }
+
+  buildMasterDock() {
+    this.masterDock = new THREE.Group();
+    this.masterDock.position.set(590, 25, 0);
+    this.masterDock.visible = false;
+
+    // Working Tree Vault Motherboard File Socket (left side of master dock)
+    const socketGroup = new THREE.Group();
+    socketGroup.position.set(-56, 0, 0);
+
+    const frameGeo = new THREE.BoxGeometry(105, 135, 68);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x09140e, roughness: 0.2, metalness: 0.9 });
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    socketGroup.add(frame);
+
+    // Beveled frame neon edge
+    const frameWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(frameGeo),
+      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0.5 }),
+    );
+    socketGroup.add(frameWire);
+
+    // Target File Slot for solution.py
+    const slotGeo = new THREE.BoxGeometry(58, 58, 14);
+    this.slotMat = new THREE.MeshBasicMaterial({ color: 0xd8ff64, wireframe: true });
+    this.solutionSlot = new THREE.Mesh(slotGeo, this.slotMat);
+    this.solutionSlot.position.set(0, 0, 38);
+    socketGroup.add(this.solutionSlot);
+
+    // Docking Alignment Laser Guides
+    const guidesGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-29, -29, 38), new THREE.Vector3(-40, -40, 58),
+      new THREE.Vector3(29, -29, 38), new THREE.Vector3(40, -40, 58),
+      new THREE.Vector3(-29, 29, 38), new THREE.Vector3(-40, 40, 58),
+      new THREE.Vector3(29, 29, 38), new THREE.Vector3(40, 40, 58),
+    ]);
+    const guides = new THREE.LineSegments(guidesGeo, new THREE.LineBasicMaterial({ color: 0xd8ff64 }));
+    socketGroup.add(guides);
+
+    this.masterDock.add(socketGroup);
+
+    // Receipt Evidence Trail Plate (right side of master dock)
+    const receiptGeo = new THREE.PlaneGeometry(122, 160);
+    const receiptMat = new THREE.MeshBasicMaterial({
+      map: createTexture(512, 640, (ctx, w, h) => {
+        ctx.fillStyle = 'rgba(7, 12, 9, 0.96)';
+        ctx.fillRect(4, 4, w - 8, h - 8);
+        ctx.strokeStyle = 'rgba(216, 255, 100, 0.45)';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(4, 4, w - 8, h - 8);
+
+        ctx.fillStyle = '#d8ff64';
+        ctx.fillRect(24, 24, 4, h - 48);
+
+        ctx.font = '700 20px monospace';
+        ctx.fillStyle = '#d8ff64';
+        ctx.fillText('AUDIT EVIDENCE TRAIL (ILLUSTRATIVE)', 42, 54);
+
+        ctx.fillStyle = '#f4f7f4';
+        ctx.font = '700 28px monospace';
+        ctx.fillText('execution_log.json', 42, 100);
+
+        ctx.strokeStyle = 'rgba(216, 255, 100, 0.2)';
+        ctx.beginPath();
+        ctx.moveTo(42, 120);
+        ctx.lineTo(w - 42, 120);
+        ctx.stroke();
+
+        const logs = [
+          '// REPORT30 Benchmark Record (illustrative)',
+          '{',
+          '  "task": "task_001_count_vowels",',
+          '  "pre_test_hash": "9c1f...b2e7",',
+          '  "post_test_hash": "9c1f...b2e7",',
+          '  "hash_drift_bits": 0,',
+          '  "ast_parsed": true,',
+          '  "gates_passed": [1, 2, 3, 4],',
+          '  "exit_code": 0,',
+          '  "verified_copy_back": ["solution.py"]',
+          '}',
+        ];
+
+        logs.forEach((line, i) => {
+          ctx.fillStyle = line.includes('0') || line.includes('true') || line.includes('solution.py') ? '#d8ff64' : '#a8b8ad';
+          ctx.font = '500 17px monospace';
+          ctx.fillText(line, 42, 154 + i * 32);
+        });
+      }),
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+
+    this.receiptMesh = new THREE.Mesh(receiptGeo, receiptMat);
+    this.receiptMesh.position.set(22, 0, 15);
+    this.receiptMesh.rotation.y = -0.16;
+    this.masterDock.add(this.receiptMesh);
+
+    this.world.add(this.masterDock);
+  }
+
+  setupPostProcessing() {
+    if (this.tier === 'LOW') {
+      this.usePost = false;
+      return;
+    }
+
+    try {
+      this.renderTarget = new THREE.WebGLRenderTarget(this.width, this.height, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.HalfFloatType,
+      });
+
+      this.postScene = new THREE.Scene();
+      this.postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+      this.postMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          tDiffuse: { value: null },
+          uVelocity: { value: 0 },
+          uTime: { value: 0 },
+          uAlert: { value: 0 },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float uVelocity;
+          uniform float uTime;
+          uniform float uAlert;
+          varying vec2 vUv;
+
+          float random(vec2 p) {
+            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+          }
+
+          void main() {
+            vec2 uv = vUv;
+            vec2 center = vec2(0.5, 0.5);
+            vec2 dist = uv - center;
+            float r2 = dot(dist, dist);
+
+            float distortion = 1.0 + r2 * (0.025 + abs(uVelocity) * 0.0001);
+            vec2 distortedUv = center + dist * distortion;
+
+            float chroma = abs(uVelocity) * 0.0007 + uAlert * 0.0035;
+            vec2 dir = normalize(dist + vec2(0.0001));
+
+            float r = texture2D(tDiffuse, distortedUv + dir * chroma).r;
+            float g = texture2D(tDiffuse, distortedUv).g;
+            float b = texture2D(tDiffuse, distortedUv - dir * chroma).b;
+            vec3 col = vec3(r, g, b);
+
+            if (uAlert > 0.01) {
+              col = mix(col, vec3(col.r * 1.5 + 0.18, col.g * 0.5, col.b * 0.45), uAlert * 0.55);
+            }
+
+            float grain = (random(uv + sin(uTime * 8.0)) - 0.5) * 0.024;
+            col += grain;
+
+            float vignette = smoothstep(0.95, 0.35, length(dist));
+            col *= (0.75 + 0.25 * vignette);
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `,
+      });
+
+      const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.postMaterial);
+      this.postScene.add(quad);
+      this.usePost = true;
+    } catch (e) {
+      console.warn('Post-processing unavailable, rendering directly:', e);
+      this.usePost = false;
+    }
+  }
+
+  setupPointerEvents() {
+    window.addEventListener('pointermove', (e) => {
+      this.pointerTarget.x = (e.clientX / window.innerWidth) * 2 - 1;
+      this.pointerTarget.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    }, { passive: true });
+  }
+
+  downgradeTier() {
+    if (this.tier === 'HIGH') {
+      this.tier = 'MID';
+      this.renderer.setPixelRatio(1.2);
+    } else if (this.tier === 'MID' && this.isMobile) {
+      this.tier = 'LOW';
+      this.renderer.setPixelRatio(1);
+      this.usePost = false;
+      if (this.renderTarget) {
+        this.renderTarget.dispose();
+        this.renderTarget = null;
+      }
+    }
+  }
+
+  triggerDrift() {
+    this.alertIntensity = 1.0;
+    this.laserMat.color.setHex(0xff4747);
+    this.gimbalR3.material.color.setHex(0xff4747);
+    this.courierCoreMat.emissive.setHex(0xff4747);
+    this.courierLatticeMat.color.setHex(0xff4747);
+    this.courierWireMat.color.setHex(0xff4747);
+    this.crackMat.opacity = 0.9;
+  }
+
+  resetDrift() {
+    this.alertIntensity = 0;
+    this.laserMat.color.setHex(0xd8ff64);
+    this.gimbalR3.material.color.setHex(0xd8ff64);
+    this.courierCoreMat.emissive.setHex(0xd8ff64);
+    this.courierLatticeMat.color.setHex(0x5ef3d2);
+    this.courierWireMat.color.setHex(0xd8ff64);
+    this.crackMat.opacity = 0;
+  }
+
+  resize() {
+    this.width = this.canvas.clientWidth || window.innerWidth;
+    this.height = this.canvas.clientHeight || window.innerHeight;
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const isPhone = window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    this.isMobile = isPhone || (isCoarse && window.innerWidth < 900);
+
+    this.renderer.setSize(this.width, this.height, false);
+    this.camera.aspect = this.width / Math.max(1, this.height);
+
+    if (this.isMobile) {
+      // Mobile: hero centered in upper open area between top rail and bottom copy card
+      this.camera.setViewOffset(this.width, this.height, 0, this.height * 0.06, this.width, this.height);
+    } else {
+      // Desktop: hero centered in the free area to the right of text column (around 66% width)
+      this.camera.setViewOffset(this.width, this.height, -this.width * 0.18, 0, this.width, this.height);
+    }
+    this.camera.updateProjectionMatrix();
+
+    if (this.renderTarget) {
+      this.renderTarget.setSize(this.width, this.height);
+    }
+  }
+
+  setProgress(p) {
+    this.progress = Math.max(0, Math.min(1, p));
+  }
+
+  updateProtagonistChoreography(deltaTime) {
+    this.time += deltaTime;
+    const p = this.progress;
+    const t = this.time;
+
+    // Smooth pointer lerp
+    this.pointer.x += (this.pointerTarget.x - this.pointer.x) * 0.08;
+    this.pointer.y += (this.pointerTarget.y - this.pointer.y) * 0.08;
+
+    // Responsive Desktop and Mobile camera framing
+    const isMobile = this.isMobile || window.innerWidth < 900;
+    // Map stage progress p to camera spline progress u_cam with mathematical exactness across 7 stages
+    const u_cam = Math.max(0, Math.min(1, (p - 0.5 / 7) / (6 / 7)));
+    const camPos = this.cameraSpline.getPointAt(u_cam);
+    const lookPos = this.lookSpline.getPointAt(u_cam);
+
+    // On desktop, shift camera left so 3D objects are framed in the free area right of the text column.
+    // In Stage 7, masterDock contains both the file socket and the wide receipt plate, so ease shift to +37 for full rail clearance.
+    const stage7Factor = Math.max(0, Math.min(1, (p - 5.8 / 7) / (1.2 / 7)));
+    const stageShiftX = -68 + stage7Factor * 105;
+    const desktopShiftX = isMobile ? 0 : stageShiftX;
+    // On mobile, increase distance and shift down so 3D objects are framed comfortably in the top half
+    const mobileZScale = isMobile ? 2.15 : 1.0;
+    const mobileYShift = isMobile ? -55 : 0;
+
+    this.camera.position.set(
+      camPos.x + desktopShiftX + this.pointer.x * 18,
+      camPos.y + this.pointer.y * 12 + mobileYShift,
+      camPos.z * mobileZScale,
+    );
+    this.camera.lookAt(lookPos.x + desktopShiftX, lookPos.y + mobileYShift, lookPos.z);
+
+    // Dust particles
+    if (this.dust) this.dust.rotation.y = t * 0.02;
+
+    // Kinetic Courier Components Animation
+    if (this.courierCore) {
+      this.courierCore.rotation.x += deltaTime * 0.9;
+      this.courierCore.rotation.y += deltaTime * 1.3;
+    }
+    if (this.courierLattice) {
+      this.courierLattice.rotation.x -= deltaTime * 0.7;
+      this.courierLattice.rotation.z += deltaTime * 1.1;
+    }
+    if (this.orbitalRing1) {
+      this.orbitalRing1.rotation.z += deltaTime * 1.5;
+    }
+    if (this.orbitalRing2) {
+      this.orbitalRing2.rotation.x -= deltaTime * 1.2;
+    }
+
+    // --- COURIER CONTINUOUS TRAJECTORY THROUGH 7 STAGES ---
+    const p1 = new THREE.Vector3(-460, 100, 0); // Stage 1: In octagonal bulkhead pod
+    const p2 = new THREE.Vector3(-260, 100, 0); // Stage 2: Passing aperture opening
+    const p3 = new THREE.Vector3(-80, 45, 0);   // Stage 3: Stopped at vault collar
+    const p4 = new THREE.Vector3(75, 25, 0);    // Stage 4: In AST scan zone
+    const p5a = new THREE.Vector3(260, 25, -30);// Stage 5: Top of conduit
+    const p5b = new THREE.Vector3(260, -115, 0);// Stage 5: Inside quarantine pod
+    const p6a = new THREE.Vector3(440, -20, 0); // Stage 6: Gate 2 failure flinch point
+    const p6b = new THREE.Vector3(530, -20, 0); // Stage 6: Cleared all gates
+    const p7 = new THREE.Vector3(534, 25, 38);  // Stage 7: Docks into solution.py slot in masterDock
+
+    let courierPos = p1.clone();
+    let courierScale = 1.0;
+    let courierColor = 0xd8ff64;
+    let flinchOffset = new THREE.Vector3(0, 0, 0);
+
+    // Breathing pulse when idle
+    const breathing = 1.0 + 0.05 * Math.sin(t * 2.5);
+
+    if (p <= 1 / 7) {
+      // Stage 1: Born inside closed pod, pulsing slowly
+      const a = p / (1 / 7);
+      courierPos = p1.clone();
+      courierScale = 0.88 + a * 0.12; // Clearly the protagonist from inception
+      courierColor = 0xa4e8b0; // Cool dim jade green when newborn
+    } else if (p <= 2 / 7) {
+      // Stage 2: Code lines wrap on faces, travels through boundary opening
+      const a = (p - 1 / 7) / (1 / 7);
+      courierPos = p1.clone().lerp(p2, a);
+      courierScale = 1.0;
+      courierColor = 0xb8f070;
+
+      // Rotate iris aperture
+      if (this.boundaryPortal) this.boundaryPortal.rotation.z = t * 0.6;
+
+      // Rogue shards deflect off boundary portal
+      this.rogueShards.forEach((shard, i) => {
+        const bounce = Math.sin(t * 4 + i) * 18;
+        shard.position.x = shard.userData.basePos.x - bounce;
+      });
+    } else if (p <= 3 / 7) {
+      // Stage 3: Stops at sealed vault collar; tight, tense camera; vault locks
+      const a = (p - 2 / 7) / (1 / 7);
+      courierPos = p2.clone().lerp(p3, a);
+      courierScale = 1.0;
+      courierColor = 0xd8ff64;
+
+      // Counter-rotating gimbal laser rings
+      this.gimbalR1.rotation.z = t * 1.4;
+      this.gimbalR2.rotation.y = t * 2.0;
+      this.gimbalR3.rotation.x = t * 2.6;
+      this.lasers.rotation.z = -t * 1.4;
+    } else if (p <= 4 / 7) {
+      // Stage 4: Scan blade sweeps, AST nodes light one by one
+      const a = (p - 3 / 7) / (1 / 7);
+      courierPos = p3.clone().lerp(p4, a);
+      courierScale = 1.0;
+      courierColor = 0xd8ff64;
+
+      // Sweep scan blade across courier
+      this.scanBlade.position.x = -35 + a * 70;
+
+      // Light up AST branch nodes sequentially
+      this.astBranchNodes.forEach((node, i) => {
+        const threshold = i / this.astBranchNodes.length;
+        const lit = a >= threshold;
+        node.material.opacity = lit ? 0.95 : 0.35;
+        node.material.emissiveIntensity = lit ? 0.8 : 0.2;
+      });
+    } else if (p <= 5 / 7) {
+      // Stage 5: Clone travels down conduit into quarantine space, source stays sealed
+      const a = (p - 4 / 7) / (1 / 7);
+      courierPos = this.conduitCurve.getPointAt(Math.min(1, Math.max(0, a)));
+      courierScale = 1.0;
+      courierColor = 0x8fffa8;
+
+      // Source tree platform stays sealed and dimmed
+      this.sourceTree.position.y = 25 + Math.sin(t * 0.8) * 1.5;
+      this.podMesh.rotation.y = t * 0.4;
+    } else if (p <= 6 / 7) {
+      // Stage 6: Gates arena. Fails gate 2 (red flinch/cracks), retries cleaner, passes all 4
+      const a = (p - 5 / 7) / (1 / 7);
+      courierScale = 1.0;
+
+      if (a < 0.42) {
+        // Approach and fail at gate 2
+        const subA = a / 0.42;
+        courierPos = p5b.clone().lerp(p6a, subA);
+        courierColor = 0xd8ff64;
+        this.crackMat.opacity = 0;
+        this.retryArcMat.opacity = 0;
+      } else if (a < 0.62) {
+        // Flinch, crack, red flash, recoil along retry arc
+        const subA = (a - 0.42) / 0.2;
+        courierColor = 0xff4747; // RED ON REJECT
+        this.crackMat.opacity = 0.9;
+        this.retryArcMat.opacity = 0.85;
+        flinchOffset.set(
+          -Math.sin(subA * Math.PI) * 24,
+          Math.sin(subA * Math.PI) * 16,
+          Math.sin(subA * Math.PI) * 10,
+        );
+        this.courier.rotation.z = Math.sin(subA * Math.PI) * 0.45;
+        courierPos = p6a.clone().add(flinchOffset);
+      } else {
+        // Retry cleaner: gather composure, brighter, steady green, pass all four gates
+        const subA = (a - 0.62) / 0.38;
+        courierPos = p6a.clone().lerp(p6b, subA);
+        courierColor = 0xd8ff64; // STEADY EMERALD PHOSPHOR
+        this.crackMat.opacity = Math.max(0, 0.9 - subA * 2.5);
+        this.retryArcMat.opacity = Math.max(0, 0.85 - subA * 2);
+        this.courier.rotation.z = 0;
+      }
+
+      // Gate lights
+      this.arenaGates.forEach((gate, i) => {
+        const gateThresh = 0.62 + (i / 4) * 0.36;
+        const pass = a >= gateThresh;
+        const isFailing = a > 0.42 && a < 0.62 && i === 1;
+        const lampColor = pass ? 0xd8ff64 : (isFailing ? 0xff4747 : 0x142018);
+        const emissiveColor = pass ? 0xd8ff64 : (isFailing ? 0xff4747 : 0x07110a);
+        const emissiveIntensity = pass ? 2.5 : (isFailing ? 3.0 : 0.2);
+        gate.lamp.material.color.setHex(lampColor);
+        gate.lamp.material.emissive.setHex(emissiveColor);
+        gate.lamp.material.emissiveIntensity = emissiveIntensity;
+        gate.curtain.material.opacity = pass ? 0.4 : 0.16;
+      });
+    } else {
+      // Stage 7: Verified courier travels from Gate 4 exit into Master Dock solution.py slot
+      const a = (p - 6 / 7) / (1 / 7);
+      if (a < 0.35) {
+        const subA = a / 0.35;
+        courierPos = p6b.clone().lerp(p7, subA);
+        courierScale = 1.0;
+      } else {
+        // Docked into solution.py socket
+        const subA = Math.min(1.0, (a - 0.35) / 0.65);
+        courierPos = p7.clone();
+        courierScale = Math.max(0.82, 1.0 - subA * 0.18);
+        if (subA > 0.4) {
+          audio.playDock();
+          this.slotMat.color.setHex(0xd8ff64);
+        }
+      }
+      courierColor = 0xd8ff64;
+
+      // Quarantined space retracts and dims
+      this.quarantinePod.position.y = -115 - a * 40;
+      this.podMesh.material.opacity = Math.max(0.1, 0.7 - a * 0.6);
+      this.receiptMesh.material.opacity = Math.min(1.0, 0.4 + a * 0.6);
+    }
+
+    // Apply color and breathing to Courier
+    this.courierCoreMat.emissive.setHex(isDrifting ? 0xff4747 : courierColor);
+    this.courierWireMat.color.setHex(isDrifting ? 0xff4747 : courierColor);
+
+    this.courier.position.copy(courierPos);
+    this.courier.scale.setScalar(courierScale * breathing);
+
+    // Update Screen-Space Hero Protagonist HUD Reticle & Callout
+    this.updateHeroScreenTag(isDrifting, Math.min(6, Math.max(0, Math.floor(p * 7))));
+
+    // Update internal glow, rim light, and floor glow to follow courier
+    if (this.courierGlow) {
+      this.courierGlow.color.setHex(isDrifting ? 0xff4747 : courierColor);
+    }
+    if (this.courierRimLight) {
+      this.courierRimLight.position.set(courierPos.x + 35, courierPos.y + 45, courierPos.z - 70);
+      this.courierRimLight.color.setHex(isDrifting ? 0xff4747 : courierColor);
+    }
+    if (this.courierFloorGlow) {
+      this.courierFloorGlow.position.x = courierPos.x;
+      this.courierFloorGlow.position.z = courierPos.z;
+      this.courierFloorGlowMat.color.setHex(isDrifting ? 0xff4747 : courierColor);
+      this.courierFloorGlowMat.opacity = isDrifting ? 0.95 : 0.85;
+    }
+
+    // Orbiting Satellites motion around Courier
+    this.glyphSprites.forEach((item) => {
+      item.angle += deltaTime * item.speed;
+      item.sprite.position.set(
+        Math.cos(item.angle) * item.radius,
+        Math.sin(item.angle * 1.5) * 12,
+        Math.sin(item.angle) * item.radius,
+      );
+    });
+
+    // Inactive object fading and strict stage bleed prevention
+    const activeStage = p * 7;
+
+    this.boundaryCage.visible = activeStage < 1.4;
+    this.boundaryZone.visible = activeStage >= 0.7 && activeStage < 2.3;
+    this.vaultCollar.visible = activeStage >= 1.8 && activeStage < 3.3;
+    this.astZone.visible = activeStage >= 2.8 && activeStage < 4.3;
+
+    // STAGE 5 DUAL SPACE: strictly hidden before stage 5 (activeStage >= 3.8)
+    this.dualSpace.visible = activeStage >= 3.8 && activeStage < 5.3;
+
+    // STAGE 6 GATES ARENA: strictly hidden before stage 6 (activeStage >= 4.8)
+    this.gateArena.visible = activeStage >= 4.8 && activeStage < 6.3;
+
+    // STAGE 7 MASTER DOCK: strictly hidden before stage 7 (activeStage >= 5.8)
+    this.masterDock.visible = activeStage >= 5.8;
+
+    // Inactive objects fade to ~30%, not 12%
+    if (this.cageMat) this.cageMat.opacity = activeStage < 1.0 ? 0.22 : 0.08;
+    if (this.laserMat) this.laserMat.opacity = (activeStage >= 2.0 && activeStage <= 3.0) ? 0.95 : 0.3;
+    if (this.bladeMat) this.bladeMat.opacity = (activeStage >= 3.0 && activeStage <= 4.0) ? 0.88 : 0.3;
+  }
+
+  updateHeroScreenTag(isDrifting, activeStep) {
+    if (!courierHeroTag) return;
+
+    if (this.progress > 0.985) {
+      courierHeroTag.classList.add('is-hidden');
+      return;
+    }
+    courierHeroTag.classList.remove('is-hidden');
+
+    const worldPos = this.courier.position.clone();
+    const proj = worldPos.project(this.camera);
+
+    if (proj.z > 1) {
+      courierHeroTag.classList.add('is-hidden');
+      return;
+    }
+
+    const x = (proj.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-(proj.y * 0.5) + 0.5) * window.innerHeight;
+
+    courierHeroTag.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    courierHeroTag.classList.toggle('is-breached', isDrifting || this.alertIntensity > 0.05);
+
+    if (courierHudStatus) {
+      if (isDrifting || this.alertIntensity > 0.05) {
+        courierHudStatus.textContent = 'ALERT: TEST DRIFT DETECTED · DISCARDING WORKTREE';
+      } else {
+        courierHudStatus.textContent = HERO_STAGE_STATUSES[activeStep] || HERO_STAGE_STATUSES[0];
+      }
+    }
+  }
+
+  render(elapsed, deltaTime) {
+    if (isReduced) return;
+
+    // Auto-downgrade performance check (never below MID on desktop)
+    if (deltaTime > 0.024) {
+      this.slowFrameAccumulator += deltaTime;
+      if (this.slowFrameAccumulator > 1.0) {
+        this.downgradeTier();
+        this.slowFrameAccumulator = 0;
+      }
+    } else {
+      this.slowFrameAccumulator = Math.max(0, this.slowFrameAccumulator - deltaTime * 0.5);
+    }
+
+    this.updateProtagonistChoreography(deltaTime);
+
+    if (this.usePost && this.renderTarget) {
+      this.renderer.setRenderTarget(this.renderTarget);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+
+      this.postMaterial.uniforms.tDiffuse.value = this.renderTarget.texture;
+      this.postMaterial.uniforms.uVelocity.value = scrollVelocity;
+      this.postMaterial.uniforms.uTime.value = this.time;
+      this.postMaterial.uniforms.uAlert.value = this.alertIntensity;
+
+      this.renderer.render(this.postScene, this.postCamera);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  dispose() {
+    this.renderer.dispose();
+    if (this.renderTarget) this.renderTarget.dispose();
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Initialization & Single Deterministic Ticker Loop
+ * ------------------------------------------------------------------ */
 function initStoryScene() {
   if (scene || isReduced) return;
   try {
     scene = new TaskScene(canvas);
   } catch (error) {
     body.classList.add('no-webgl');
-    console.warn('CD-AVC 3D scene unavailable; showing the static fallback.', error);
+    console.warn('CD-AVC 3D scene unavailable, displaying static fallback:', error);
     return;
   }
   scene.resize();
-  scene.setProgress(storyTrigger?.scrollTrigger?.progress ?? 0);
-  scene.render(0, scene.progress);
+  scene.setProgress(initStep >= 0 ? (initStep + 0.5) / 7 : (storyTrigger?.scrollTrigger?.progress ?? 0));
   body.classList.add('webgl-ready');
-  scene.start();
 }
 
 function setupScroll() {
   if (isReduced) return;
-  const sceneLoader = new IntersectionObserver((entries) => {
+
+  const sceneObserver = new IntersectionObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting)) {
       initStoryScene();
-      sceneLoader.disconnect();
+      sceneObserver.disconnect();
     }
   }, { rootMargin: '160px 0px' });
-  sceneLoader.observe(story);
-  // Start immediately when the story is already on screen; the observer is only
-  // a fallback for browsers that throttle observers in a hidden tab.
+  sceneObserver.observe(story);
+
   if (story.getBoundingClientRect().top < window.innerHeight) {
     initStoryScene();
-    sceneLoader.disconnect();
+    sceneObserver.disconnect();
   }
-  const timeline = { progress: 0 };
+
+  let manualStep = initStep >= 0;
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 15) manualStep = false;
+  }, { passive: true });
+
+  const initialProgress = initStep >= 0 ? (initStep + 0.5) / 7 : 0;
+  const timeline = { progress: initialProgress };
   const update = (progress) => {
     timeline.progress = progress;
     const step = Math.min(6, Math.floor(progress * 7));
     setStep(step);
     scene?.setProgress(progress);
   };
-  update(0);
+
+  update(initialProgress);
+
   storyTrigger = gsap.to(timeline, {
     progress: 1,
     ease: 'none',
@@ -93,10 +2108,14 @@ function setupScroll() {
       end: 'bottom bottom',
       pin: pin,
       pinSpacing: false,
-      scrub: true,
+      scrub: 0.5,
       invalidateOnRefresh: true,
-      onUpdate: (self) => update(self.progress),
-      onRefresh: (self) => update(self.progress),
+      onUpdate: (self) => {
+        if (!manualStep) update(self.progress);
+      },
+      onRefresh: (self) => {
+        if (!manualStep) update(self.progress);
+      },
     },
   });
 }
@@ -104,1118 +2123,36 @@ function setupScroll() {
 function setupLenis() {
   if (isReduced) return;
   lenis = new Lenis({
-    duration: 1.05,
+    duration: 1.15,
     smoothWheel: true,
     syncTouch: false,
     autoRaf: false,
   });
-  lenis.on('scroll', ScrollTrigger.update);
-  gsap.ticker.add(lenisTicker);
+
+  lenis.on('scroll', (e) => {
+    ScrollTrigger.update();
+    scrollVelocity = e.velocity || 0;
+  });
+
+  // Single Ticker: Lenis + ScrollTrigger + Three.js Timer render
+  gsap.ticker.add((time) => {
+    lenis?.raf(time * 1000);
+    if (scene) {
+      scene.timer.update();
+      scene.render(scene.timer.getElapsed(), scene.timer.getDelta());
+    }
+  });
   gsap.ticker.lagSmoothing(1000, 16);
-}
-
-/* ------------------------------------------------------------------ *
- * Canvas textures
- * ------------------------------------------------------------------ */
-
-const ACCENT = '#d8ff64';
-const INK = '#f4f6f1';
-const MUTED = 'rgba(202, 214, 204, .84)';
-const FAIL = '#ff7a59';
-
-function createTexture(width, height, draw) {
-  const source = document.createElement('canvas');
-  source.width = width;
-  source.height = height;
-  const context = source.getContext('2d');
-  context.clearRect(0, 0, width, height);
-  draw(context, width, height);
-  const texture = new THREE.CanvasTexture(source);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  return texture;
-}
-
-function roundRect(context, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + r, y);
-  context.arcTo(x + width, y, x + width, y + height, r);
-  context.arcTo(x + width, y + height, x, y + height, r);
-  context.arcTo(x, y + height, x, y, r);
-  context.arcTo(x, y, x + width, y, r);
-  context.closePath();
-}
-
-function plateTexture({ kicker, title, sub, width = 768, height = 232 }) {
-  return createTexture(width, height, (ctx) => {
-    ctx.fillStyle = 'rgba(8, 12, 10, .92)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .24)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(24, 28, 5, height - 56);
-    ctx.fillStyle = 'rgba(216, 255, 100, .92)';
-    ctx.font = '700 23px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(kicker.toUpperCase(), 50, 58);
-    ctx.fillStyle = INK;
-    ctx.font = '600 48px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(title, 50, 124);
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 24px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(sub, 50, 172);
-  });
-}
-
-function monoPlateTexture({ kicker, value, sub, width = 640, height = 216 }) {
-  return createTexture(width, height, (ctx) => {
-    ctx.fillStyle = 'rgba(8, 12, 10, .93)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .24)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(22, 26, 5, height - 52);
-    ctx.fillStyle = 'rgba(216, 255, 100, .92)';
-    ctx.font = '700 22px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(kicker.toUpperCase(), 46, 56);
-    ctx.fillStyle = INK;
-    ctx.font = '400 34px Menlo, monospace';
-    ctx.fillText(value, 46, 116);
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 22px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(sub, 46, 164);
-  });
-}
-
-function contractTexture() {
-  return createTexture(1024, 390, (ctx, width, height) => {
-    ctx.fillStyle = 'rgba(10, 15, 12, .97)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 12);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .36)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 12);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(30, 26, 6, height - 52);
-    ctx.font = '700 25px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillStyle = 'rgba(216, 255, 100, .95)';
-    ctx.fillText('CONTRACT', 58, 62);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 23px Menlo, monospace';
-    ctx.fillText('benchmark task', width - 44, 62);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = INK;
-    ctx.font = '600 62px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('task_001', 58, 136);
-    ctx.fillStyle = 'rgba(188, 201, 191, .78)';
-    ctx.font = '400 28px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('Count vowels', 58, 178);
-    ctx.strokeStyle = 'rgba(216, 255, 100, .18)';
-    ctx.beginPath();
-    ctx.moveTo(58, 204);
-    ctx.lineTo(width - 44, 204);
-    ctx.stroke();
-    const rows = [
-      ['file', 'solution.py'],
-      ['symbol', 'count_vowels'],
-      ['retry budget', '2'],
-    ];
-    rows.forEach(([key, value], index) => {
-      const y = 248 + index * 48;
-      ctx.fillStyle = 'rgba(150, 164, 154, .88)';
-      ctx.font = '400 24px Menlo, monospace';
-      ctx.fillText(key, 58, y);
-      ctx.fillStyle = INK;
-      ctx.font = '400 27px Menlo, monospace';
-      ctx.fillText(value, 290, y);
-    });
-  });
-}
-
-function patchTexture() {
-  return createTexture(512, 680, (ctx, width, height) => {
-    ctx.fillStyle = '#0d1411';
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(0, 0, width, 64);
-    ctx.fillStyle = '#0b0e0d';
-    ctx.font = '700 30px Menlo, monospace';
-    ctx.fillText('solution.py', 22, 43);
-    ctx.textAlign = 'right';
-    ctx.font = '700 14px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('PATCH', width - 22, 40);
-    ctx.textAlign = 'left';
-
-    ctx.fillStyle = 'rgba(216, 255, 100, .055)';
-    ctx.fillRect(0, 92, width, 38);
-
-    const lines = [
-      [['def ', ACCENT], ['count_vowels', INK], ['(text):', '#a9bfae']],
-      [['    total ', INK], ['= ', '#a9bfae'], ['0', '#e6c07b']],
-      [['    for ', ACCENT], ['ch ', INK], ['in ', ACCENT], ['text:', INK]],
-      [['        if ', ACCENT], ['ch ', INK], ['in ', ACCENT], ['"aeiou"', '#b7d38f'], [':', INK]],
-      [['            total ', INK], ['+= ', '#a9bfae'], ['1', '#e6c07b']],
-      [['    return ', ACCENT], ['total', INK]],
-    ];
-
-    let y = 126;
-    lines.forEach((parts, index) => {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(126, 143, 132, .7)';
-      ctx.font = '400 19px Menlo, monospace';
-      ctx.fillText(String(index + 1), 46, y);
-      ctx.textAlign = 'left';
-      let x = 72;
-      parts.forEach(([text, color]) => {
-        ctx.fillStyle = color;
-        ctx.font = '400 27px Menlo, monospace';
-        ctx.fillText(text, x, y);
-        x += ctx.measureText(text).width;
-      });
-      y += 62;
-    });
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .14)';
-    ctx.beginPath();
-    ctx.moveTo(0, height - 96);
-    ctx.lineTo(width, height - 96);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(216, 255, 100, .07)';
-    ctx.fillRect(0, height - 95, width, 95);
-    ctx.fillStyle = '#b7d38f';
-    ctx.font = '400 22px Menlo, monospace';
-    ctx.fillText('parse ok', 22, height - 54);
-    ctx.fillStyle = 'rgba(202, 214, 204, .84)';
-    ctx.font = '400 20px Menlo, monospace';
-    ctx.fillText('symbol count_vowels', 22, height - 27);
-  });
-}
-
-function repoTexture() {
-  return createTexture(1024, 700, (ctx, width) => {
-    ctx.fillStyle = '#0d1311';
-    ctx.fillRect(0, 0, width, 700);
-    ctx.fillStyle = ACCENT;
-    ctx.font = '700 24px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('WORKING TREE', 36, 52);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(184, 200, 188, .86)';
-    ctx.font = '400 20px Menlo, monospace';
-    ctx.fillText('main · clean', width - 36, 52);
-    ctx.textAlign = 'left';
-    ctx.strokeStyle = 'rgba(216, 255, 100, .16)';
-    ctx.beginPath();
-    ctx.moveTo(36, 80);
-    ctx.lineTo(width - 36, 80);
-    ctx.stroke();
-
-    const headers = ['benchmarks/', 'tests/', 'src/', 'docs/', 'pyproject.toml', 'README.md', 'execution_log.json', 'execution_report.md'];
-    headers.forEach((name, index) => {
-      const column = index < 4 ? 0 : 1;
-      const row = index % 4;
-      const x = 40 + column * 500;
-      const y = 140 + row * 132;
-      if (index < 4) {
-        ctx.fillStyle = 'rgba(216, 255, 100, .7)';
-        ctx.fillRect(x, y - 18, 16, 16);
-      } else {
-        ctx.strokeStyle = index > 5 ? 'rgba(216, 255, 100, .32)' : 'rgba(174, 190, 178, .5)';
-        ctx.strokeRect(x + .5, y - 17.5, 15, 15);
-      }
-      ctx.fillStyle = index > 5 ? 'rgba(190, 206, 194, .74)' : '#dfe7e0';
-      ctx.font = '400 24px Menlo, monospace';
-      ctx.fillText(name, x + 30, y);
-      ctx.strokeStyle = 'rgba(174, 190, 178, .08)';
-      ctx.beginPath();
-      ctx.moveTo(x, y + 38);
-      ctx.lineTo(x + 430, y + 38);
-      ctx.stroke();
-    });
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .2)';
-    ctx.strokeRect(20, 20, width - 40, 660);
-  });
-}
-
-function rejectTexture() {
-  return createTexture(512, 620, (ctx, width, height) => {
-    ctx.fillStyle = '#17100e';
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = FAIL;
-    ctx.fillRect(0, 0, width, 58);
-    ctx.fillStyle = '#1a0d09';
-    ctx.font = '700 25px Menlo, monospace';
-    ctx.fillText('attempt 1', 20, 40);
-    ctx.textAlign = 'right';
-    ctx.font = '700 13px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('FAILED', width - 20, 37);
-    ctx.textAlign = 'left';
-    const lines = [
-      'Locked test hash changed',
-      'between capture and run.',
-    ];
-    ctx.fillStyle = 'rgba(255, 168, 140, .9)';
-    ctx.font = '400 20px Menlo, monospace';
-    lines.forEach((line, index) => {
-      ctx.fillText(line, 28, 128 + index * 34);
-    });
-    ctx.strokeStyle = 'rgba(255, 122, 89, .35)';
-    for (let i = 0; i < 7; i += 1) {
-      ctx.beginPath();
-      ctx.moveTo(28, 250 + i * 40);
-      ctx.lineTo(width - 28, 250 + i * 40);
-      ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(255, 122, 89, .85)';
-    ctx.font = '400 15px Menlo, monospace';
-    ctx.fillText('original file restored', 28, height - 28);
-  });
-}
-
-function glowTexture() {
-  return createTexture(256, 256, (ctx, width, height) => {
-    const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2);
-    gradient.addColorStop(0, 'rgba(216, 255, 100, .75)');
-    gradient.addColorStop(.35, 'rgba(216, 255, 100, .18)');
-    gradient.addColorStop(1, 'rgba(216, 255, 100, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-  });
-}
-
-function gridTexture() {
-  return createTexture(2048, 2048, (ctx, width, height) => {
-    ctx.strokeStyle = 'rgba(150, 176, 154, .17)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= width; x += 64) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(216, 255, 100, .2)';
-    ctx.lineWidth = 2;
-    for (let x = 0; x <= width; x += 256) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 256) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    ctx.globalCompositeOperation = 'destination-in';
-    const fade = ctx.createRadialGradient(width / 2, height / 2, width * .06, width / 2, height / 2, width * .52);
-    fade.addColorStop(0, 'rgba(0,0,0,1)');
-    fade.addColorStop(.62, 'rgba(0,0,0,.72)');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
-  });
-}
-
-let gateScreenMap = null;
-
-function gateScreenTexture() {
-  if (gateScreenMap) return gateScreenMap;
-  gateScreenMap = createTexture(256, 304, (ctx, width, height) => {
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#0f1813');
-    gradient.addColorStop(.55, '#0a110e');
-    gradient.addColorStop(1, '#070b09');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'rgba(160, 188, 166, .12)';
-    ctx.lineWidth = 1;
-    for (let x = 16; x < width; x += 32) {
-      ctx.beginPath();
-      ctx.moveTo(x + .5, 14);
-      ctx.lineTo(x + .5, height - 14);
-      ctx.stroke();
-    }
-    for (let y = 14; y < height; y += 32) {
-      ctx.beginPath();
-      ctx.moveTo(14, y + .5);
-      ctx.lineTo(width - 14, y + .5);
-      ctx.stroke();
-    }
-
-    const glow = ctx.createRadialGradient(width / 2, height * .48, 0, width / 2, height * .48, width * .62);
-    glow.addColorStop(0, 'rgba(216, 255, 100, .05)');
-    glow.addColorStop(1, 'rgba(216, 255, 100, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .22)';
-    ctx.lineWidth = 2;
-    const corner = 22;
-    [[16, 16, 1, 1], [width - 16, 16, -1, 1], [16, height - 16, 1, -1], [width - 16, height - 16, -1, -1]].forEach(([x, y, dx, dy]) => {
-      ctx.beginPath();
-      ctx.moveTo(x, y + dy * corner);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x + dx * corner, y);
-      ctx.stroke();
-    });
-  });
-  return gateScreenMap;
-}
-
-function backdropTexture() {
-  return createTexture(512, 512, (ctx, width, height) => {
-    const gradient = ctx.createRadialGradient(width / 2, height * .46, 0, width / 2, height * .46, width * .52);
-    gradient.addColorStop(0, 'rgba(25, 38, 30, .95)');
-    gradient.addColorStop(.55, 'rgba(16, 24, 19, .55)');
-    gradient.addColorStop(1, 'rgba(11, 14, 13, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-  });
-}
-
-/* ------------------------------------------------------------------ *
- * Scene
- * ------------------------------------------------------------------ */
-
-const GATE_X = [-450, -120, 210, 540];
-const GATE_THRESHOLDS = [2 / 7, 3 / 7, 5.35 / 7, 5.88 / 7];
-const PATCH_X = [
-  [0, -680],
-  [1 / 7, -680],
-  [2 / 7, -450],
-  [3 / 7, -120],
-  [4 / 7, -10],
-  [5 / 7, -10],
-  [5.32 / 7, 210],
-  [5.62 / 7, 390],
-  [5.88 / 7, 540],
-  [6 / 7, 540],
-  [1, 830],
-];
-const FLOOR_Y = -212;
-const PATCH_Y = 50;
-const PATCH_Z = 40;
-const REPO_Z = 170;
-
-// Vertical extent of the rig used for the fit in `resize()`.  The contract card
-// (380 + 90) is the highest element and the floor plane the lowest; keep these
-// in sync if either moves.
-const RIG_HEIGHT = 682;
-const RIG_CENTER_Y = 129;
-
-// One camera set-up per story beat.  `w`/`h` are the world-space box that must
-// stay inside the clear stage between the copy column and the rail; the camera
-// distance is solved from those, not from the height of the whole rig.
-const SHOTS = [
-  { x: -640, y: 200, w: 900, h: 640, dx: 250, dy: 150 }, // contract + empty slot
-  { x: -700, y: 90, w: 540, h: 500, dx: 210, dy: 130 }, // patch close-up
-  { x: -450, y: 55, w: 600, h: 600, dx: 230, dy: 140 }, // gate 01
-  { x: -120, y: 55, w: 600, h: 600, dx: 230, dy: 140 }, // gate 02
-  { x: -10, y: 60, w: 960, h: 600, dx: 260, dy: 160 }, // isolated worktree
-  { x: 375, y: 40, w: 800, h: 680, dx: 260, dy: 160 }, // gates 03 + 04 / reject
-  { x: 850, y: 40, w: 760, h: 660, dx: 250, dy: 150 }, // copy-back
-];
-
-class TaskScene {
-  constructor(target) {
-    this.canvas = target;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x0b0e0d, 0);
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.16;
-    this.canvas.replaceWith(this.renderer.domElement);
-    this.canvas = this.renderer.domElement;
-    this.canvas.id = 'task-canvas';
-    this.canvas.setAttribute('aria-label', 'Three-dimensional CD-AVC verification cage');
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0b0e0d, 1700, 3200);
-    this.camera = new THREE.PerspectiveCamera(32, 1, .1, 4000);
-    this.clock = new THREE.Clock();
-    this.time = 0;
-    this.progress = 0;
-    this.running = false;
-    this.visible = true;
-    this.phase = { step: 0, local: 0 };
-    this.scale = 1;
-    this.regionShift = 0;
-    this.lookY = 40;
-    this.patchX = -620;
-    this.group = new THREE.Group();
-    this.rig = new THREE.Group();
-    this.rig.rotation.y = -0.055;
-    this.group.add(this.rig);
-    this.scene.add(this.group);
-    this.accent = new THREE.Color(ACCENT);
-    this.accentDim = new THREE.Color(0x2c3830);
-    this.failColor = new THREE.Color(FAIL);
-    this.screenBase = new THREE.Color(0x8b978f);
-    this.screenPass = new THREE.Color(0xffffff);
-    this.buildLights();
-    this.buildRoom();
-    this.buildRig();
-    this.observer = new IntersectionObserver((entries) => {
-      this.visible = entries.some((entry) => entry.isIntersecting);
-      if (this.visible && !isReduced) this.start();
-      else this.stop();
-    }, { threshold: 0.01 });
-    this.observer.observe(story);
-  }
-
-  buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xc4d8c9, 0x0a0d0b, 1.0));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(-420, 620, 760);
-    this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xd8ff64, 1.35);
-    rim.position.set(620, 260, -520);
-    this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0x8fb6a0, .8);
-    fill.position.set(500, -180, 620);
-    this.scene.add(fill);
-  }
-
-  buildRoom() {
-    const backdrop = new THREE.Mesh(
-      new THREE.PlaneGeometry(5200, 3800),
-      new THREE.MeshBasicMaterial({ map: backdropTexture(), transparent: true, depthWrite: false, toneMapped: false, fog: false, opacity: .75 }),
-    );
-    backdrop.position.set(160, 120, -900);
-    this.rig.add(backdrop);
-
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(5200, 3800),
-      new THREE.MeshBasicMaterial({ map: gridTexture(), transparent: true, depthWrite: false, toneMapped: false, opacity: .8 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(120, FLOOR_Y, 220);
-    this.rig.add(floor);
-
-    const glow = glowTexture();
-    this.pools = [];
-    GATE_X.forEach((x) => {
-      const pool = new THREE.Mesh(
-        new THREE.PlaneGeometry(360, 240),
-        new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: .16 }),
-      );
-      pool.rotation.x = -Math.PI / 2;
-      pool.position.set(x, FLOOR_Y + 1.5, 20);
-      this.rig.add(pool);
-      this.pools.push(pool);
-    });
-    const repoPool = new THREE.Mesh(
-      new THREE.PlaneGeometry(620, 320),
-      new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: .1 }),
-    );
-    repoPool.rotation.x = -Math.PI / 2;
-    repoPool.position.set(780, FLOOR_Y + 1.5, 20);
-    this.rig.add(repoPool);
-
-    const guide = new THREE.Mesh(
-      new THREE.BoxGeometry(1660, 2, 2),
-      new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .22, toneMapped: false }),
-    );
-    guide.position.set(100, FLOOR_Y + 2, 90);
-    this.rig.add(guide);
-    for (let i = 0; i < 24; i += 1) {
-      const tick = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 1, i % 4 === 0 ? 18 : 9),
-        new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false }),
-      );
-      tick.position.set(-700 + i * 72, FLOOR_Y + 2, 90);
-      this.rig.add(tick);
-    }
-
-    const dustGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(220 * 3);
-    for (let i = 0; i < 220; i += 1) {
-      positions[i * 3] = -900 + Math.random() * 2100;
-      positions[i * 3 + 1] = FLOOR_Y + Math.random() * 620;
-      positions[i * 3 + 2] = -320 + Math.random() * 620;
-    }
-    dustGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.dust = new THREE.Points(
-      dustGeometry,
-      new THREE.PointsMaterial({ color: 0xd8ff64, size: 1.6, transparent: true, opacity: .24, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
-    );
-    this.rig.add(this.dust);
-  }
-
-  buildRig() {
-    const metal = new THREE.MeshStandardMaterial({ color: 0x1b241f, roughness: .42, metalness: .55 });
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x101713, roughness: .58, metalness: .35 });
-    this.metal = metal;
-    this.darkMetal = darkMetal;
-
-    const cage = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1720, 590, 320)),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false }),
-    );
-    cage.position.set(100, 78, 0);
-    this.rig.add(cage);
-
-    const contract = new THREE.Mesh(
-      new THREE.BoxGeometry(460, 180, 12),
-      [
-        darkMetal,
-        darkMetal,
-        darkMetal,
-        darkMetal,
-        new THREE.MeshBasicMaterial({ map: contractTexture(), transparent: true, toneMapped: false }),
-        darkMetal,
-      ],
-    );
-    contract.position.set(-620, 380, 110);
-    const contractEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(contract.geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .35, toneMapped: false }),
-    );
-    contractEdges.position.copy(contract.position);
-    this.contractFace = contract.material[4];
-    this.contractEdge = contractEdges.material;
-    this.contractGroup = new THREE.Group();
-    this.rig.add(this.contractGroup);
-    this.contractGroup.add(contract);
-    this.contractGroup.add(contractEdges);
-
-    this.gates = GATE_X.map((x, index) => this.buildGate(index, x));
-
-    this.buildWorktree();
-    this.buildPatch();
-    this.buildRejected();
-    this.buildRepo();
-
-    this.hashPlate = this.addStatusPlate(
-      new THREE.Vector3(-420, -150, 210),
-      monoPlateTexture({ kicker: 'LOCKED TESTS', value: '9c1f…b2e7', sub: 'sha-256 · before = after' }),
-      220,
-      74,
-    );
-    this.astPlate = this.addStatusPlate(
-      new THREE.Vector3(-120, -150, 210),
-      monoPlateTexture({ kicker: 'AST CONTRACT', value: 'count_vowels', sub: 'file parses · symbol found' }),
-      220,
-      74,
-    );
-    this.receiptPlate = this.addStatusPlate(
-      new THREE.Vector3(1030, -70, 170),
-      monoPlateTexture({ kicker: 'RECEIPTS', value: 'execution_log.json', sub: 'execution_report.md' }),
-      300,
-      100,
-    );
-    this.receiptPlate.material.opacity = 0;
-  }
-
-  addStatusPlate(position, texture, width, height) {
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-    plate.position.copy(position);
-    this.rig.add(plate);
-    return plate;
-  }
-
-  buildGate(index, x) {
-    const group = new THREE.Group();
-    group.position.set(x, 20, 0);
-    const outerW = 276;
-    const outerH = 320;
-    const bar = 22;
-    const depth = 28;
-    const innerW = outerW - bar * 2;
-    const innerH = outerH - bar * 2;
-
-    const parts = [
-      [outerW, bar, depth, 0, (outerH - bar) / 2],
-      [outerW, bar, depth, 0, -(outerH - bar) / 2],
-      [bar, innerH, depth, -(outerW - bar) / 2, 0],
-      [bar, innerH, depth, (outerW - bar) / 2, 0],
-    ];
-    parts.forEach(([width, height, deep, px, py]) => {
-      const part = new THREE.Mesh(new THREE.BoxGeometry(width, height, deep), this.metal);
-      part.position.set(px, py, 0);
-      group.add(part);
-    });
-
-    const screenMaterial = new THREE.MeshBasicMaterial({
-      map: gateScreenTexture(),
-      color: 0x8b978f,
-      transparent: true,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-    });
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(innerW, innerH), screenMaterial);
-    screen.position.set(0, 0, -6);
-    group.add(screen);
-
-    const stripMaterial = new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false });
-    const strips = [
-      [innerW, 3, 3, 0, innerH / 2, depth / 2 + 1],
-      [innerW, 3, 3, 0, -innerH / 2, depth / 2 + 1],
-      [3, innerH, 3, -innerW / 2, 0, depth / 2 + 1],
-      [3, innerH, 3, innerW / 2, 0, depth / 2 + 1],
-    ];
-    strips.forEach(([width, height, deep, px, py, pz]) => {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(width, height, deep), stripMaterial);
-      strip.position.set(px, py, pz);
-      group.add(strip);
-    });
-
-    for (let i = 0; i < 7; i += 1) {
-      const tick = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 7, 2),
-        new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .3, toneMapped: false }),
-      );
-      tick.position.set(-innerW / 2 + (i + 1) * (innerW / 8), innerH / 2 + 12, depth / 2 + 1);
-      group.add(tick);
-    }
-
-    const legHeight = 72;
-    [-1, 1].forEach((side) => {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(10, legHeight, 12), this.darkMetal);
-      leg.position.set(side * (outerW / 2 - 30), -(outerH / 2) - legHeight / 2, 0);
-      group.add(leg);
-    });
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(outerW + 26, 12, 84), this.darkMetal);
-    plinth.position.set(0, -(outerH / 2) - legHeight - 6, 0);
-    group.add(plinth);
-
-    const lampMaterial = new THREE.MeshBasicMaterial({ color: 0x2c3830, toneMapped: false });
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(5.5, 14, 14), lampMaterial);
-    lamp.position.set(outerW / 2 - 20, outerH / 2 + 16, 0);
-    group.add(lamp);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture(),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      opacity: .04,
-    }));
-    halo.position.copy(lamp.position);
-    halo.scale.set(52, 52, 1);
-    group.add(halo);
-
-    const scanMaterial = new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
-    const scan = new THREE.Mesh(new THREE.PlaneGeometry(innerW, 4), scanMaterial);
-    scan.position.set(0, 0, depth / 2 + 4);
-    group.add(scan);
-
-    this.rig.add(group);
-
-    const labelY = index % 2 === 0 ? 225 : 275;
-    const labels = [
-      ['TEST SEAL', 'sha-256 · before + after'],
-      ['AST CONTRACT', 'parses · symbol exists'],
-      ['TARGETED', 'hidden + negative suites'],
-      ['REGRESSION', 'existing suite'],
-    ];
-    const labelTexture = plateTexture({
-      kicker: `gate 0${index + 1}`,
-      title: labels[index][0],
-      sub: labels[index][1],
-    });
-    const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: .92 });
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(236, 71), labelMaterial);
-    label.position.set(x, labelY, 24);
-    this.rig.add(label);
-
-    return {
-      group,
-      screenMaterial,
-      strips: stripMaterial,
-      lampMaterial,
-      halo,
-      scan,
-      scanMaterial,
-      label,
-      labelMaterial,
-      pool: this.pools[index],
-      threshold: GATE_THRESHOLDS[index],
-    };
-  }
-
-  buildPatch() {
-    const face = new THREE.MeshBasicMaterial({ map: patchTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x0f1512, roughness: .5, metalness: .3 });
-    const geometry = new THREE.BoxGeometry(190, 230, 14);
-    const mesh = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .55, toneMapped: false }),
-    );
-    this.patch = new THREE.Group();
-    this.patch.add(mesh);
-    this.patch.add(edges);
-
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture(),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      opacity: .2,
-    }));
-    halo.scale.set(280, 330, 1);
-    halo.position.z = -14;
-    this.patch.add(halo);
-    this.rig.add(this.patch);
-
-    const slotPoints = [
-      new THREE.Vector3(-95, -115, 0),
-      new THREE.Vector3(95, -115, 0),
-      new THREE.Vector3(95, 115, 0),
-      new THREE.Vector3(-95, 115, 0),
-      new THREE.Vector3(-95, -115, 0),
-    ];
-    const slotGeometry = new THREE.BufferGeometry().setFromPoints(slotPoints);
-    this.patchSlot = new THREE.Line(slotGeometry, new THREE.LineDashedMaterial({ color: 0xd8ff64, dashSize: 8, gapSize: 7, transparent: true, opacity: .45, toneMapped: false }));
-    this.patchSlot.computeLineDistances();
-    this.patchSlot.position.set(-620, 20, 8);
-    this.rig.add(this.patchSlot);
-  }
-
-  buildWorktree() {
-    const shell = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1220, 410, 260)),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0, toneMapped: false }),
-    );
-    shell.position.set(40, 5, 0);
-    this.rig.add(shell);
-    this.shell = shell;
-
-    const texture = plateTexture({
-      kicker: 'isolation',
-      title: 'git worktree',
-      sub: 'declared commands · source untouched',
-    });
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), material);
-    label.position.set(40, 350, 40);
-    this.rig.add(label);
-    this.shellLabel = label;
-  }
-
-  buildRejected() {
-    const face = new THREE.MeshBasicMaterial({ map: rejectTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: .7, metalness: .15 });
-    const geometry = new THREE.BoxGeometry(170, 208, 12);
-    const mesh = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xff7a59, transparent: true, opacity: .55, toneMapped: false }),
-    );
-    this.rejected = new THREE.Group();
-    this.rejected.add(mesh);
-    this.rejected.add(edges);
-    this.rejected.visible = false;
-    this.rig.add(this.rejected);
-
-    const tray = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(230, 18, 160)),
-      new THREE.LineBasicMaterial({ color: 0xff7a59, transparent: true, opacity: .3, toneMapped: false }),
-    );
-    tray.position.set(80, FLOOR_Y + 14, 260);
-    this.rig.add(tray);
-    this.tray = tray;
-
-    const curve = new THREE.EllipseCurve(80, 280, 128, 82, .2, 4.1);
-    const points = curve.getPoints(44).map((point) => new THREE.Vector3(point.x, FLOOR_Y + 3, point.y));
-    const retry = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineDashedMaterial({ color: 0xff7a59, dashSize: 10, gapSize: 9, transparent: true, opacity: 0, toneMapped: false }),
-    );
-    retry.computeLineDistances();
-    this.rig.add(retry);
-    this.retry = retry;
-
-    const retryTexture = monoPlateTexture({ kicker: 'REPAIR', value: 'retry ≤ 2', sub: 'original file restored' });
-    const retryMaterial = new THREE.MeshBasicMaterial({ map: retryTexture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    this.retryLabel = new THREE.Mesh(new THREE.PlaneGeometry(190, 64), retryMaterial);
-    this.retryLabel.position.set(80, FLOOR_Y + 100, 380);
-    this.rig.add(this.retryLabel);
-  }
-
-  buildRepo() {
-    const face = new THREE.MeshBasicMaterial({ map: repoTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x131b16, roughness: .5, metalness: .35 });
-    const geometry = new THREE.BoxGeometry(440, 300, 260);
-    const cabinet = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    cabinet.position.set(780, -60, 0);
-    this.rig.add(cabinet);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .28, toneMapped: false }),
-    );
-    edges.position.copy(cabinet.position);
-    this.rig.add(edges);
-    this.repo = cabinet;
-
-    const socketPoints = [
-      new THREE.Vector3(-108, -122, 0),
-      new THREE.Vector3(108, -122, 0),
-      new THREE.Vector3(108, 122, 0),
-      new THREE.Vector3(-108, 122, 0),
-      new THREE.Vector3(-108, -122, 0),
-    ];
-    const socket = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(socketPoints),
-      new THREE.LineDashedMaterial({ color: 0xd8ff64, dashSize: 9, gapSize: 7, transparent: true, opacity: .38, toneMapped: false }),
-    );
-    socket.computeLineDistances();
-    socket.position.set(780, 20, 132);
-    this.rig.add(socket);
-    this.socket = socket;
-
-    const repoLabelMaterial = new THREE.MeshBasicMaterial({
-      map: plateTexture({ kicker: 'source of truth', title: 'working tree', sub: 'only verified files are copied back' }),
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-      opacity: .9,
-    });
-    const repoLabel = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), repoLabelMaterial);
-    repoLabel.position.set(780, 170, 40);
-    this.rig.add(repoLabel);
-    this.repoLabel = repoLabel;
-
-    const verifiedMaterial = new THREE.MeshBasicMaterial({
-      map: plateTexture({ kicker: 'verified', title: 'all gates green', sub: 'files copied · receipts written' }),
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-      opacity: 0,
-    });
-    const verified = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), verifiedMaterial);
-    verified.position.set(780, 290, 46);
-    this.rig.add(verified);
-    this.verified = verified;
-
-    const connector = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(990, -60, 130),
-        new THREE.Vector3(1030, -60, 170),
-      ]),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .25, toneMapped: false }),
-    );
-    this.rig.add(connector);
-    this.connector = connector;
-  }
-
-  resize() {
-    const width = this.canvas.clientWidth || window.innerWidth;
-    const height = this.canvas.clientHeight || window.innerHeight;
-    this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / Math.max(1, height);
-    const compact = window.matchMedia('(max-width: 1180px)').matches;
-    this.compact = compact;
-    const fov = compact ? 40 : 32;
-    this.camera.fov = fov;
-    this.camera.updateProjectionMatrix();
-    const halfHeight = Math.tan((fov * Math.PI) / 360) * 1500;
-    const pxPerUnit = height / 2 / halfHeight;
-    const gutter = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-gutter')) || 32;
-    let left = gutter;
-    let right = width - gutter;
-    let top = gutter;
-    let bottom = height - gutter;
-    if (compact) {
-      const copy = document.querySelector('.story-copy')?.getBoundingClientRect();
-      const meta = document.querySelector('.story-meta')?.getBoundingClientRect();
-      if (meta) top = meta.bottom + 26;
-      if (copy) bottom = copy.top - 18;
-    } else {
-      const copy = document.querySelector('.story-copy')?.getBoundingClientRect();
-      const rail = document.querySelector('.story-rail')?.getBoundingClientRect();
-      if (copy) left = copy.right + 16;
-      if (rail) right = rail.left - 16;
-    }
-    const regionWidth = Math.max(160, right - left);
-    const regionHeight = Math.max(160, bottom - top);
-    const fitted = regionHeight * (compact ? .95 : .9) / (RIG_HEIGHT * pxPerUnit);
-    this.scale = Math.max(.35, Math.min(2.6, fitted));
-    this.group.scale.setScalar(this.scale);
-    this.regionShift = ((left + right) / 2 - width / 2) / pxPerUnit;
-    this.group.position.y = this.lookY + (height / 2 - (top + bottom) / 2) / pxPerUnit - RIG_CENTER_Y * this.scale;
-    this.applyState();
-  }
-
-  setProgress(progress) {
-    this.progress = Math.max(0, Math.min(1, progress));
-    const scaled = this.progress * 7;
-    const step = Math.min(6, Math.floor(scaled));
-    this.phase.step = step;
-    this.phase.local = Math.min(1, scaled - step);
-    this.applyState();
-  }
-
-  applyState() {
-    const p = this.progress;
-    const time = this.time;
-
-    this.patchX = trackKey(p, PATCH_X);
-    const dock = smoothstep(.9, .996, p);
-    const intro = smoothstep(.045, .075, p);
-    const bob = Math.sin(time * 1.1) * 1.4 * (1 - dock);
-    this.patch.visible = intro > .01;
-    this.patch.scale.setScalar(.001 + intro * .999);
-    this.patch.position.set(
-      this.patchX,
-      20 + bob,
-      10 + 135 * dock,
-    );
-    this.patch.rotation.y = -.32 * dock;
-    this.patch.rotation.z = Math.sin(p * Math.PI * 2) * .012 * (1 - dock);
-    this.patchSlot.visible = intro < .35;
-    this.patchSlot.material.opacity = .45 * (1 - intro);
-    this.patchSlot.position.y = 20 + Math.sin(time * 1.1) * 2;
-
-    this.gates.forEach((gate) => {
-      const pass = smoothstep(gate.threshold, gate.threshold + .022, p);
-      const local = clamp01((p - gate.threshold) / .032);
-      const scanning = p >= gate.threshold && local < 1;
-      gate.lampMaterial.color.copy(this.accentDim).lerp(this.accent, pass);
-      gate.halo.material.opacity = .04 + pass * .5;
-      gate.strips.opacity = .26 + pass * .6;
-      gate.scanMaterial.opacity = scanning ? Math.sin(local * Math.PI) * .9 : 0;
-      gate.scan.position.y = 138 - local * 276;
-      gate.labelMaterial.opacity = .72 + pass * .26;
-      gate.screenMaterial.color.copy(this.screenBase).lerp(this.screenPass, pass);
-      gate.pool.material.opacity = .16 + pass * .16;
-    });
-
-    const rejectIn = smoothstep(.58, .62, p);
-    const fall = smoothstep(.6, .78, p);
-    this.rejected.visible = rejectIn > .02;
-    this.rejected.scale.setScalar(.001 + rejectIn * .999);
-    this.rejected.position.set(
-      180 - 100 * fall,
-      20 - 185 * fall,
-      20 + 225 * fall,
-    );
-    this.rejected.rotation.x = -1.24 * fall;
-    this.rejected.rotation.y = .42 * fall;
-    this.rejected.rotation.z = -.5 * fall;
-    this.tray.material.opacity = .12 + rejectIn * .3;
-    const retryIn = smoothstep(.72, .78, p);
-    this.retry.material.opacity = retryIn * .4;
-    this.retryLabel.material.opacity = retryIn * .9;
-
-    const shellIn = smoothstep(4 / 7, 4.4 / 7, p) * (1 - smoothstep(.94, 1, p) * .72);
-    this.shell.material.opacity = shellIn * .24;
-    this.shellLabel.material.opacity = shellIn;
-    this.shellLabel.position.y = 350 + Math.sin(time * .8) * 2;
-
-    const verifiedIn = smoothstep(.9, .98, p);
-    this.verified.material.opacity = verifiedIn;
-    this.verified.position.y = 290 + (1 - verifiedIn) * 16;
-    this.repoLabel.material.opacity = .9 - verifiedIn * .55;
-    this.socket.material.opacity = .38 + verifiedIn * .45;
-    this.receiptPlate.material.opacity = smoothstep(.93, 1, p);
-    this.receiptPlate.position.x = 1030 + (1 - smoothstep(.93, 1, p)) * 40;
-    this.connector.material.opacity = .1 + verifiedIn * .3;
-
-    this.hashPlate.material.opacity = smoothstep(.26, .29, p) * (1 - smoothstep(.42, .46, p));
-    this.astPlate.material.opacity = smoothstep(.40, .44, p) * (1 - smoothstep(.55, .58, p));
-    const contractFade = .95 - smoothstep(.12, .3, p) * .95;
-    this.contractFace.opacity = contractFade;
-    this.contractEdge.opacity = .35 * contractFade;
-
-    const lookX = this.patchX * this.scale - this.regionShift;
-    const lookY = this.lookY - smoothstep(.82, .98, p) * 44;
-    const side = this.compact ? 40 : 220;
-    const cameraZ = 1500 - smoothstep(.55, .82, p) * 150 + smoothstep(.78, 1, p) * 210;
-    this.camera.position.set(lookX + side, lookY + 210, cameraZ);
-    this.camera.lookAt(lookX, lookY, 0);
-
-    this.dust.rotation.y = time * .006;
-    this.dust.position.y = Math.sin(time * .12) * 6;
-    this.rig.rotation.y = -0.055 + Math.sin(p * Math.PI) * .012;
-  }
-
-  start() {
-    if (this.running || isReduced) return;
-    this.running = true;
-    this.clock.start();
-    this.frameId = requestAnimationFrame(() => this.loop());
-  }
-
-  stop() {
-    this.running = false;
-    if (this.frameId) cancelAnimationFrame(this.frameId);
-  }
-
-  destroy() {
-    this.stop();
-    this.observer.disconnect();
-    this.renderer.dispose();
-  }
-
-  loop() {
-    if (!this.running) return;
-    this.time = this.clock.getElapsedTime();
-    this.applyState();
-    this.renderer.render(this.scene, this.camera);
-    this.frameId = requestAnimationFrame(() => this.loop());
-  }
-
-  render(time, progress) {
-    if (!this.visible && !isReduced) return;
-    this.time = time;
-    this.setProgress(progress);
-    this.renderer.render(this.scene, this.camera);
-  }
-}
-
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
-}
-
-function smoothstep(edge0, edge1, value) {
-  const x = clamp01((value - edge0) / Math.max(.0001, edge1 - edge0));
-  return x * x * (3 - 2 * x);
-}
-
-function trackKey(progress, keys) {
-  if (progress <= keys[0][0]) return keys[0][1];
-  for (let index = 1; index < keys.length; index += 1) {
-    if (progress <= keys[index][0]) {
-      const [t0, v0] = keys[index - 1];
-      const [t1, v1] = keys[index];
-      return v0 + (v1 - v0) * smoothstep(0, 1, (progress - t0) / Math.max(1e-6, t1 - t0));
-    }
-  }
-  return keys[keys.length - 1][1];
 }
 
 reduced.addEventListener?.('change', () => {
   setReducedState();
   if (storyTrigger) storyTrigger.kill();
   if (lenis) {
-    gsap.ticker.remove(lenisTicker);
     lenis.destroy();
     lenis = null;
   }
-  scene?.destroy();
+  scene?.dispose();
   scene = null;
   ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
   setupScroll();
@@ -1225,19 +2162,21 @@ reduced.addEventListener?.('change', () => {
 window.addEventListener('resize', () => {
   scene?.resize();
 }, { passive: true });
+
 window.addEventListener('scroll', () => {
   if (!isReduced) return;
-  const progress = clamp01((window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight));
+  const progress = Math.max(0, Math.min(1, (window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight)));
   setStep(Math.min(6, Math.floor(progress * 7)));
 }, { passive: true });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) scene?.stop();
-  else if (!isReduced && scene?.visible) scene?.start();
-});
 
 setReducedState();
 setupScroll();
 setupLenis();
+
 window.addEventListener('load', () => {
   ScrollTrigger.refresh();
+  if (initStep >= 0) {
+    setStep(initStep);
+    scene?.setProgress((initStep + 0.5) / 7);
+  }
 }, { once: true });
