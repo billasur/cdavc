@@ -18,16 +18,30 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
 import random
+import signal
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from types import ModuleType
 from typing import Any
 
 MUTANT_VERSION = "1"
 DEFAULT_MUTANTS = 3
 """Mutants generated per file when the caller does not choose a count."""
+
+MUTANT_TIMEOUT_SECONDS = 2.0
+"""Execution budget for one mutant; a hanging mutant is a rejected mutant."""
+
+
+class MutantTimeout(BaseException):
+    """Raised when one mutant exceeds its execution budget.
+
+    Deliberately a ``BaseException``: the property runner treats every
+    ``Exception`` from a candidate as a property failure, and one-shot alarms
+    would then be swallowed mid-loop and never re-armed.
+    """
 
 OPERATORS = (
     "compare_boundary",
@@ -138,6 +152,31 @@ def module_from_source(source: str, *, name: str = "cdavc_mutant", attributes: I
     return module
 
 
+@contextlib.contextmanager
+def _deadline(seconds: float | None) -> Iterator[None]:
+    """Bound one mutant's execution with ``SIGALRM`` where available.
+
+    A mutant can rewrite a loop bound into non-termination.  Without this
+    guard the *measurement* hangs the gate process, and the candidate's own
+    verdict is lost even though the candidate is fine.
+    """
+
+    if not seconds or not hasattr(signal, "setitimer"):
+        yield
+        return
+
+    def _expire(_signum: int, _frame: Any) -> None:
+        raise MutantTimeout()
+
+    previous = signal.signal(signal.SIGALRM, _expire)
+    signal.setitimer(signal.ITIMER_REAL, max(0.01, float(seconds)))
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
 def kill_rate(
     sources: Sequence[str],
     entries: Sequence[Mapping[str, Any]],
@@ -145,6 +184,7 @@ def kill_rate(
     run_table: Any,
     seed: int = 0,
     limit: int = DEFAULT_MUTANTS,
+    timeout: float | None = MUTANT_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     """Generate mutants of ``sources`` and count how many the properties reject.
 
@@ -155,6 +195,7 @@ def kill_rate(
     generated = 0
     killed = 0
     survivors: list[dict[str, Any]] = []
+    timeouts: list[dict[str, Any]] = []
     for index, source in enumerate(sources):
         try:
             mutants = generate_mutants(source, limit=limit, seed=seed + index)
@@ -163,8 +204,16 @@ def kill_rate(
         for mutant in mutants:
             generated += 1
             try:
-                module = module_from_source(mutant["source"], name=f"cdavc_mutant_{generated}")
-                result = run_table(module, entries, seed=seed)
+                with _deadline(timeout):
+                    module = module_from_source(mutant["source"], name=f"cdavc_mutant_{generated}")
+                    result = run_table(module, entries, seed=seed)
+            except MutantTimeout:
+                # Non-termination is exactly the defect the gate exists to
+                # reject, so it counts as killed; the budget only keeps the
+                # measurement from hanging the candidate's verdict.
+                killed += 1
+                timeouts.append({"operator": mutant["operator"], "line": mutant["line"]})
+                continue
             except Exception:  # a mutant that cannot even import is killed
                 killed += 1
                 continue
@@ -176,6 +225,7 @@ def kill_rate(
         "generated": generated,
         "killed": killed,
         "survived": survivors,
+        "timeouts": timeouts,
         "kill_rate": (killed / generated) if generated else None,
     }
 
@@ -205,6 +255,8 @@ __all__ = [
     "generate_mutants",
     "kill_rate",
     "main",
+    "MUTANT_TIMEOUT_SECONDS",
+    "MutantTimeout",
     "module_from_source",
     "mutation_sites",
 ]

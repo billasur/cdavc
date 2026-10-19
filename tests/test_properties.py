@@ -162,6 +162,39 @@ class PropertyGateTests(unittest.TestCase):
         self.assertGreaterEqual(report["kill_rate"], 0.0)
         self.assertLessEqual(report["kill_rate"], 1.0)
 
+    def test_hanging_mutant_is_bounded_and_counted_as_killed(self):
+        import time
+
+        def hanging(_module, _entries, *, seed=0, replay=()):
+            time.sleep(30)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "solution.py"
+            path.write_text((SOLUTIONS / "task_021" / "solution.py").read_text())
+            source = path.read_text()
+        entries = load_table(TABLE)["task_021"]
+        started = time.perf_counter()
+        report = kill_rate([source], entries, run_table=hanging, seed=SEED, limit=2, timeout=0.1)
+        elapsed = time.perf_counter() - started
+        self.assertGreater(report["generated"], 0)
+        self.assertEqual(report["killed"], report["generated"])
+        self.assertTrue(report["timeouts"])
+        self.assertLess(elapsed, 5.0)
+
+    def test_mutant_metric_cannot_reject_a_correct_candidate(self):
+        """Regression: a hanging mutant used to fail task_021's whole verdict."""
+
+        result = probe(
+            table_path=TABLE,
+            task_id="task_021",
+            files=[SOLUTIONS / "task_021" / "solution.py"],
+            seed=SEED,
+            mutants=3,
+            mutant_timeout=0.1,
+        )
+        self.assertTrue(result["ok"], result["failures"][:1])
+        self.assertIsNotNone(result["mutants"]["kill_rate"])
+
     def test_non_stdlib_imports_respects_the_local_allowlist(self):
         tree = ast.parse("import numpy\nfrom helper import VALUE\nimport json\n")
         self.assertEqual(non_stdlib_imports(tree), ["helper", "numpy"])

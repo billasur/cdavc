@@ -38,9 +38,9 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote_plus
 
 try:  # ``-m cdavc.properties`` imports the package; a direct run needs the sibling module
-    from .mutants import DEFAULT_MUTANTS, kill_rate as mutant_kill_rate
+    from .mutants import DEFAULT_MUTANTS, MUTANT_TIMEOUT_SECONDS, kill_rate as mutant_kill_rate
 except ImportError:  # pragma: no cover - direct script execution
-    from mutants import DEFAULT_MUTANTS, kill_rate as mutant_kill_rate  # type: ignore[no-redef]
+    from mutants import DEFAULT_MUTANTS, MUTANT_TIMEOUT_SECONDS, kill_rate as mutant_kill_rate  # type: ignore[no-redef]
 
 PROPERTY_VERSION = "1"
 DEFAULT_TABLE = "benchmarks/properties.json"
@@ -1085,6 +1085,7 @@ def probe(
     seed: int,
     replay_path: Path | str | None = None,
     mutants: int = 0,
+    mutant_timeout: float = MUTANT_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     table = load_table(table_path)
     entries = entries_for(table, task_id)
@@ -1096,13 +1097,24 @@ def probe(
     module = load_module(files)
     result = run_table(module, entries, seed=seed, replay=replay)
     if mutants:
-        result["mutants"] = mutant_kill_rate(
-            [Path(path).read_text() for path in files],
-            entries,
-            run_table=run_table,
-            seed=seed,
-            limit=mutants,
-        )
+        # The kill rate is a measurement of the gate, not part of it.  It is
+        # computed only after the verdict and can never reject a candidate.
+        try:
+            result["mutants"] = mutant_kill_rate(
+                [Path(path).read_text() for path in files],
+                entries,
+                run_table=run_table,
+                seed=seed,
+                limit=mutants,
+                timeout=mutant_timeout,
+            )
+        except Exception as exc:  # noqa: BLE001 - a metric failure is not a verdict
+            result["mutants"] = {
+                "generated": 0,
+                "killed": 0,
+                "kill_rate": None,
+                "error": type(exc).__name__,
+            }
     return result
 
 
