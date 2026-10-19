@@ -242,6 +242,7 @@ class BenchmarkTests(unittest.TestCase):
             bad = self._response("def wrong() -> int:\n    return 42\n")
             good = self._response("def answer() -> int:\n    return 42\n")
             prompts = []
+            transcript = []
 
             class SequenceProvider:
                 available = True
@@ -251,6 +252,7 @@ class BenchmarkTests(unittest.TestCase):
 
                 def complete_with_metadata(self, messages, *, seed=None):
                     prompts.append(messages[0]["content"])
+                    transcript.extend(message["content"] for message in messages)
                     return next(self.responses)
 
             def provider_factory(arm, _task):
@@ -265,8 +267,13 @@ class BenchmarkTests(unittest.TestCase):
             ).run()
             cage = next(record for record in records if record["arm"] == "cdavc")
             self.assertTrue(cage["pass"])
-            self.assertEqual(cage["attempts"], 2)
+            # A missing required symbol is decidable from the source, so the
+            # repair turn is spent inside one draw instead of a second draw.
+            self.assertEqual(cage["attempts"], 1)
+            self.assertEqual(cage["samples_drawn"], 1)
+            self.assertEqual(cage["static_reasks"], 1)
             self.assertNotIn(secret, "\n".join(prompts))
+            self.assertNotIn(secret, "\n".join(transcript))
             self.assertIn("locked_test_hashes", cage)
             self.assertIn("tests/test_answer.py", cage["locked_test_hashes"])
 
@@ -624,6 +631,102 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(cage["json_reasks"], 1)
             self.assertEqual(cage["samples_drawn"], 1)
             self.assertIn("not a JSON files object", cage["failure"])
+
+    def test_sample_budget_defaults_to_one_draw_for_the_single_shot_arm(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=2)
+            runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
+            self.assertEqual(runner._samples_for("baseline_single", task), 1)
+            self.assertEqual(runner._samples_for("baseline_retry", task), 3)
+            self.assertEqual(runner._samples_for("cdavc", task), 3)
+
+    def test_sample_budget_never_exceeds_what_the_task_allows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0)
+            runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
+            self.assertEqual(runner._samples_for("cdavc", task), 1)
+            with self.assertRaises(BenchmarkError):
+                BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], samples=0)
+            with self.assertRaises(BenchmarkError):
+                BenchmarkRunner(
+                    root,
+                    lambda _arm, _task: MockProvider([]),
+                    tasks=[task],
+                    samples={"not_an_arm": 2},
+                )
+
+    def test_first_passing_draw_wins_and_stops_sampling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=3)
+            bad = self._response("def answer() -> int:\n    return 0\n")
+            good = self._response("def answer() -> int:\n    return 42\n")
+
+            def provider_factory(_arm, _task):
+                return MockProvider([bad, good, bad, bad])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+                samples=3,
+            ).run()
+            for record in records:
+                self.assertTrue(record["pass"], record["failure"])
+                self.assertEqual(record["samples_budget"], 3)
+                self.assertEqual(record["samples_drawn"], 2)
+                self.assertEqual(record["samples_to_accept"], 2)
+                self.assertEqual(record["attempts"], 2)
+                self.assertEqual([item["status"] for item in record["attempt_log"]], ["REJECTED", "ACCEPTED"])
+                self.assertNotEqual(record["attempt_log"][0]["seed"], record["attempt_log"][1]["seed"])
+
+    def test_repeated_failure_signature_stops_before_the_budget_is_spent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=3)
+            bad = self._response("def answer() -> int:\n    return 0\n")
+
+            def provider_factory(_arm, _task):
+                return MockProvider([bad, bad, bad, bad])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+                samples=4,
+            ).run()
+            for record in records:
+                self.assertFalse(record["pass"])
+                self.assertEqual(record["samples_budget"], 4)
+                self.assertEqual(record["samples_drawn"], 2)
+                self.assertEqual(record["distinct_failure_signatures"], 1)
+
+    def test_static_contract_repair_does_not_spend_a_draw(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=3)
+            broken = self._response("def answer() -> int\n    return 42\n")
+            good = self._response("def answer() -> int:\n    return 42\n")
+
+            def provider_factory(_arm, _task):
+                return MockProvider([broken, good])
+
+            records = BenchmarkRunner(
+                root,
+                provider_factory,
+                tasks=[task],
+                records_path=root / "records.jsonl",
+                samples=4,
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertTrue(cage["pass"], cage["failure"])
+            self.assertEqual(cage["samples_drawn"], 1)
+            self.assertEqual(cage["static_reasks"], 1)
+            self.assertEqual(cage["json_reasks"], 0)
 
     def test_patch_writer_refuses_escapes_and_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:

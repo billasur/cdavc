@@ -63,6 +63,9 @@ STDLIB_ONLY_HINT = (
 JSON_REASK_PROMPT = "Return only the JSON object requested above, with no prose and no markdown fence."
 """Single corrective turn issued when a provider reply cannot be parsed as JSON."""
 
+STATIC_REASKS = 1
+"""Corrective turns allowed for a static contract violation; none spend a draw."""
+
 DEFAULT_SAMPLES = 4
 """Independent draws for the CD-AVC arm when ``--samples`` is not given."""
 
@@ -350,6 +353,7 @@ class BenchmarkRunner:
         digest: dict[tuple[str, str], Mapping[str, Any]] = {}
         signatures: list[str] = []
         json_reasks = 0
+        static_reasks = 0
         hidden_rejections = 0
         public_gate_passes = 0
         properties: dict[str, Any] = {}
@@ -381,6 +385,30 @@ class BenchmarkRunner:
                             if completion.model:
                                 reported_model = completion.model
                             self._apply_response(task, completion.text, workspace)
+                        if arm == "cdavc":
+                            # A syntax or import violation is decidable from the
+                            # source alone, so one corrective turn is cheaper
+                            # than spending another draw on the same mistake.
+                            static = self._static_contract_failure(task, workspace)
+                            while static and static_reasks < STATIC_REASKS:
+                                static_reasks += 1
+                                instruction = (
+                                    "The submitted files fail a static contract check: "
+                                    f"{static}\nReturn the corrected complete files as the same JSON object, "
+                                    "using the standard library only."
+                                )
+                                try:
+                                    completion = self._reask(
+                                        provider, prompt, completion, instruction, draw
+                                    )
+                                except Exception:  # the static verdict already stands
+                                    break
+                                prompt_tokens = _add_usage(prompt_tokens, completion.prompt_tokens)
+                                completion_tokens = _add_usage(completion_tokens, completion.completion_tokens)
+                                if completion.model:
+                                    reported_model = completion.model
+                                self._apply_response(task, completion.text, workspace)
+                                static = self._static_contract_failure(task, workspace)
                         candidate = self._store_candidate(arm, task, workspace)
                         if arm == "cdavc":
                             gates = self._run_cage_gates(
@@ -459,6 +487,7 @@ class BenchmarkRunner:
             "distinct_failure_signatures": len(set(signatures)),
             "failure_signatures": list(signatures),
             "json_reasks": json_reasks,
+            "static_reasks": static_reasks,
             "public_gate_passes": public_gate_passes,
             "hidden_rejections": hidden_rejections,
             "property_table_hash": properties.get("table_hash") or self._property_table_hash(),
@@ -564,10 +593,22 @@ class BenchmarkRunner:
         """Spend one corrective turn when a reply is not a parseable JSON object."""
 
         del task, arm
+        return self._reask(provider, prompt, completion, JSON_REASK_PROMPT, draw)
+
+    def _reask(
+        self,
+        provider: Any,
+        prompt: str,
+        completion: ProviderCompletion,
+        instruction: str,
+        draw: int,
+    ) -> ProviderCompletion:
+        """Ask again with the previous reply and one corrective instruction."""
+
         messages: list[Mapping[str, str]] = [
             {"role": "user", "content": prompt},
             {"role": "assistant", "content": completion.text},
-            {"role": "user", "content": JSON_REASK_PROMPT},
+            {"role": "user", "content": instruction},
         ]
         return self._complete_messages(provider, messages, seed=_sample_seed(self.seed, draw))
 
@@ -666,34 +707,9 @@ class BenchmarkRunner:
             properties = {}
         _assert_test_hashes(workspace, hashes)
         results.append("locked_test_hashes")
-        local_modules = self._local_module_names(task, workspace)
-        for relative in task.implementation_files:
-            source_path = workspace / relative
-            try:
-                source = source_path.read_text()
-                tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
-            except (OSError, SyntaxError) as exc:
-                raise _GateFailure("AST contract failed") from exc
-            declared = {
-                node.name
-                for node in ast.walk(tree)
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-            }
-            missing = set(task.symbols) - declared
-            if missing:
-                raise _GateFailure("AST contract is missing a required symbol")
-            imported = property_gate.non_stdlib_imports(tree, allowed=local_modules)
-            if imported:
-                raise _GateFailure(
-                    f"AST Contract Failed: candidate imports the non-stdlib module {imported[0]!r}; "
-                    "the evaluation environment has no third-party packages."
-                )
-            required = required_exception(task.invariants)
-            if required and not has_raise_statement(tree):
-                raise _GateFailure(
-                    f"AST Contract Failed: Task invariant requires input validation raising {required}, "
-                    "but no Raise statements were found in implementation."
-                )
+        violation = self._static_contract_failure(task, workspace)
+        if violation:
+            raise _GateFailure(violation)
         results.append("ast_contract")
         property_info = self._run_property_gate(task, workspace, digest if digest is not None else {}, properties)
         if property_info:
@@ -715,6 +731,44 @@ class BenchmarkRunner:
             results.append("regression")
         _assert_test_hashes(workspace, hashes)
         return results
+
+    def _static_contract_failure(self, task: BenchmarkTask, workspace: Path) -> str | None:
+        """Return the first source-only contract violation, or ``None``.
+
+        These checks read the candidate's own source, so their message can be
+        shown to the model and repaired without executing the tests.  They
+        therefore do not spend one of the task's independent draws.
+        """
+
+        local_modules = self._local_module_names(task, workspace)
+        for relative in task.implementation_files:
+            source_path = workspace / relative
+            try:
+                source = source_path.read_text()
+                tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
+            except (OSError, SyntaxError) as exc:
+                return f"AST contract failed: {exc}"
+            declared = {
+                node.name
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            }
+            missing = set(task.symbols) - declared
+            if missing:
+                return "AST contract is missing a required symbol"
+            imported = property_gate.non_stdlib_imports(tree, allowed=local_modules)
+            if imported:
+                return (
+                    f"AST Contract Failed: candidate imports the non-stdlib module {imported[0]!r}; "
+                    "the evaluation environment has no third-party packages."
+                )
+            required = required_exception(task.invariants)
+            if required and not has_raise_statement(tree):
+                return (
+                    f"AST Contract Failed: Task invariant requires input validation raising {required}, "
+                    "but no Raise statements were found in implementation."
+                )
+        return None
 
     def _local_module_names(self, task: BenchmarkTask, workspace: Path) -> tuple[str, ...]:
         """Modules a candidate may legitimately import from its own repository."""
@@ -1255,14 +1309,14 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         )
 
     lines.extend(["", "## Sampling and gate metrics", ""])
-    lines.append("| Arm | Mean samples drawn | Mean samples to accept | Mean distinct failure signatures | JSON re-asks | Mean properties checked |")
-    lines.append("|---|---:|---:|---:|---:|---:|")
+    lines.append("| Arm | Mean samples drawn | Mean samples to accept | Mean distinct failure signatures | JSON re-asks | Static re-asks | Mean properties checked |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|")
     sampling = {arm: _sampling_summary(rows, arm) for arm in ARMS}
     for arm in ARMS:
         item = sampling[arm]
         lines.append(
             f"| `{arm}` | {_number(item['mean_samples_drawn'])} | {_number(item['mean_samples_to_accept'])} | "
-            f"{_number(item['mean_distinct_signatures'])} | {item['json_reasks']} | "
+            f"{_number(item['mean_distinct_signatures'])} | {item['json_reasks']} | {item['static_reasks']} | "
             f"{_number(item['mean_properties_checked'])} |"
         )
     cage_sampling = sampling["cdavc"]
@@ -1764,6 +1818,7 @@ def _sampling_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[st
             [record.get("distinct_failure_signatures") for record in selected]
         ),
         "json_reasks": sum(int(record.get("json_reasks") or 0) for record in selected),
+        "static_reasks": sum(int(record.get("static_reasks") or 0) for record in selected),
         "public_gate_passes": public_passes,
         "hidden_rejections": hidden_rejections,
         "false_accept_rate": (hidden_rejections / public_passes) if public_passes else None,
