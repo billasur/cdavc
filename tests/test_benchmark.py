@@ -540,6 +540,142 @@ class BenchmarkTests(unittest.TestCase):
             self.assertIn("IndexError", cage["failure"])
             self.assertNotIn("targeted test", cage["failure"])
 
+    def test_invalid_feedback_mode_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0)
+            with self.assertRaisesRegex(BenchmarkError, "feedback_mode"):
+                BenchmarkRunner(
+                    root,
+                    lambda _arm, _task: MockProvider([]),
+                    tasks=[task],
+                    records_path=root / "records.jsonl",
+                    feedback_mode="everything",
+                )
+
+    def _retry_sequence_run(self, root, *, feedback_mode):
+        task = self._task(max_retries=2)
+        wrong_zero = self._response("def answer() -> int:\n    return 0\n")
+        wrong_one = self._response("def answer() -> int:\n    return 100\n")
+        good = self._response("def answer() -> int:\n    return 42\n")
+        prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
+
+        class SequenceProvider:
+            available = True
+
+            def __init__(self, responses, arm):
+                self.responses = iter(responses)
+                self.arm = arm
+
+            def complete_with_metadata(self, messages, *, seed=None):
+                prompts[self.arm].append(messages[0]["content"])
+                return next(self.responses)
+
+        def provider_factory(arm, _task):
+            if arm == "baseline_retry":
+                return SequenceProvider([wrong_zero, wrong_one, good], arm)
+            return SequenceProvider([good], arm)
+
+        records = BenchmarkRunner(
+            root,
+            provider_factory,
+            tasks=[task],
+            records_path=root / f"records-{feedback_mode}.jsonl",
+            feedback_mode=feedback_mode,
+        ).run()
+        retry = next(record for record in records if record["arm"] == "baseline_retry")
+        return retry, prompts
+
+    def test_latest_feedback_is_default_and_feeds_only_the_latest_trace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            retry, prompts = self._retry_sequence_run(root, feedback_mode="latest")
+            self.assertTrue(retry["pass"])
+            self.assertEqual(retry["attempts"], 3)
+            self.assertEqual(retry["feedback_mode"], "latest")
+            first, second, third = prompts["baseline_retry"]
+            self.assertNotIn("!=", first)
+            self.assertIn("AssertionError: 0 != 42", second)
+            self.assertNotIn("AssertionError: 100 != 42", second)
+            self.assertIn("AssertionError: 100 != 42", third)
+            self.assertNotIn("AssertionError: 0 != 42", third)
+            self.assertNotIn("Attempt 1 failure", third)
+
+    def test_cumulative_feedback_feeds_every_prior_trace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            retry, prompts = self._retry_sequence_run(root, feedback_mode="cumulative")
+            self.assertTrue(retry["pass"])
+            self.assertEqual(retry["attempts"], 3)
+            self.assertEqual(retry["feedback_mode"], "cumulative")
+            first, second, third = prompts["baseline_retry"]
+            self.assertNotIn("!=", first)
+            self.assertIn("AssertionError: 0 != 42", second)
+            self.assertIn("Attempt 1 failure", third)
+            self.assertIn("Attempt 2 failure", third)
+            self.assertIn("AssertionError: 0 != 42", third)
+            self.assertIn("AssertionError: 100 != 42", third)
+            # The cage arm always repairs from the latest sanitised failure only.
+            cage_third_prompt_present = len(prompts["cdavc"]) == 1
+            self.assertTrue(cage_third_prompt_present)
+
+    def test_cage_prompt_stays_latest_only_under_cumulative_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=2)
+            wrong_zero = self._response("def answer() -> int:\n    return 0\n")
+            wrong_one = self._response("def answer() -> int:\n    return 100\n")
+            good = self._response("def answer() -> int:\n    return 42\n")
+            prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
+
+            class SequenceProvider:
+                available = True
+
+                def __init__(self, responses, arm):
+                    self.responses = iter(responses)
+                    self.arm = arm
+
+                def complete_with_metadata(self, messages, *, seed=None):
+                    prompts[self.arm].append(messages[0]["content"])
+                    return next(self.responses)
+
+            records = BenchmarkRunner(
+                root,
+                lambda arm, _task: SequenceProvider([wrong_zero, wrong_one, good], arm),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+                feedback_mode="cumulative",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertTrue(cage["pass"])
+            self.assertEqual(cage["attempts"], 3)
+            third = prompts["cdavc"][2]
+            self.assertIn("AssertionError: 100 != 42", third)
+            self.assertNotIn("AssertionError: 0 != 42", third)
+            self.assertNotIn("Attempt 1 failure", third)
+
+    def test_feedback_mode_mismatch_rejects_resume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0)
+            good = self._response("def answer() -> int:\n    return 42\n")
+            records_path = root / "records.jsonl"
+            BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([good]),
+                tasks=[task],
+                records_path=records_path,
+            ).run()
+            with self.assertRaisesRegex(BenchmarkError, "resume metadata mismatch"):
+                BenchmarkRunner(
+                    root,
+                    lambda _arm, _task: MockProvider([good]),
+                    tasks=[task],
+                    records_path=records_path,
+                    feedback_mode="cumulative",
+                )
+
+
 
 if __name__ == "__main__":
     unittest.main()

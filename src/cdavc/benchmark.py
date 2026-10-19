@@ -45,6 +45,9 @@ from .providers import (
 ARMS = ("baseline_single", "baseline_retry", "cdavc")
 """The stable order and names used in benchmark records."""
 
+FEEDBACK_MODES = ("latest", "cumulative")
+"""Retry-feedback modes: only the latest failure trace, or every prior trace."""
+
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
 BENCHMARK_VERSION = "1"
 
@@ -230,6 +233,7 @@ class BenchmarkRunner:
         hardware: str | None = None,
         timeout_seconds: float = 30.0,
         retry_cap: int = 3,
+        feedback_mode: str = "latest",
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -251,6 +255,9 @@ class BenchmarkRunner:
             raise BenchmarkError("timeout_seconds must be greater than zero")
         if isinstance(retry_cap, bool) or not isinstance(retry_cap, int) or retry_cap < 0:
             raise BenchmarkError("retry_cap must be a non-negative integer")
+        if feedback_mode not in FEEDBACK_MODES:
+            raise BenchmarkError(f"feedback_mode must be one of: {', '.join(FEEDBACK_MODES)}")
+        self.feedback_mode = feedback_mode
         self.seed = seed
         self.model = model
         self.quantisation = quantisation
@@ -279,6 +286,7 @@ class BenchmarkRunner:
             "quantisation": self.quantisation,
             "version": self.version,
             "hardware": self.hardware,
+            "feedback_mode": self.feedback_mode,
         }
         for record in self._records:
             for field_name, configured in expected.items():
@@ -318,6 +326,7 @@ class BenchmarkRunner:
         meter = _MemoryMeter()
         attempts: list[_Attempt] = []
         failure = ""
+        failures: list[str] = []
         gates: list[str] = []
         reported_model: str | None = None
         provider = self._provider_for(arm, task)
@@ -328,7 +337,7 @@ class BenchmarkRunner:
             with self._execution_directory(arm) as workspace:
                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
                 for attempt_number in range(1, max_attempts + 1):
-                    prompt = self._prompt(task, arm, failure)
+                    prompt = self._prompt(task, arm, failures)
                     completion: ProviderCompletion | None = None
                     try:
                         completion = self._complete(provider, prompt, task, arm, attempt_number)
@@ -350,6 +359,7 @@ class BenchmarkRunner:
                         break
                     except Exception as exc:  # bounded candidate failures become data, not runner crashes
                         failure = _safe_failure(exc)
+                        failures.append(failure)
                         attempts.append(
                             _Attempt(
                                 False,
@@ -392,6 +402,7 @@ class BenchmarkRunner:
             "quantization": self._metadata_value("quantisation", provider),
             "version": self._metadata_value("version", provider),
             "runner_version": BENCHMARK_VERSION,
+            "feedback_mode": self.feedback_mode,
             "hardware": self.hardware or platform.platform(),
             "seed": self.seed,
             "attempt_log": [
@@ -453,14 +464,17 @@ class BenchmarkRunner:
             result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
         return _normalise_completion(result)
 
-    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
+    def _prompt(self, task: BenchmarkTask, arm: str, failures: list[str]) -> str:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
         repair = ""
-        if previous_failure:
+        if failures:
             if arm == "baseline_retry":
-                repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
+                feedback = failures[-1]
+                if self.feedback_mode == "cumulative":
+                    feedback = _format_cumulative_feedback(failures)
+                repair = f"\nPrevious failing output; repair the candidate using only this output:\n{feedback}\n"
             elif arm == "cdavc":
-                repair = self._cage_repair(task, previous_failure)
+                repair = self._cage_repair(task, failures[-1])
         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
@@ -969,6 +983,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
+    parser.add_argument(
+        "--feedback-mode",
+        choices=FEEDBACK_MODES,
+        default="latest",
+        help="retry prompt feedback: only the latest failure trace, or every prior trace (baseline_retry arm)",
+    )
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
@@ -1009,6 +1029,7 @@ def main(argv: list[str] | None = None) -> int:
             hardware=args.hardware,
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
+            feedback_mode=args.feedback_mode,
         )
         records = runner.run()
         output = render_report(records)
@@ -1239,6 +1260,12 @@ def _usage_source(attempts: Sequence[_Attempt], token_in: int | None, token_out:
     return "provider_partial"
 
 
+def _format_cumulative_feedback(failures: Sequence[str]) -> str:
+    """Render every prior failure trace, oldest first, for cumulative retry feedback."""
+
+    return "\n".join(f"Attempt {index} failure:\n{failure}" for index, failure in enumerate(failures, 1))
+
+
 def _safe_failure(exc: Exception) -> str:
     if isinstance(exc, _GateFailure):
         return str(exc)
@@ -1362,6 +1389,7 @@ def _ci_text(value: Mapping[str, Any]) -> str:
 
 __all__ = [
     "ARMS",
+    "FEEDBACK_MODES",
     "BenchmarkError",
     "BenchmarkRunner",
     "BenchmarkTask",
