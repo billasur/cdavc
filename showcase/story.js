@@ -1,11 +1,12 @@
 import * as THREE from './vendor/three.module.min.js';
 
-const { gsap, ScrollTrigger } = window;
-const Lenis = window.Lenis;
+const { gsap, ScrollTrigger, Lenis } = window;
 document.body.classList.add('story-module-loaded');
-
 gsap.registerPlugin(ScrollTrigger);
 
+/* ------------------------------------------------------------------ *
+ * Page wiring: copy panels, step rail, scroll, one render loop.
+ * ------------------------------------------------------------------ */
 const body = document.body;
 const story = document.querySelector('#task-story');
 const pin = document.querySelector('.story-pin');
@@ -15,83 +16,65 @@ const railItems = [...document.querySelectorAll('.story-rail li')];
 const stageReadout = document.querySelector('#story-stage');
 const staticVisual = document.querySelector('.static-visual');
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+const STEPS = 7;
+
 let isReduced = reduced.matches;
-let scene = null;
-let storyTrigger = null;
+let world = null;
 let lenis = null;
-const lenisTicker = (time) => lenis?.raf(time * 1000);
+let trigger = null;
 let lastStep = -1;
+let targetProgress = 0;
+
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, v) => { const x = clamp01((v - a) / Math.max(1e-6, b - a)); return x * x * (3 - 2 * x); };
+
+function setStep(step) {
+  const s = Math.min(STEPS - 1, Math.max(0, step));
+  if (s === lastStep) return;
+  lastStep = s;
+  stageReadout.textContent = `${String(s + 1).padStart(2, '0')} / 07`;
+  staticVisual.dataset.step = String(s);
+  panels.forEach((panel, i) => {
+    panel.classList.toggle('is-current', i === s);
+    panel.setAttribute('aria-hidden', String(i !== s));
+  });
+  railItems.forEach((item, i) => item.classList.toggle('is-current', i === s));
+}
+
+function stepFromProgress(p) {
+  // a little past the boundary so the copy swaps while the camera is mid-move
+  return Math.min(STEPS - 1, Math.floor(p * STEPS + 0.18));
+}
 
 function setReducedState() {
   isReduced = reduced.matches;
   body.classList.toggle('is-reduced-motion', isReduced);
   if (isReduced) {
-    const step = Math.min(6, Math.max(0, Math.round((window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight) * 6)));
-    setStep(step);
+    const p = clamp01((window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight));
+    setStep(stepFromProgress(p));
   }
 }
 
-function setStep(step) {
-  const safeStep = Math.min(6, Math.max(0, step));
-  if (safeStep === lastStep && !isReduced) return;
-  lastStep = safeStep;
-  stageReadout.textContent = `${String(safeStep + 1).padStart(2, '0')} / 07`;
-  staticVisual.dataset.step = String(safeStep);
-  panels.forEach((panel, index) => {
-    const active = index === safeStep;
-    panel.classList.toggle('is-current', active);
-    panel.setAttribute('aria-hidden', String(!active));
-  });
-  railItems.forEach((item, index) => item.classList.toggle('is-current', index === safeStep));
-}
-
-function initStoryScene() {
-  if (scene || isReduced) return;
-  try {
-    scene = new TaskScene(canvas);
-  } catch (error) {
-    body.classList.add('no-webgl');
-    console.warn('CD-AVC 3D scene unavailable; showing the static fallback.', error);
-    return;
-  }
-  scene.resize();
-  scene.setProgress(storyTrigger?.scrollTrigger?.progress ?? 0);
-  scene.render(0, scene.progress);
-  body.classList.add('webgl-ready');
-  scene.start();
+function tick(time) {
+  lenis?.raf(time * 1000);
+  world?.frame(time);
 }
 
 function setupScroll() {
   if (isReduced) return;
-  const sceneLoader = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      initStoryScene();
-      sceneLoader.disconnect();
-    }
-  }, { rootMargin: '160px 0px' });
-  sceneLoader.observe(story);
-  // Start immediately when the story is already on screen; the observer is only
-  // a fallback for browsers that throttle observers in a hidden tab.
-  if (story.getBoundingClientRect().top < window.innerHeight) {
-    initStoryScene();
-    sceneLoader.disconnect();
-  }
-  const timeline = { progress: 0 };
-  const update = (progress) => {
-    timeline.progress = progress;
-    const step = Math.min(6, Math.floor(progress * 7));
-    setStep(step);
-    scene?.setProgress(progress);
-  };
+  initWorld();
+  const state = { progress: 0 };
+  const update = (p) => { targetProgress = p; setStep(stepFromProgress(p)); };
   update(0);
-  storyTrigger = gsap.to(timeline, {
+  trigger = gsap.to(state, {
     progress: 1,
     ease: 'none',
     scrollTrigger: {
       trigger: story,
       start: 'top top',
       end: 'bottom bottom',
-      pin: pin,
+      pin,
       pinSpacing: false,
       scrub: true,
       invalidateOnRefresh: true,
@@ -103,1141 +86,799 @@ function setupScroll() {
 
 function setupLenis() {
   if (isReduced) return;
-  lenis = new Lenis({
-    duration: 1.05,
-    smoothWheel: true,
-    syncTouch: false,
-    autoRaf: false,
-  });
+  lenis = new Lenis({ duration: 1.05, smoothWheel: true, syncTouch: false, autoRaf: false });
   lenis.on('scroll', ScrollTrigger.update);
-  gsap.ticker.add(lenisTicker);
+  gsap.ticker.add(tick);
   gsap.ticker.lagSmoothing(1000, 16);
 }
 
-/* ------------------------------------------------------------------ *
- * Canvas textures
- * ------------------------------------------------------------------ */
-
-const ACCENT = '#d8ff64';
-const INK = '#f4f6f1';
-const MUTED = 'rgba(202, 214, 204, .84)';
-const FAIL = '#ff7a59';
-
-function createTexture(width, height, draw) {
-  const source = document.createElement('canvas');
-  source.width = width;
-  source.height = height;
-  const context = source.getContext('2d');
-  context.clearRect(0, 0, width, height);
-  draw(context, width, height);
-  const texture = new THREE.CanvasTexture(source);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  return texture;
+function teardown() {
+  trigger?.kill();
+  trigger = null;
+  if (lenis) { gsap.ticker.remove(tick); lenis.destroy(); lenis = null; }
+  world?.destroy();
+  world = null;
+  ScrollTrigger.getAll().forEach((t) => t.kill());
 }
 
-function roundRect(context, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + r, y);
-  context.arcTo(x + width, y, x + width, y + height, r);
-  context.arcTo(x + width, y + height, x, y + height, r);
-  context.arcTo(x, y + height, x, y, r);
-  context.arcTo(x, y, x + width, y, r);
-  context.closePath();
-}
-
-function plateTexture({ kicker, title, sub, width = 768, height = 232 }) {
-  return createTexture(width, height, (ctx) => {
-    ctx.fillStyle = 'rgba(8, 12, 10, .92)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .24)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(24, 28, 5, height - 56);
-    ctx.fillStyle = 'rgba(216, 255, 100, .92)';
-    ctx.font = '700 23px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(kicker.toUpperCase(), 50, 58);
-    ctx.fillStyle = INK;
-    ctx.font = '600 48px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(title, 50, 124);
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 24px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(sub, 50, 172);
-  });
-}
-
-function monoPlateTexture({ kicker, value, sub, width = 640, height = 216 }) {
-  return createTexture(width, height, (ctx) => {
-    ctx.fillStyle = 'rgba(8, 12, 10, .93)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .24)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 8);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(22, 26, 5, height - 52);
-    ctx.fillStyle = 'rgba(216, 255, 100, .92)';
-    ctx.font = '700 22px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(kicker.toUpperCase(), 46, 56);
-    ctx.fillStyle = INK;
-    ctx.font = '400 34px Menlo, monospace';
-    ctx.fillText(value, 46, 116);
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 22px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(sub, 46, 164);
-  });
-}
-
-function contractTexture() {
-  return createTexture(1024, 390, (ctx, width, height) => {
-    ctx.fillStyle = 'rgba(10, 15, 12, .97)';
-    roundRect(ctx, 2, 2, width - 4, height - 4, 12);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216, 255, 100, .36)';
-    ctx.lineWidth = 2;
-    roundRect(ctx, 2, 2, width - 4, height - 4, 12);
-    ctx.stroke();
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(30, 26, 6, height - 52);
-    ctx.font = '700 25px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillStyle = 'rgba(216, 255, 100, .95)';
-    ctx.fillText('CONTRACT', 58, 62);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = MUTED;
-    ctx.font = '400 23px Menlo, monospace';
-    ctx.fillText('benchmark task', width - 44, 62);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = INK;
-    ctx.font = '600 62px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('task_001', 58, 136);
-    ctx.fillStyle = 'rgba(188, 201, 191, .78)';
-    ctx.font = '400 28px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('Count vowels', 58, 178);
-    ctx.strokeStyle = 'rgba(216, 255, 100, .18)';
-    ctx.beginPath();
-    ctx.moveTo(58, 204);
-    ctx.lineTo(width - 44, 204);
-    ctx.stroke();
-    const rows = [
-      ['file', 'solution.py'],
-      ['symbol', 'count_vowels'],
-      ['retry budget', '2'],
-    ];
-    rows.forEach(([key, value], index) => {
-      const y = 248 + index * 48;
-      ctx.fillStyle = 'rgba(150, 164, 154, .88)';
-      ctx.font = '400 24px Menlo, monospace';
-      ctx.fillText(key, 58, y);
-      ctx.fillStyle = INK;
-      ctx.font = '400 27px Menlo, monospace';
-      ctx.fillText(value, 290, y);
-    });
-  });
-}
-
-function patchTexture() {
-  return createTexture(512, 680, (ctx, width, height) => {
-    ctx.fillStyle = '#0d1411';
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(0, 0, width, 64);
-    ctx.fillStyle = '#0b0e0d';
-    ctx.font = '700 30px Menlo, monospace';
-    ctx.fillText('solution.py', 22, 43);
-    ctx.textAlign = 'right';
-    ctx.font = '700 14px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('PATCH', width - 22, 40);
-    ctx.textAlign = 'left';
-
-    ctx.fillStyle = 'rgba(216, 255, 100, .055)';
-    ctx.fillRect(0, 92, width, 38);
-
-    const lines = [
-      [['def ', ACCENT], ['count_vowels', INK], ['(text):', '#a9bfae']],
-      [['    total ', INK], ['= ', '#a9bfae'], ['0', '#e6c07b']],
-      [['    for ', ACCENT], ['ch ', INK], ['in ', ACCENT], ['text:', INK]],
-      [['        if ', ACCENT], ['ch ', INK], ['in ', ACCENT], ['"aeiou"', '#b7d38f'], [':', INK]],
-      [['            total ', INK], ['+= ', '#a9bfae'], ['1', '#e6c07b']],
-      [['    return ', ACCENT], ['total', INK]],
-    ];
-
-    let y = 126;
-    lines.forEach((parts, index) => {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(126, 143, 132, .7)';
-      ctx.font = '400 19px Menlo, monospace';
-      ctx.fillText(String(index + 1), 46, y);
-      ctx.textAlign = 'left';
-      let x = 72;
-      parts.forEach(([text, color]) => {
-        ctx.fillStyle = color;
-        ctx.font = '400 27px Menlo, monospace';
-        ctx.fillText(text, x, y);
-        x += ctx.measureText(text).width;
-      });
-      y += 62;
-    });
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .14)';
-    ctx.beginPath();
-    ctx.moveTo(0, height - 96);
-    ctx.lineTo(width, height - 96);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(216, 255, 100, .07)';
-    ctx.fillRect(0, height - 95, width, 95);
-    ctx.fillStyle = '#b7d38f';
-    ctx.font = '400 22px Menlo, monospace';
-    ctx.fillText('parse ok', 22, height - 54);
-    ctx.fillStyle = 'rgba(202, 214, 204, .84)';
-    ctx.font = '400 20px Menlo, monospace';
-    ctx.fillText('symbol count_vowels', 22, height - 27);
-  });
-}
-
-function repoTexture() {
-  return createTexture(1024, 700, (ctx, width) => {
-    ctx.fillStyle = '#0d1311';
-    ctx.fillRect(0, 0, width, 700);
-    ctx.fillStyle = ACCENT;
-    ctx.font = '700 24px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('WORKING TREE', 36, 52);
-    ctx.textAlign = 'right';
-    ctx.fillStyle = 'rgba(184, 200, 188, .86)';
-    ctx.font = '400 20px Menlo, monospace';
-    ctx.fillText('main · clean', width - 36, 52);
-    ctx.textAlign = 'left';
-    ctx.strokeStyle = 'rgba(216, 255, 100, .16)';
-    ctx.beginPath();
-    ctx.moveTo(36, 80);
-    ctx.lineTo(width - 36, 80);
-    ctx.stroke();
-
-    const headers = ['benchmarks/', 'tests/', 'src/', 'docs/', 'pyproject.toml', 'README.md', 'execution_log.json', 'execution_report.md'];
-    headers.forEach((name, index) => {
-      const column = index < 4 ? 0 : 1;
-      const row = index % 4;
-      const x = 40 + column * 500;
-      const y = 140 + row * 132;
-      if (index < 4) {
-        ctx.fillStyle = 'rgba(216, 255, 100, .7)';
-        ctx.fillRect(x, y - 18, 16, 16);
-      } else {
-        ctx.strokeStyle = index > 5 ? 'rgba(216, 255, 100, .32)' : 'rgba(174, 190, 178, .5)';
-        ctx.strokeRect(x + .5, y - 17.5, 15, 15);
-      }
-      ctx.fillStyle = index > 5 ? 'rgba(190, 206, 194, .74)' : '#dfe7e0';
-      ctx.font = '400 24px Menlo, monospace';
-      ctx.fillText(name, x + 30, y);
-      ctx.strokeStyle = 'rgba(174, 190, 178, .08)';
-      ctx.beginPath();
-      ctx.moveTo(x, y + 38);
-      ctx.lineTo(x + 430, y + 38);
-      ctx.stroke();
-    });
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .2)';
-    ctx.strokeRect(20, 20, width - 40, 660);
-  });
-}
-
-function rejectTexture() {
-  return createTexture(512, 620, (ctx, width, height) => {
-    ctx.fillStyle = '#17100e';
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = FAIL;
-    ctx.fillRect(0, 0, width, 58);
-    ctx.fillStyle = '#1a0d09';
-    ctx.font = '700 25px Menlo, monospace';
-    ctx.fillText('attempt 1', 20, 40);
-    ctx.textAlign = 'right';
-    ctx.font = '700 13px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('FAILED', width - 20, 37);
-    ctx.textAlign = 'left';
-    const lines = [
-      'Locked test hash changed',
-      'between capture and run.',
-    ];
-    ctx.fillStyle = 'rgba(255, 168, 140, .9)';
-    ctx.font = '400 20px Menlo, monospace';
-    lines.forEach((line, index) => {
-      ctx.fillText(line, 28, 128 + index * 34);
-    });
-    ctx.strokeStyle = 'rgba(255, 122, 89, .35)';
-    for (let i = 0; i < 7; i += 1) {
-      ctx.beginPath();
-      ctx.moveTo(28, 250 + i * 40);
-      ctx.lineTo(width - 28, 250 + i * 40);
-      ctx.stroke();
-    }
-    ctx.fillStyle = 'rgba(255, 122, 89, .85)';
-    ctx.font = '400 15px Menlo, monospace';
-    ctx.fillText('original file restored', 28, height - 28);
-  });
-}
-
-function glowTexture() {
-  return createTexture(256, 256, (ctx, width, height) => {
-    const gradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2);
-    gradient.addColorStop(0, 'rgba(216, 255, 100, .75)');
-    gradient.addColorStop(.35, 'rgba(216, 255, 100, .18)');
-    gradient.addColorStop(1, 'rgba(216, 255, 100, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-  });
-}
-
-function gridTexture() {
-  return createTexture(2048, 2048, (ctx, width, height) => {
-    ctx.strokeStyle = 'rgba(150, 176, 154, .17)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= width; x += 64) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 64) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(216, 255, 100, .2)';
-    ctx.lineWidth = 2;
-    for (let x = 0; x <= width; x += 256) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += 256) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-      ctx.stroke();
-    }
-    ctx.globalCompositeOperation = 'destination-in';
-    const fade = ctx.createRadialGradient(width / 2, height / 2, width * .06, width / 2, height / 2, width * .52);
-    fade.addColorStop(0, 'rgba(0,0,0,1)');
-    fade.addColorStop(.62, 'rgba(0,0,0,.72)');
-    fade.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
-  });
-}
-
-let gateScreenMap = null;
-
-function gateScreenTexture() {
-  if (gateScreenMap) return gateScreenMap;
-  gateScreenMap = createTexture(256, 304, (ctx, width, height) => {
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#0f1813');
-    gradient.addColorStop(.55, '#0a110e');
-    gradient.addColorStop(1, '#070b09');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'rgba(160, 188, 166, .12)';
-    ctx.lineWidth = 1;
-    for (let x = 16; x < width; x += 32) {
-      ctx.beginPath();
-      ctx.moveTo(x + .5, 14);
-      ctx.lineTo(x + .5, height - 14);
-      ctx.stroke();
-    }
-    for (let y = 14; y < height; y += 32) {
-      ctx.beginPath();
-      ctx.moveTo(14, y + .5);
-      ctx.lineTo(width - 14, y + .5);
-      ctx.stroke();
-    }
-
-    const glow = ctx.createRadialGradient(width / 2, height * .48, 0, width / 2, height * .48, width * .62);
-    glow.addColorStop(0, 'rgba(216, 255, 100, .05)');
-    glow.addColorStop(1, 'rgba(216, 255, 100, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = 'rgba(216, 255, 100, .22)';
-    ctx.lineWidth = 2;
-    const corner = 22;
-    [[16, 16, 1, 1], [width - 16, 16, -1, 1], [16, height - 16, 1, -1], [width - 16, height - 16, -1, -1]].forEach(([x, y, dx, dy]) => {
-      ctx.beginPath();
-      ctx.moveTo(x, y + dy * corner);
-      ctx.lineTo(x, y);
-      ctx.lineTo(x + dx * corner, y);
-      ctx.stroke();
-    });
-  });
-  return gateScreenMap;
-}
-
-function backdropTexture() {
-  return createTexture(512, 512, (ctx, width, height) => {
-    const gradient = ctx.createRadialGradient(width / 2, height * .46, 0, width / 2, height * .46, width * .52);
-    gradient.addColorStop(0, 'rgba(25, 38, 30, .95)');
-    gradient.addColorStop(.55, 'rgba(16, 24, 19, .55)');
-    gradient.addColorStop(1, 'rgba(11, 14, 13, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-  });
+function initWorld() {
+  if (world || isReduced) return;
+  try {
+    world = new World(canvas);
+    body.classList.add('webgl-ready');
+  } catch (error) {
+    body.classList.add('no-webgl');
+    console.warn('CD-AVC 3D scene unavailable; showing the static fallback.', error);
+  }
 }
 
 /* ------------------------------------------------------------------ *
- * Scene
+ * Look
  * ------------------------------------------------------------------ */
+const BG = 0x0b0e0d;
+const ACCENT = 0xd8ff64;
+const INK = 0xf4f6f1;
+const FAIL = 0xff7a59;
+const ACCENT_CSS = '#d8ff64';
+const INK_CSS = '#f4f6f1';
+const GREY_CSS = '#7d8981';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+const SP = 8;                  // distance between stations on the x axis
+const DIM = 0.15;              // opacity of an inactive object
+const CARD_W = 3;
+const CARD_H = 2;
 
-const GATE_X = [-450, -120, 210, 540];
-const GATE_THRESHOLDS = [2 / 7, 3 / 7, 5.35 / 7, 5.88 / 7];
-const PATCH_X = [
-  [0, -680],
-  [1 / 7, -680],
-  [2 / 7, -450],
-  [3 / 7, -120],
-  [4 / 7, -10],
-  [5 / 7, -10],
-  [5.32 / 7, 210],
-  [5.62 / 7, 390],
-  [5.88 / 7, 540],
-  [6 / 7, 540],
-  [1, 830],
-];
-const FLOOR_Y = -212;
-const PATCH_Y = 50;
-const PATCH_Z = 40;
-const REPO_Z = 170;
+function canvasTex(wu, hu, draw, ppu = 300) {
+  const c = document.createElement('canvas');
+  c.width = Math.round(wu * ppu);
+  c.height = Math.round(hu * ppu);
+  const g = c.getContext('2d');
+  draw(g, c.width, c.height, ppu);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
 
-// Vertical extent of the rig used for the fit in `resize()`.  The contract card
-// (380 + 90) is the highest element and the floor plane the lowest; keep these
-// in sync if either moves.
-const RIG_HEIGHT = 682;
-const RIG_CENTER_Y = 129;
+function roundedShape(w, h, r) {
+  const s = new THREE.Shape();
+  const x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  return s;
+}
 
-// One camera set-up per story beat.  `w`/`h` are the world-space box that must
-// stay inside the clear stage between the copy column and the rail; the camera
-// distance is solved from those, not from the height of the whole rig.
-const SHOTS = [
-  { x: -640, y: 200, w: 900, h: 640, dx: 250, dy: 150 }, // contract + empty slot
-  { x: -700, y: 90, w: 540, h: 500, dx: 210, dy: 130 }, // patch close-up
-  { x: -450, y: 55, w: 600, h: 600, dx: 230, dy: 140 }, // gate 01
-  { x: -120, y: 55, w: 600, h: 600, dx: 230, dy: 140 }, // gate 02
-  { x: -10, y: 60, w: 960, h: 600, dx: 260, dy: 160 }, // isolated worktree
-  { x: 375, y: 40, w: 800, h: 680, dx: 260, dy: 160 }, // gates 03 + 04 / reject
-  { x: 850, y: 40, w: 760, h: 660, dx: 250, dy: 150 }, // copy-back
-];
+function slabGeometry(w, h, depth, r) {
+  const g = new THREE.ExtrudeGeometry(roundedShape(w, h, r), {
+    depth, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 3, curveSegments: 10,
+  });
+  g.translate(0, 0, -depth / 2);
+  return g;
+}
 
-class TaskScene {
-  constructor(target) {
-    this.canvas = target;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setClearColor(0x0b0e0d, 0);
+function outline(w, h, r, color, opacity) {
+  const pts = roundedShape(w, h, r).getPoints(10).map((p) => new THREE.Vector3(p.x, p.y, 0));
+  const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  line.material.userData = { base: opacity, k: 1 };
+  return line;
+}
+
+/* ------------------------------------------------------------------ *
+ * Stations: per-station fade registry. Every material carries a base
+ * opacity and an animation factor k; the world multiplies by a fade
+ * weight (1 when active, DIM when not).
+ * ------------------------------------------------------------------ */
+class Bucket {
+  constructor() { this.mats = []; }
+  add(m, base = 1) {
+    m.transparent = true;
+    m.userData = { base, k: 1 };
+    this.mats.push(m);
+    return m;
+  }
+  track(m) { this.mats.push(m); return m; }
+  apply(w) { for (const m of this.mats) m.opacity = m.userData.base * m.userData.k * w; }
+}
+
+function planeMat(bucket, tex, base = 1) {
+  return bucket.add(new THREE.MeshBasicMaterial({ map: tex, depthWrite: false, toneMapped: false, fog: false }), base);
+}
+function flatMat(bucket, color, base = 1) {
+  return bucket.add(new THREE.MeshBasicMaterial({ color, depthWrite: false, toneMapped: false }), base);
+}
+function line(bucket, geo, color, base) {
+  const m = bucket.add(new THREE.LineBasicMaterial({ color }), base);
+  return new THREE.LineSegments(geo, m);
+}
+function textPlane(bucket, wu, hu, draw, base = 1) {
+  const m = planeMat(bucket, canvasTex(wu, hu, draw), base);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wu, hu), m);
+  mesh.renderOrder = 3;
+  return mesh;
+}
+function fitText(g, text, maxW, size) {
+  g.font = `500 ${size}px ${MONO}`;
+  const w = g.measureText(text).width;
+  if (w > maxW) g.font = `500 ${Math.floor(size * maxW / w)}px ${MONO}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * World
+ * ------------------------------------------------------------------ */
+class World {
+  constructor(canvasEl) {
+    this.canvas = canvasEl;
+    const params = new URLSearchParams(location.search);
+    this.tier = this.pickTier(params.get('quality'));
+    this.renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: this.tier < 2, alpha: false, powerPreference: 'high-performance' });
+    this.renderer.setClearColor(BG, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.16;
-    this.canvas.replaceWith(this.renderer.domElement);
-    this.canvas = this.renderer.domElement;
-    this.canvas.id = 'task-canvas';
-    this.canvas.setAttribute('aria-label', 'Three-dimensional CD-AVC verification cage');
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0b0e0d, 1700, 3200);
-    this.camera = new THREE.PerspectiveCamera(32, 1, .1, 4000);
-    this.clock = new THREE.Clock();
-    this.time = 0;
+    this.scene.fog = new THREE.Fog(BG, 12, 30);
+    this.camera = new THREE.PerspectiveCamera(30, 1.6, 0.1, 80);
     this.progress = 0;
-    this.running = false;
-    this.visible = true;
-    this.phase = { step: 0, local: 0 };
-    this.scale = 1;
-    this.regionShift = 0;
-    this.lookY = 40;
-    this.patchX = -620;
-    this.group = new THREE.Group();
-    this.rig = new THREE.Group();
-    this.rig.rotation.y = -0.055;
-    this.group.add(this.rig);
-    this.scene.add(this.group);
-    this.accent = new THREE.Color(ACCENT);
-    this.accentDim = new THREE.Color(0x2c3830);
-    this.failColor = new THREE.Color(FAIL);
-    this.screenBase = new THREE.Color(0x8b978f);
-    this.screenPass = new THREE.Color(0xffffff);
-    this.buildLights();
-    this.buildRoom();
-    this.buildRig();
-    this.observer = new IntersectionObserver((entries) => {
-      this.visible = entries.some((entry) => entry.isIntersecting);
-      if (this.visible && !isReduced) this.start();
-      else this.stop();
-    }, { threshold: 0.01 });
-    this.observer.observe(story);
+    this.velocity = 0;
+    this.lastTime = 0;
+    this.frameMs = [];
+    this.disposed = false;
+    this.post = null;
+    this.tags = [];
+    this.buckets = Array.from({ length: STEPS }, () => new Bucket());
+    this.cardBucket = new Bucket();
+    this.rejectBucket = new Bucket();
+
+    this.buildEnvironment();
+    this.buildBackdrop();
+    this.buildCard();
+    this.buildContractRows();
+    this.buildCodeLines();
+    this.buildTests(2);
+    this.buildAst(3);
+    this.buildWorktree(4);
+    this.buildGates(5);
+    this.buildTree(6);
+    this.buildReject();
+    this.buildTags();
+
+    this.ro = new ResizeObserver(() => this.resize());
+    this.ro.observe(canvasEl);
+    this.resize();
+    this.frame(0);
+    body.classList.add('webgl-ready');
   }
 
-  buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xc4d8c9, 0x0a0d0b, 1.0));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(-420, 620, 760);
-    this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xd8ff64, 1.35);
-    rim.position.set(620, 260, -520);
-    this.scene.add(rim);
-    const fill = new THREE.DirectionalLight(0x8fb6a0, .8);
-    fill.position.set(500, -180, 620);
-    this.scene.add(fill);
+  pickTier(forced) {
+    if (forced === 'low') return 0;
+    if (forced === 'mid') return 1;
+    if (forced === 'high') return 2;
+    const coarse = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 720;
+    const weak = (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+    let software = false;
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+      const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+      software = /swiftshader|llvmpipe|software/i.test(name);
+    } catch { /* ignore */ }
+    if (software) return 0;
+    if (coarse || weak) return 1;
+    return 2;
   }
 
-  buildRoom() {
-    const backdrop = new THREE.Mesh(
-      new THREE.PlaneGeometry(5200, 3800),
-      new THREE.MeshBasicMaterial({ map: backdropTexture(), transparent: true, depthWrite: false, toneMapped: false, fog: false, opacity: .75 }),
-    );
-    backdrop.position.set(160, 120, -900);
-    this.rig.add(backdrop);
-
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(5200, 3800),
-      new THREE.MeshBasicMaterial({ map: gridTexture(), transparent: true, depthWrite: false, toneMapped: false, opacity: .8 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(120, FLOOR_Y, 220);
-    this.rig.add(floor);
-
-    const glow = glowTexture();
-    this.pools = [];
-    GATE_X.forEach((x) => {
-      const pool = new THREE.Mesh(
-        new THREE.PlaneGeometry(360, 240),
-        new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: .16 }),
-      );
-      pool.rotation.x = -Math.PI / 2;
-      pool.position.set(x, FLOOR_Y + 1.5, 20);
-      this.rig.add(pool);
-      this.pools.push(pool);
-    });
-    const repoPool = new THREE.Mesh(
-      new THREE.PlaneGeometry(620, 320),
-      new THREE.MeshBasicMaterial({ map: glow, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: .1 }),
-    );
-    repoPool.rotation.x = -Math.PI / 2;
-    repoPool.position.set(780, FLOOR_Y + 1.5, 20);
-    this.rig.add(repoPool);
-
-    const guide = new THREE.Mesh(
-      new THREE.BoxGeometry(1660, 2, 2),
-      new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .22, toneMapped: false }),
-    );
-    guide.position.set(100, FLOOR_Y + 2, 90);
-    this.rig.add(guide);
-    for (let i = 0; i < 24; i += 1) {
-      const tick = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 1, i % 4 === 0 ? 18 : 9),
-        new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false }),
-      );
-      tick.position.set(-700 + i * 72, FLOOR_Y + 2, 90);
-      this.rig.add(tick);
-    }
-
-    const dustGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(220 * 3);
-    for (let i = 0; i < 220; i += 1) {
-      positions[i * 3] = -900 + Math.random() * 2100;
-      positions[i * 3 + 1] = FLOOR_Y + Math.random() * 620;
-      positions[i * 3 + 2] = -320 + Math.random() * 620;
-    }
-    dustGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.dust = new THREE.Points(
-      dustGeometry,
-      new THREE.PointsMaterial({ color: 0xd8ff64, size: 1.6, transparent: true, opacity: .24, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
-    );
-    this.rig.add(this.dust);
-  }
-
-  buildRig() {
-    const metal = new THREE.MeshStandardMaterial({ color: 0x1b241f, roughness: .42, metalness: .55 });
-    const darkMetal = new THREE.MeshStandardMaterial({ color: 0x101713, roughness: .58, metalness: .35 });
-    this.metal = metal;
-    this.darkMetal = darkMetal;
-
-    const cage = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1720, 590, 320)),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false }),
-    );
-    cage.position.set(100, 78, 0);
-    this.rig.add(cage);
-
-    const contract = new THREE.Mesh(
-      new THREE.BoxGeometry(460, 180, 12),
-      [
-        darkMetal,
-        darkMetal,
-        darkMetal,
-        darkMetal,
-        new THREE.MeshBasicMaterial({ map: contractTexture(), transparent: true, toneMapped: false }),
-        darkMetal,
-      ],
-    );
-    contract.position.set(-620, 380, 110);
-    const contractEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(contract.geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .35, toneMapped: false }),
-    );
-    contractEdges.position.copy(contract.position);
-    this.contractFace = contract.material[4];
-    this.contractEdge = contractEdges.material;
-    this.contractGroup = new THREE.Group();
-    this.rig.add(this.contractGroup);
-    this.contractGroup.add(contract);
-    this.contractGroup.add(contractEdges);
-
-    this.gates = GATE_X.map((x, index) => this.buildGate(index, x));
-
-    this.buildWorktree();
-    this.buildPatch();
-    this.buildRejected();
-    this.buildRepo();
-
-    this.hashPlate = this.addStatusPlate(
-      new THREE.Vector3(-420, -150, 210),
-      monoPlateTexture({ kicker: 'LOCKED TESTS', value: '9c1f…b2e7', sub: 'sha-256 · before = after' }),
-      220,
-      74,
-    );
-    this.astPlate = this.addStatusPlate(
-      new THREE.Vector3(-120, -150, 210),
-      monoPlateTexture({ kicker: 'AST CONTRACT', value: 'count_vowels', sub: 'file parses · symbol found' }),
-      220,
-      74,
-    );
-    this.receiptPlate = this.addStatusPlate(
-      new THREE.Vector3(1030, -70, 170),
-      monoPlateTexture({ kicker: 'RECEIPTS', value: 'execution_log.json', sub: 'execution_report.md' }),
-      300,
-      100,
-    );
-    this.receiptPlate.material.opacity = 0;
-  }
-
-  addStatusPlate(position, texture, width, height) {
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-    plate.position.copy(position);
-    this.rig.add(plate);
-    return plate;
-  }
-
-  buildGate(index, x) {
-    const group = new THREE.Group();
-    group.position.set(x, 20, 0);
-    const outerW = 276;
-    const outerH = 320;
-    const bar = 22;
-    const depth = 28;
-    const innerW = outerW - bar * 2;
-    const innerH = outerH - bar * 2;
-
-    const parts = [
-      [outerW, bar, depth, 0, (outerH - bar) / 2],
-      [outerW, bar, depth, 0, -(outerH - bar) / 2],
-      [bar, innerH, depth, -(outerW - bar) / 2, 0],
-      [bar, innerH, depth, (outerW - bar) / 2, 0],
-    ];
-    parts.forEach(([width, height, deep, px, py]) => {
-      const part = new THREE.Mesh(new THREE.BoxGeometry(width, height, deep), this.metal);
-      part.position.set(px, py, 0);
-      group.add(part);
-    });
-
-    const screenMaterial = new THREE.MeshBasicMaterial({
-      map: gateScreenTexture(),
-      color: 0x8b978f,
-      transparent: true,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-    });
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(innerW, innerH), screenMaterial);
-    screen.position.set(0, 0, -6);
-    group.add(screen);
-
-    const stripMaterial = new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .16, toneMapped: false });
-    const strips = [
-      [innerW, 3, 3, 0, innerH / 2, depth / 2 + 1],
-      [innerW, 3, 3, 0, -innerH / 2, depth / 2 + 1],
-      [3, innerH, 3, -innerW / 2, 0, depth / 2 + 1],
-      [3, innerH, 3, innerW / 2, 0, depth / 2 + 1],
-    ];
-    strips.forEach(([width, height, deep, px, py, pz]) => {
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(width, height, deep), stripMaterial);
-      strip.position.set(px, py, pz);
-      group.add(strip);
-    });
-
-    for (let i = 0; i < 7; i += 1) {
-      const tick = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 7, 2),
-        new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .3, toneMapped: false }),
-      );
-      tick.position.set(-innerW / 2 + (i + 1) * (innerW / 8), innerH / 2 + 12, depth / 2 + 1);
-      group.add(tick);
-    }
-
-    const legHeight = 72;
-    [-1, 1].forEach((side) => {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(10, legHeight, 12), this.darkMetal);
-      leg.position.set(side * (outerW / 2 - 30), -(outerH / 2) - legHeight / 2, 0);
-      group.add(leg);
-    });
-    const plinth = new THREE.Mesh(new THREE.BoxGeometry(outerW + 26, 12, 84), this.darkMetal);
-    plinth.position.set(0, -(outerH / 2) - legHeight - 6, 0);
-    group.add(plinth);
-
-    const lampMaterial = new THREE.MeshBasicMaterial({ color: 0x2c3830, toneMapped: false });
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(5.5, 14, 14), lampMaterial);
-    lamp.position.set(outerW / 2 - 20, outerH / 2 + 16, 0);
-    group.add(lamp);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture(),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      opacity: .04,
-    }));
-    halo.position.copy(lamp.position);
-    halo.scale.set(52, 52, 1);
-    group.add(halo);
-
-    const scanMaterial = new THREE.MeshBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
-    const scan = new THREE.Mesh(new THREE.PlaneGeometry(innerW, 4), scanMaterial);
-    scan.position.set(0, 0, depth / 2 + 4);
-    group.add(scan);
-
-    this.rig.add(group);
-
-    const labelY = index % 2 === 0 ? 225 : 275;
-    const labels = [
-      ['TEST SEAL', 'sha-256 · before + after'],
-      ['AST CONTRACT', 'parses · symbol exists'],
-      ['TARGETED', 'hidden + negative suites'],
-      ['REGRESSION', 'existing suite'],
-    ];
-    const labelTexture = plateTexture({
-      kicker: `gate 0${index + 1}`,
-      title: labels[index][0],
-      sub: labels[index][1],
-    });
-    const labelMaterial = new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: .92 });
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(236, 71), labelMaterial);
-    label.position.set(x, labelY, 24);
-    this.rig.add(label);
-
-    return {
-      group,
-      screenMaterial,
-      strips: stripMaterial,
-      lampMaterial,
-      halo,
-      scan,
-      scanMaterial,
-      label,
-      labelMaterial,
-      pool: this.pools[index],
-      threshold: GATE_THRESHOLDS[index],
+  /* --- environment: a small offline studio, no HDR download --- */
+  buildEnvironment() {
+    const room = new THREE.Scene();
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), new THREE.MeshBasicMaterial({ color: 0x0c110e, side: THREE.BackSide }));
+    room.add(shell);
+    const panel = (w, h, x, y, z, color, power, ry = 0, rx = 0) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(power), side: THREE.DoubleSide }));
+      m.position.set(x, y, z); m.rotation.set(rx, ry, 0); room.add(m);
     };
+    panel(9, 4, 0, 5.8, 0, 0xffffff, 3.2, 0, Math.PI / 2);
+    panel(1.4, 8, -9.5, 0, 2, 0xe9f2ec, 2.4, Math.PI / 2);
+    panel(1.4, 8, 9.5, 0, -2, 0xe9f2ec, 1.6, Math.PI / 2);
+    panel(7, 1.2, 0, 0.5, -9.5, ACCENT, 2.0);
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pm.fromScene(room, 0.035).texture;
+    this.scene.environmentIntensity = 0.9;
+    pm.dispose();
+    const key = new THREE.DirectionalLight(0xffffff, 0.8);
+    key.position.set(3, 6, 6);
+    this.scene.add(key);
   }
 
-  buildPatch() {
-    const face = new THREE.MeshBasicMaterial({ map: patchTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x0f1512, roughness: .5, metalness: .3 });
-    const geometry = new THREE.BoxGeometry(190, 230, 14);
-    const mesh = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .55, toneMapped: false }),
-    );
-    this.patch = new THREE.Group();
-    this.patch.add(mesh);
-    this.patch.add(edges);
+  /* --- floor lines and dust: quiet depth cues --- */
+  buildBackdrop() {
+    const pts = [];
+    const x0 = -14, x1 = SP * (STEPS - 1) + 14, y = -1.75;
+    for (let x = Math.ceil(x0); x <= x1; x += 1.5) { pts.push(x, y, -12, x, y, 5); }
+    for (let z = -12; z <= 5; z += 1.5) { pts.push(x0, y, z, x1, y, z); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    this.grid = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.07 }));
+    this.scene.add(this.grid);
 
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTexture(),
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
-      opacity: .2,
-    }));
-    halo.scale.set(280, 330, 1);
-    halo.position.z = -14;
-    this.patch.add(halo);
-    this.rig.add(this.patch);
-
-    const slotPoints = [
-      new THREE.Vector3(-95, -115, 0),
-      new THREE.Vector3(95, -115, 0),
-      new THREE.Vector3(95, 115, 0),
-      new THREE.Vector3(-95, 115, 0),
-      new THREE.Vector3(-95, -115, 0),
-    ];
-    const slotGeometry = new THREE.BufferGeometry().setFromPoints(slotPoints);
-    this.patchSlot = new THREE.Line(slotGeometry, new THREE.LineDashedMaterial({ color: 0xd8ff64, dashSize: 8, gapSize: 7, transparent: true, opacity: .45, toneMapped: false }));
-    this.patchSlot.computeLineDistances();
-    this.patchSlot.position.set(-620, 20, 8);
-    this.rig.add(this.patchSlot);
-  }
-
-  buildWorktree() {
-    const shell = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(1220, 410, 260)),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: 0, toneMapped: false }),
-    );
-    shell.position.set(40, 5, 0);
-    this.rig.add(shell);
-    this.shell = shell;
-
-    const texture = plateTexture({
-      kicker: 'isolation',
-      title: 'git worktree',
-      sub: 'declared commands · source untouched',
-    });
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), material);
-    label.position.set(40, 350, 40);
-    this.rig.add(label);
-    this.shellLabel = label;
-  }
-
-  buildRejected() {
-    const face = new THREE.MeshBasicMaterial({ map: rejectTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: .7, metalness: .15 });
-    const geometry = new THREE.BoxGeometry(170, 208, 12);
-    const mesh = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xff7a59, transparent: true, opacity: .55, toneMapped: false }),
-    );
-    this.rejected = new THREE.Group();
-    this.rejected.add(mesh);
-    this.rejected.add(edges);
-    this.rejected.visible = false;
-    this.rig.add(this.rejected);
-
-    const tray = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(230, 18, 160)),
-      new THREE.LineBasicMaterial({ color: 0xff7a59, transparent: true, opacity: .3, toneMapped: false }),
-    );
-    tray.position.set(80, FLOOR_Y + 14, 260);
-    this.rig.add(tray);
-    this.tray = tray;
-
-    const curve = new THREE.EllipseCurve(80, 280, 128, 82, .2, 4.1);
-    const points = curve.getPoints(44).map((point) => new THREE.Vector3(point.x, FLOOR_Y + 3, point.y));
-    const retry = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineDashedMaterial({ color: 0xff7a59, dashSize: 10, gapSize: 9, transparent: true, opacity: 0, toneMapped: false }),
-    );
-    retry.computeLineDistances();
-    this.rig.add(retry);
-    this.retry = retry;
-
-    const retryTexture = monoPlateTexture({ kicker: 'REPAIR', value: 'retry ≤ 2', sub: 'original file restored' });
-    const retryMaterial = new THREE.MeshBasicMaterial({ map: retryTexture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, opacity: 0 });
-    this.retryLabel = new THREE.Mesh(new THREE.PlaneGeometry(190, 64), retryMaterial);
-    this.retryLabel.position.set(80, FLOOR_Y + 100, 380);
-    this.rig.add(this.retryLabel);
-  }
-
-  buildRepo() {
-    const face = new THREE.MeshBasicMaterial({ map: repoTexture(), transparent: true, toneMapped: false });
-    const side = new THREE.MeshStandardMaterial({ color: 0x131b16, roughness: .5, metalness: .35 });
-    const geometry = new THREE.BoxGeometry(440, 300, 260);
-    const cabinet = new THREE.Mesh(geometry, [side, side, side, side, face, side]);
-    cabinet.position.set(780, -60, 0);
-    this.rig.add(cabinet);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .28, toneMapped: false }),
-    );
-    edges.position.copy(cabinet.position);
-    this.rig.add(edges);
-    this.repo = cabinet;
-
-    const socketPoints = [
-      new THREE.Vector3(-108, -122, 0),
-      new THREE.Vector3(108, -122, 0),
-      new THREE.Vector3(108, 122, 0),
-      new THREE.Vector3(-108, 122, 0),
-      new THREE.Vector3(-108, -122, 0),
-    ];
-    const socket = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(socketPoints),
-      new THREE.LineDashedMaterial({ color: 0xd8ff64, dashSize: 9, gapSize: 7, transparent: true, opacity: .38, toneMapped: false }),
-    );
-    socket.computeLineDistances();
-    socket.position.set(780, 20, 132);
-    this.rig.add(socket);
-    this.socket = socket;
-
-    const repoLabelMaterial = new THREE.MeshBasicMaterial({
-      map: plateTexture({ kicker: 'source of truth', title: 'working tree', sub: 'only verified files are copied back' }),
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-      opacity: .9,
-    });
-    const repoLabel = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), repoLabelMaterial);
-    repoLabel.position.set(780, 170, 40);
-    this.rig.add(repoLabel);
-    this.repoLabel = repoLabel;
-
-    const verifiedMaterial = new THREE.MeshBasicMaterial({
-      map: plateTexture({ kicker: 'verified', title: 'all gates green', sub: 'files copied · receipts written' }),
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      side: THREE.DoubleSide,
-      opacity: 0,
-    });
-    const verified = new THREE.Mesh(new THREE.PlaneGeometry(340, 102), verifiedMaterial);
-    verified.position.set(780, 290, 46);
-    this.rig.add(verified);
-    this.verified = verified;
-
-    const connector = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(990, -60, 130),
-        new THREE.Vector3(1030, -60, 170),
-      ]),
-      new THREE.LineBasicMaterial({ color: 0xd8ff64, transparent: true, opacity: .25, toneMapped: false }),
-    );
-    this.rig.add(connector);
-    this.connector = connector;
-  }
-
-  resize() {
-    const width = this.canvas.clientWidth || window.innerWidth;
-    const height = this.canvas.clientHeight || window.innerHeight;
-    this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / Math.max(1, height);
-    const compact = window.matchMedia('(max-width: 1180px)').matches;
-    this.compact = compact;
-    const fov = compact ? 40 : 32;
-    this.camera.fov = fov;
-    this.camera.updateProjectionMatrix();
-    const halfHeight = Math.tan((fov * Math.PI) / 360) * 1500;
-    const pxPerUnit = height / 2 / halfHeight;
-    const gutter = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--page-gutter')) || 32;
-    let left = gutter;
-    let right = width - gutter;
-    let top = gutter;
-    let bottom = height - gutter;
-    if (compact) {
-      const copy = document.querySelector('.story-copy')?.getBoundingClientRect();
-      const meta = document.querySelector('.story-meta')?.getBoundingClientRect();
-      if (meta) top = meta.bottom + 26;
-      if (copy) bottom = copy.top - 18;
-    } else {
-      const copy = document.querySelector('.story-copy')?.getBoundingClientRect();
-      const rail = document.querySelector('.story-rail')?.getBoundingClientRect();
-      if (copy) left = copy.right + 16;
-      if (rail) right = rail.left - 16;
+    if (this.tier >= 2) {
+      const n = 420;
+      const arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i += 1) {
+        arr[i * 3] = -12 + Math.random() * (SP * (STEPS - 1) + 24);
+        arr[i * 3 + 1] = -1.6 + Math.random() * 4.4;
+        arr[i * 3 + 2] = -10 + Math.random() * 13;
+      }
+      const pg = new THREE.BufferGeometry();
+      pg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      this.dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: INK, size: 0.022, transparent: true, opacity: 0.35, sizeAttenuation: true, depthWrite: false }));
+      this.scene.add(this.dust);
     }
-    const regionWidth = Math.max(160, right - left);
-    const regionHeight = Math.max(160, bottom - top);
-    const fitted = regionHeight * (compact ? .95 : .9) / (RIG_HEIGHT * pxPerUnit);
-    this.scale = Math.max(.35, Math.min(2.6, fitted));
-    this.group.scale.setScalar(this.scale);
-    this.regionShift = ((left + right) / 2 - width / 2) / pxPerUnit;
-    this.group.position.y = this.lookY + (height / 2 - (top + bottom) / 2) / pxPerUnit - RIG_CENTER_Y * this.scale;
-    this.applyState();
   }
 
-  setProgress(progress) {
-    this.progress = Math.max(0, Math.min(1, progress));
-    const scaled = this.progress * 7;
-    const step = Math.min(6, Math.floor(scaled));
-    this.phase.step = step;
-    this.phase.local = Math.min(1, scaled - step);
-    this.applyState();
+  /* --- the one object that travels the whole story --- */
+  buildCard() {
+    this.card = new THREE.Group();
+    this.flip = new THREE.Group();
+    this.card.add(this.flip);
+    const bodyMat = this.cardBucket.add(new THREE.MeshPhysicalMaterial({
+      color: 0x111915, metalness: 0.5, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.18, envMapIntensity: 1.1,
+    }), 1);
+    bodyMat.depthWrite = true;
+    const cardBody = new THREE.Mesh(slabGeometry(CARD_W, CARD_H, 0.06, 0.14), bodyMat); cardBody.renderOrder = 1; this.flip.add(cardBody);
+    const edgeF = outline(CARD_W, CARD_H, 0.14, ACCENT, 0.7); edgeF.position.z = 0.046;
+    const edgeB = outline(CARD_W, CARD_H, 0.14, ACCENT, 0.7); edgeB.position.z = -0.046;
+    this.cardBucket.track(edgeF.material); this.cardBucket.track(edgeB.material);
+    this.flip.add(edgeF, edgeB);
+    this.front = new THREE.Group(); this.front.position.z = 0.05;
+    this.back = new THREE.Group(); this.back.position.z = -0.05; this.back.rotation.y = Math.PI;
+    this.flip.add(this.front, this.back);
+    this.scene.add(this.card);
   }
 
-  applyState() {
-    const p = this.progress;
-    const time = this.time;
-
-    this.patchX = trackKey(p, PATCH_X);
-    const dock = smoothstep(.9, .996, p);
-    const intro = smoothstep(.045, .075, p);
-    const bob = Math.sin(time * 1.1) * 1.4 * (1 - dock);
-    this.patch.visible = intro > .01;
-    this.patch.scale.setScalar(.001 + intro * .999);
-    this.patch.position.set(
-      this.patchX,
-      20 + bob,
-      10 + 135 * dock,
-    );
-    this.patch.rotation.y = -.32 * dock;
-    this.patch.rotation.z = Math.sin(p * Math.PI * 2) * .012 * (1 - dock);
-    this.patchSlot.visible = intro < .35;
-    this.patchSlot.material.opacity = .45 * (1 - intro);
-    this.patchSlot.position.y = 20 + Math.sin(time * 1.1) * 2;
-
-    this.gates.forEach((gate) => {
-      const pass = smoothstep(gate.threshold, gate.threshold + .022, p);
-      const local = clamp01((p - gate.threshold) / .032);
-      const scanning = p >= gate.threshold && local < 1;
-      gate.lampMaterial.color.copy(this.accentDim).lerp(this.accent, pass);
-      gate.halo.material.opacity = .04 + pass * .5;
-      gate.strips.opacity = .26 + pass * .6;
-      gate.scanMaterial.opacity = scanning ? Math.sin(local * Math.PI) * .9 : 0;
-      gate.scan.position.y = 138 - local * 276;
-      gate.labelMaterial.opacity = .72 + pass * .26;
-      gate.screenMaterial.color.copy(this.screenBase).lerp(this.screenPass, pass);
-      gate.pool.material.opacity = .16 + pass * .16;
+  buildContractRows() {
+    const B = this.cardBucket;
+    const head = textPlane(B, CARD_W, CARD_H, (g, w, h, u) => {
+      g.fillStyle = ACCENT_CSS; g.font = `600 ${0.115 * u}px ${MONO}`; g.textBaseline = 'middle';
+      g.fillText('CONTRACT', 0.24 * u, 0.26 * u);
+      g.fillStyle = GREY_CSS; g.textAlign = 'right'; g.fillText('task_001', w - 0.24 * u, 0.26 * u);
+      g.strokeStyle = 'rgba(244,246,241,.14)'; g.lineWidth = 2;
+      for (const y of [0.46, 0.96, 1.26, 1.56]) { g.beginPath(); g.moveTo(0.24 * u, y * u); g.lineTo(w - 0.24 * u, y * u); g.stroke(); }
+    }, 1);
+    this.front.add(head);
+    const rows = [['files', 'solution.py'], ['expose', 'count_vowels'], ['retries', 'max 2']];
+    this.rows = rows.map(([label, value], i) => {
+      const y = 0.32 - i * 0.5 + 0.02;
+      const mk = (lit) => textPlane(B, CARD_W, 0.5, (g, w, h, u) => {
+        g.textBaseline = 'middle';
+        g.fillStyle = GREY_CSS; g.font = `500 ${0.11 * u}px ${MONO}`; g.fillText(label, 0.24 * u, h / 2);
+        g.fillStyle = lit ? ACCENT_CSS : '#cfd6d0'; g.font = `600 ${0.2 * u}px ${MONO}`; g.fillText(value, 0.95 * u, h / 2);
+      }, 1);
+      const dimP = mk(false), litP = mk(true);
+      for (const p of [dimP, litP]) { p.position.set(0, y - 0.0, 0.002); this.front.add(p); }
+      return { dim: dimP.material, lit: litP.material };
     });
-
-    const rejectIn = smoothstep(.58, .62, p);
-    const fall = smoothstep(.6, .78, p);
-    this.rejected.visible = rejectIn > .02;
-    this.rejected.scale.setScalar(.001 + rejectIn * .999);
-    this.rejected.position.set(
-      180 - 100 * fall,
-      20 - 185 * fall,
-      20 + 225 * fall,
-    );
-    this.rejected.rotation.x = -1.24 * fall;
-    this.rejected.rotation.y = .42 * fall;
-    this.rejected.rotation.z = -.5 * fall;
-    this.tray.material.opacity = .12 + rejectIn * .3;
-    const retryIn = smoothstep(.72, .78, p);
-    this.retry.material.opacity = retryIn * .4;
-    this.retryLabel.material.opacity = retryIn * .9;
-
-    const shellIn = smoothstep(4 / 7, 4.4 / 7, p) * (1 - smoothstep(.94, 1, p) * .72);
-    this.shell.material.opacity = shellIn * .24;
-    this.shellLabel.material.opacity = shellIn;
-    this.shellLabel.position.y = 350 + Math.sin(time * .8) * 2;
-
-    const verifiedIn = smoothstep(.9, .98, p);
-    this.verified.material.opacity = verifiedIn;
-    this.verified.position.y = 290 + (1 - verifiedIn) * 16;
-    this.repoLabel.material.opacity = .9 - verifiedIn * .55;
-    this.socket.material.opacity = .38 + verifiedIn * .45;
-    this.receiptPlate.material.opacity = smoothstep(.93, 1, p);
-    this.receiptPlate.position.x = 1030 + (1 - smoothstep(.93, 1, p)) * 40;
-    this.connector.material.opacity = .1 + verifiedIn * .3;
-
-    this.hashPlate.material.opacity = smoothstep(.26, .29, p) * (1 - smoothstep(.42, .46, p));
-    this.astPlate.material.opacity = smoothstep(.40, .44, p) * (1 - smoothstep(.55, .58, p));
-    const contractFade = .95 - smoothstep(.12, .3, p) * .95;
-    this.contractFace.opacity = contractFade;
-    this.contractEdge.opacity = .35 * contractFade;
-
-    const lookX = this.patchX * this.scale - this.regionShift;
-    const lookY = this.lookY - smoothstep(.82, .98, p) * 44;
-    const side = this.compact ? 40 : 220;
-    const cameraZ = 1500 - smoothstep(.55, .82, p) * 150 + smoothstep(.78, 1, p) * 210;
-    this.camera.position.set(lookX + side, lookY + 210, cameraZ);
-    this.camera.lookAt(lookX, lookY, 0);
-
-    this.dust.rotation.y = time * .006;
-    this.dust.position.y = Math.sin(time * .12) * 6;
-    this.rig.rotation.y = -0.055 + Math.sin(p * Math.PI) * .012;
   }
 
-  start() {
-    if (this.running || isReduced) return;
-    this.running = true;
-    this.clock.start();
-    this.frameId = requestAnimationFrame(() => this.loop());
+  buildCodeLines() {
+    const B = this.cardBucket;
+    const head = textPlane(B, CARD_W, CARD_H, (g, w, h, u) => {
+      g.fillStyle = GREY_CSS; g.font = `500 ${0.11 * u}px ${MONO}`; g.textBaseline = 'middle';
+      g.fillText('solution.py', 0.24 * u, 0.26 * u);
+      g.fillStyle = 'rgba(244,246,241,.14)'; for (let i = 0; i < 3; i += 1) { g.beginPath(); g.arc(w - (0.3 + i * 0.13) * u, 0.26 * u, 0.034 * u, 0, 7); g.fill(); }
+      g.strokeStyle = 'rgba(244,246,241,.14)'; g.lineWidth = 2; g.beginPath(); g.moveTo(0.24 * u, 0.46 * u); g.lineTo(w - 0.24 * u, 0.46 * u); g.stroke();
+    }, 1);
+    this.back.add(head);
+    const code = ['def count_vowels(text):', '    total = 0', '    for ch in text.lower():', '        if ch in "aeiou":', '            total += 1', '    return total'];
+    this.codeLines = code.map((txt, i) => {
+      const plane = textPlane(B, 2.6, 0.24, (g, w, h) => {
+        g.textBaseline = 'middle'; g.fillStyle = i === 0 ? ACCENT_CSS : '#d9dfd9';
+        fitText(g, txt, w, 0.17 * 300); g.fillText(txt, 0, h / 2);
+      }, 1);
+      plane.position.set(0, 0.5 - i * 0.255 - 0.03, 0.002);
+      this.back.add(plane);
+      return plane.material;
+    });
   }
 
-  stop() {
-    this.running = false;
-    if (this.frameId) cancelAnimationFrame(this.frameId);
+  /* --- 03 sealed test box with a hash tag --- */
+  buildTests(i) {
+    const B = this.buckets[i];
+    const g = new THREE.Group();
+    g.position.set(SP * i + 0.85, 0, 0);
+    const mat = B.add(new THREE.MeshPhysicalMaterial({ color: 0x111915, metalness: 0.5, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.2 }), 1);
+    mat.depthWrite = true;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.45, 1.7), mat);
+    box.position.y = -0.12;
+    g.add(box);
+    const boxEdges = line(B, new THREE.EdgesGeometry(box.geometry), INK, 0.55); boxEdges.position.copy(box.position); g.add(boxEdges);
+    const lidMat = B.add(new THREE.MeshPhysicalMaterial({ color: 0x151e19, metalness: 0.6, roughness: 0.25, clearcoat: 1 }), 1);
+    lidMat.depthWrite = true;
+    this.testLid = new THREE.Group();
+    this.testLid.add(new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.14, 1.82), lidMat));
+    this.testLid.add(line(B, new THREE.EdgesGeometry(new THREE.BoxGeometry(1.82, 0.14, 1.82)), ACCENT, 0.9));
+    g.add(this.testLid);
+    const face = textPlane(B, 1.5, 1.2, (c, w, h, u) => {
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = '#d9dfd9'; c.font = `600 ${0.3 * u}px ${MONO}`; c.fillText('tests/', w / 2, h * 0.62);
+      // padlock
+      c.strokeStyle = ACCENT_CSS; c.lineWidth = 0.045 * u;
+      c.beginPath(); c.arc(w / 2, h * 0.2 + 0.02 * u, 0.13 * u, Math.PI, 0); c.stroke();
+      c.fillStyle = ACCENT_CSS; c.fillRect(w / 2 - 0.2 * u, h * 0.2 + 0.02 * u, 0.4 * u, 0.28 * u);
+    }, 1);
+    face.position.set(0, -0.1, 0.856);
+    g.add(face);
+    this.testFace = face.material;
+    this.testRing = line(B, new THREE.EdgesGeometry(new THREE.BoxGeometry(2.0, 1.75, 2.0)), ACCENT, 0.5);
+    this.testRing.position.y = -0.12;
+    g.add(this.testRing);
+    this.testGroup = g;
+    this.scene.add(g);
   }
+
+  /* --- 04 card passing through an AST bracket frame --- */
+  buildAst(i) {
+    const B = this.buckets[i];
+    const g = new THREE.Group();
+    g.position.x = SP * i;
+    const W = 3.9, H = 2.8, T = 0.05, L = 0.7;
+    const m = flatMat(B, ACCENT, 1);
+    const bar = (w, h, x, y) => { const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, T), m); mesh.position.set(x, y, 0); g.add(mesh); };
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      bar(L, T, sx * (W / 2 - L / 2), sy * H / 2);
+      bar(T, L, sx * W / 2, sy * (H / 2 - L / 2));
+    }
+    this.astMembrane = new THREE.Mesh(new THREE.PlaneGeometry(W, H), flatMat(B, ACCENT, 0.04));
+    g.add(this.astMembrane);
+    const scanMat = flatMat(B, ACCENT, 0.9);
+    this.astScan = new THREE.Mesh(new THREE.PlaneGeometry(W, 0.03), scanMat);
+    this.astScan.position.z = 0.01;
+    g.add(this.astScan);
+    this.astGroup = g;
+    this.scene.add(g);
+  }
+
+  /* --- 05 card inside a wireframe cage (git worktree) --- */
+  buildWorktree(i) {
+    const B = this.buckets[i];
+    const g = new THREE.Group();
+    g.position.x = SP * i;
+    const cage = new THREE.Group();
+    cage.add(line(B, new THREE.EdgesGeometry(new THREE.BoxGeometry(3.9, 2.9, 2.5)), ACCENT, 0.95));
+    const cm = flatMat(B, ACCENT, 1);
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), cm);
+      c.position.set(x * 1.95, y * 1.45, z * 1.25); cage.add(c);
+    }
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.9, 2.5), flatMat(B, ACCENT, 0.035));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -1.45;
+    cage.add(floor);
+    this.cage = cage;
+    g.add(cage);
+    this.cageGroup = g;
+    this.scene.add(g);
+  }
+
+  /* --- 06 four numbered gate doors --- */
+  buildGates(i) {
+    const B = this.buckets[i];
+    const g = new THREE.Group();
+    g.position.x = SP * i;
+    this.doorZ = [0.6, -1.0, -2.6, -4.2];
+    const names = ['targeted', 'hidden', 'negative', 'regression'];
+    this.doorNames = names;
+    this.doors = this.doorZ.map((z, k) => {
+      const d = new THREE.Group(); d.position.z = z;
+      const frameMat = flatMat(B, INK, 0.42);
+      const W = 2.5, H = 2.7, T = 0.05;
+      const add = (w, h, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.1), frameMat); m.position.set(x, y, 0); d.add(m); };
+      add(W, T, 0, H / 2 - T / 2 - 0.1); add(T, H - 0.1, -W / 2, -0.05); add(T, H - 0.1, W / 2, -0.05);
+      const leafMat = B.add(new THREE.MeshPhysicalMaterial({ color: 0x26382e, metalness: 0.4, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.25 }), 1);
+      leafMat.depthWrite = true;
+      const leaves = [-1, 1].map((s) => {
+        const lm = new THREE.Mesh(new THREE.BoxGeometry(W / 2 - T, H - 0.2, 0.08), leafMat);
+        lm.userData.side = s; d.add(lm); const le = line(B, new THREE.EdgesGeometry(lm.geometry), ACCENT, 0.55); lm.add(le); return lm;
+      });
+      const num = (lit) => textPlane(B, 0.9, 0.4, (c, w, h, u) => {
+        c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = lit ? ACCENT_CSS : '#8b968e';
+        c.font = `600 ${0.27 * u}px ${MONO}`; c.fillText(`0${k + 1}`, w / 2, h / 2);
+      }, 1);
+      const n0 = num(false), n1 = num(true);
+      for (const n of [n0, n1]) { n.position.set(0, H / 2 + 0.26, 0.06); d.add(n); }
+      g.add(d);
+      return { group: d, leaves, w: W, h: H, num: n0.material, numLit: n1.material };
+    });
+    // floor rails guide the eye down the corridor
+    const rails = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.25, -1.72, 3), new THREE.Vector3(-1.25, -1.72, -6),
+      new THREE.Vector3(1.25, -1.72, 3), new THREE.Vector3(1.25, -1.72, -6),
+    ]);
+    g.add(line(B, rails, ACCENT, 0.3));
+    this.gateGroup = g;
+    this.scene.add(g);
+  }
+
+  /* --- 07 card lands into a file tree --- */
+  buildTree(i) {
+    const B = this.buckets[i];
+    const g = new THREE.Group();
+    g.position.x = SP * i;
+    const PW = 2.7, PH = 3.3;
+    const mat = B.add(new THREE.MeshPhysicalMaterial({ color: 0x0f1612, metalness: 0.4, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.25 }), 1);
+    mat.depthWrite = true;
+    g.add(new THREE.Mesh(slabGeometry(PW, PH, 0.08, 0.12), mat));
+    const edge = outline(PW, PH, 0.12, INK, 0.4); edge.position.z = 0.06; B.track(edge.material); g.add(edge);
+    const base = textPlane(B, PW, PH, (c, w, h, u) => {
+      c.textBaseline = 'middle';
+      c.fillStyle = GREY_CSS; c.font = `500 ${0.1 * u}px ${MONO}`; c.fillText('WORKING TREE', 0.26 * u, 0.3 * u);
+      c.fillStyle = '#c9d1ca'; c.font = `500 ${0.19 * u}px ${MONO}`;
+      c.fillText('src/', 0.26 * u, 0.78 * u);
+      c.fillStyle = '#6f7b73'; c.fillText('tests/', 0.26 * u, 1.68 * u);
+      c.strokeStyle = 'rgba(244,246,241,.14)'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(0.26 * u, 0.5 * u); c.lineTo(w - 0.26 * u, 0.5 * u); c.stroke();
+    }, 1);
+    base.position.z = 0.06; g.add(base);
+    const rowY = (n) => PH / 2 - (0.78 + n * 0.45);
+    const rowTex = (txt, color, indent) => textPlane(B, PW, 0.4, (c, w, h, u) => {
+      c.textBaseline = 'middle'; c.fillStyle = color; fitText(c, txt, w - (indent + 0.2) * u, 0.18 * u); c.fillText(txt, indent * u, h / 2);
+    }, 1);
+    const sol = rowTex('solution.py', ACCENT_CSS, 0.95);
+    const solDim = rowTex('solution.py', '#8b968e', 0.95);
+    sol.position.set(0, rowY(1), 0.065); solDim.position.set(0, rowY(1), 0.064);
+    const log = rowTex('execution_log.json', '#d9dfd9', 0.52), rep = rowTex('execution_report.md', '#d9dfd9', 0.52);
+    log.position.set(0, rowY(3), 0.065); rep.position.set(0, rowY(4), 0.065);
+    // tests sits between; shift: src (0), solution (1), tests (2.9)... positions fixed above in base texture
+    g.add(sol, solDim, log, rep);
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(PW - 0.36, 0.38), flatMat(B, ACCENT, 0.16));
+    bar.position.set(0, rowY(1), 0.062); g.add(bar);
+    this.treeSlot = new THREE.Vector3(-0.98, rowY(1), 0.12);
+    this.tree = { sol: sol.material, solDim: solDim.material, log: log.material, rep: rep.material, bar: bar.material, group: g };
+    this.treeGroup = g;
+    this.scene.add(g);
+  }
+
+  /* --- the rejected patch that falls away --- */
+  buildReject() {
+    const B = this.rejectBucket;
+    const g = new THREE.Group();
+    const mat = B.add(new THREE.MeshPhysicalMaterial({ color: 0x3a1e16, metalness: 0.3, roughness: 0.5, clearcoat: 0.4 }), 1);
+    mat.depthWrite = true;
+    g.add(new THREE.Mesh(slabGeometry(CARD_W, CARD_H, 0.06, 0.14), mat));
+    const e = outline(CARD_W, CARD_H, 0.14, FAIL, 1); e.position.z = 0.046; B.track(e.material); g.add(e);
+    const x = textPlane(B, CARD_W, CARD_H, (c, w, h, u) => {
+      c.strokeStyle = '#ff7a59'; c.lineWidth = 0.09 * u; c.lineCap = 'square';
+      const cx = w / 2, cy = h / 2, r = 0.38 * u;
+      c.beginPath(); c.moveTo(cx - r, cy - r); c.lineTo(cx + r, cy + r); c.moveTo(cx + r, cy - r); c.lineTo(cx - r, cy + r); c.stroke();
+    }, 1);
+    x.position.z = 0.07; g.add(x);
+    g.visible = false;
+    this.reject = g;
+    this.scene.add(g);
+  }
+
+  /* --- short HTML labels pinned to 3D points (crisp, on-theme) --- */
+  buildTags() {
+    const layer = document.createElement('div');
+    layer.className = 'story-tags';
+    layer.setAttribute('aria-hidden', 'true');
+    this.tagLayer = layer;
+    pin.insertBefore(layer, document.querySelector('.story-wash'));
+    const mk = (cls = '') => { const el = document.createElement('span'); el.className = `tag ${cls}`.trim(); layer.appendChild(el); return el; };
+    const T = (station, anchor, text, show, cls) => this.tags.push({ station, anchor: new THREE.Vector3(...anchor), el: mk(cls), text, show, last: '' });
+    T(0, [0, 1.35, 0], 'contract', (q) => sstep(0.02, 0.2, q));
+    T(1, [0, 1.35, 0], 'solution.py', (q) => sstep(0.55, 0.75, q));
+    T(2, [0.85, 1.5, 0], 'tests/ · locked', (q) => sstep(0.3, 0.5, q));
+    this.hashTag = { station: 2, anchor: new THREE.Vector3(0.85, -1.25, 0), el: mk('is-hash'), show: (q) => sstep(0.5, 0.62, q), custom: 'hash' };
+    this.tags.push(this.hashTag);
+    T(3, [-1.95, 1.55, 0], 'ast.parse', (q) => sstep(0.05, 0.2, q));
+    T(3, [0, -1.65, 0], 'count_vowels ✓', (q) => sstep(0.82, 0.95, q), 'is-ok');
+    T(4, [0, 1.8, 0], 'git worktree', (q) => sstep(0.25, 0.45, q));
+    T(4, [0, -1.85, 0], 'src/ untouched', (q) => sstep(0.55, 0.75, q));
+    this.gateTag = { station: 5, anchor: new THREE.Vector3(0, 2.0, -2), el: mk('is-ok'), show: () => 1, custom: 'gate' };
+    this.tags.push(this.gateTag);
+    this.rejectTag = { station: 5, anchor: new THREE.Vector3(0, 0, 0), el: mk('is-fail'), show: () => 1, custom: 'reject' };
+    this.tags.push(this.rejectTag);
+    T(6, [0, 2.1, 0], 'verified copy-back', (q) => sstep(0.8, 0.95, q), 'is-ok');
+  }
+
+  /* ----------------------------- sizing ----------------------------- */
+  resize() {
+    const w = Math.max(1, Math.round(this.canvas.clientWidth));
+    const h = Math.max(1, Math.round(this.canvas.clientHeight));
+    if (w === this.w && h === this.h) return;
+    this.w = w; this.h = h;
+    this.dpr = Math.min(window.devicePixelRatio || 1, this.tier >= 2 ? 2 : this.tier === 1 ? 1.5 : 1);
+    this.renderer.setPixelRatio(this.dpr);
+    this.renderer.setSize(w, h, false);
+    this.aspect = w / h;
+    this.compact = w < 760 || this.aspect < 1.25;
+    this.camera.aspect = this.aspect;
+    // keep the card readable on narrow canvases
+    const base = Math.tan(THREE.MathUtils.degToRad(15));
+    this.baseTan = Math.max(base, (this.compact ? 5.9 : 7.0) / this.aspect / 2 / 8.6);
+    this.camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(this.baseTan));
+    const shift = this.compact ? 0 : -0.10 * w;
+    if (shift) this.camera.setViewOffset(w, h, shift, 0, w, h); else this.camera.clearViewOffset();
+    this.camera.updateProjectionMatrix();
+    this.setupPost();
+  }
+
+  setupPost() {
+    if (this.tier < 2) { this.post?.target.dispose(); this.post = null; return; }
+    try {
+      if (!this.post) {
+        const target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4, depthBuffer: true });
+        const mat = new THREE.ShaderMaterial({
+          uniforms: { tDiffuse: { value: target.texture }, uCA: { value: 0 }, uTime: { value: 0 } },
+          vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+          fragmentShader: `uniform sampler2D tDiffuse; uniform float uCA; uniform float uTime; varying vec2 vUv;
+            void main(){
+              vec2 c = vUv - .5; float r = dot(c, c);
+              vec2 off = c * uCA * (.4 + r * 3.);
+              vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+              col *= 1. - r * .32;
+              float n = fract(sin(dot(gl_FragCoord.xy + uTime, vec2(12.9898, 78.233))) * 43758.5453);
+              col += (n - .5) * .008;
+              gl_FragColor = vec4(col, 1.);
+              #include <colorspace_fragment>
+            }`,
+          depthTest: false, depthWrite: false,
+        });
+        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+        quad.frustumCulled = false;
+        const postScene = new THREE.Scene(); postScene.add(quad);
+        this.post = { target, mat, scene: postScene, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+      }
+      this.post.target.setSize(Math.round(this.w * this.dpr), Math.round(this.h * this.dpr));
+    } catch (error) {
+      console.warn('Post-processing unavailable, using direct render.', error);
+      this.post = null; this.tier = 1;
+    }
+  }
+
+  degrade() {
+    if (this.tier === 0) return;
+    this.tier -= 1;
+    this.w = 0;
+    if (this.dust && this.tier < 2) { this.scene.remove(this.dust); this.dust = null; }
+    this.resize();
+  }
+
+  /* ----------------------------- timeline ----------------------------- */
+  poseFor(i, q) {
+    // [x, y, z, rx, ry, rz, scale, weight] relative to the station centre
+    const e = (v) => sstep(0, 1, v);
+    switch (i) {
+      case 0: return [0, 0.05, 0, 0.02, -0.34 + 0.16 * q, 0, 1, 1];
+      case 1: { const a = e(q / 0.45); return [0, 0.05 + 0.14 * Math.sin(a * Math.PI), 0, 0.02, -0.18 + a * Math.PI, 0, 1, 1]; }
+      case 2: { const a = e(q / 0.35); return [-1.15 * a, 0, -1.5 * a, 0.02, Math.PI - 0.18 - 0.1 * a, 0, 1 - 0.28 * a, 1 - 0.65 * a]; }
+      case 3: return [0, 0, lerp(1.6, -1.7, e((q - 0.12) / 0.76)), 0.02, Math.PI - 0.2, 0, 1, 1];
+      case 4: return [0, -0.05, -0.2, 0.02, Math.PI - 0.2 + 0.32 * q, 0, 0.85, 1];
+      case 5: return [0, -0.1, lerp(2.0, -5.0, e((q - 0.42) / 0.58)), 0.02, Math.PI + 0.12, 0, 0.6, 1];
+      default: {
+        const a = e(q / 0.55);
+        return [lerp(0, this.treeSlot.x, a), lerp(0.1, this.treeSlot.y, a), lerp(1.0, 0.14, a), 0.02, Math.PI + lerp(0.1, 0, a), 0, lerp(0.85, 0.17, a), 1];
+      }
+    }
+  }
+
+  camFor(i) {
+    // yaw (radians, always under 22 degrees), height, distance, target z
+    return [
+      [0.16, 0.55, 8.6, 0], [-0.15, 0.5, 8.6, 0], [0.2, 0.7, 8.8, 0],
+      [-0.24, 0.6, 9.2, 0], [0.22, 1.2, 9.6, 0], [-0.3, 0.8, 11.2, -1.0], [0.12, 0.3, 9.2, 0],
+    ][i];
+  }
+
+  update(p, dt) {
+    const s = Math.min(STEPS - 0.0001, Math.max(0, p * STEPS));
+    const i = Math.floor(s);
+    const frac = s - i;
+    const q = clamp01(frac / 0.6);
+    const hasNext = i < STEPS - 1;
+    const f = hasNext ? sstep(0.62, 1, frac) : 0;
+    const fc = hasNext ? sstep(0.6, 0.92, frac) : 0;
+    const qOf = (j) => clamp01((s - j) / 0.6);
+    this.qNow = qOf;
+    const act = (j) => (j === i ? 1 - f : j === i + 1 ? f : 0);
+    this.act = act;
+
+    // card: blend this station's pose with the next station's opening pose
+    const A = this.poseFor(i, q), Bp = hasNext ? this.poseFor(i + 1, 0) : A;
+    const ax = SP * i, bx = SP * (i + 1);
+    const pose = A.map((v, k) => lerp(v + (k === 0 ? ax : 0), Bp[k] + (k === 0 ? bx : 0), fc));
+    this.card.position.set(pose[0], pose[1], pose[2]);
+    this.card.rotation.set(pose[3], pose[4], pose[5]);
+    this.card.scale.setScalar(pose[6]);
+    this.cardW = pose[7];
+    this.cardZ = pose[2];
+    this.cardX = pose[0];
+
+    // 01 contract rows light up one by one
+    this.rows.forEach((r, k) => {
+      const lit = i === 0 ? sstep(0.18 + k * 0.2, 0.3 + k * 0.2, q) : 1;
+      r.lit.userData.k = lit; r.dim.userData.k = 1 - lit;
+    });
+    // contract face visible only until the flip, then the code face
+    // 02 code lines type in
+    const q1 = qOf(1);
+    this.codeLines.forEach((m, k) => { m.userData.k = sstep(0.42 + k * 0.08, 0.5 + k * 0.08, q1); });
+
+    // 03 tests box: lid closes, ring appears
+    const q2 = qOf(2);
+    this.testLid.position.y = lerp(1.35, 0.7, sstep(0.05, 0.42, q2));
+    this.testRing.material.userData.k = sstep(0.42, 0.6, q2);
+    this.testGroup.rotation.y = -0.25 + 0.1 * q2;
+
+    // 04 AST: membrane pulses as the card crosses it, scan sweeps down
+    const q3 = qOf(3);
+    const crossing = clamp01(1 - Math.abs(this.cardZ - 0) / 1.2) * (i === 3 ? 1 : 0);
+    this.astMembrane.material.userData.k = 0.7 + 1.6 * crossing;
+    this.astScan.position.y = lerp(1.4, -1.4, sstep(0.18, 0.8, q3));
+    this.astScan.material.userData.k = (sstep(0.15, 0.22, q3) * (1 - sstep(0.8, 0.9, q3)));
+
+    // 05 cage grows around the card
+    const q4 = qOf(4);
+    const grow = sstep(0, 0.4, q4);
+    this.cage.scale.set(1, lerp(0.02, 1, grow), 1);
+    this.cage.position.y = lerp(-1.4, 0, grow);
+    this.cageGroup.rotation.y = 0;
+
+    // 06 gates: reject, fall, retry, doors open in order
+    const q5 = qOf(5);
+    const cardGoodWait = true;
+    const goodZ = this.poseFor(5, q5)[2];
+    const doors = this.doors;
+    doors.forEach((d, k) => {
+      let open;
+      if (k === 0) open = Math.max(sstep(0.0, 0.12, q5), sstep(d.group.position.z + 1.9, d.group.position.z + 0.8, goodZ));
+      else open = sstep(d.group.position.z + 1.9, d.group.position.z + 0.8, goodZ);
+      d.open = open;
+      d.leaves.forEach((lf) => {
+        const half = d.w / 2 - 0.07;
+        const sc = 1 - 0.9 * open;
+        lf.scale.x = sc;
+        lf.position.x = lf.userData.side * (half / 2 + 0.035) * 1 + (-lf.userData.side) * 0 ;
+        lf.position.x = lf.userData.side * (d.w / 2 - 0.07 - (half * sc) / 2);
+        lf.position.y = -0.05;
+      });
+      d.numLit.userData.k = open; d.num.userData.k = 1 - open;
+    });
+    // reject card: runs at door 2, shakes, falls
+    const rz = lerp(2.0, -0.3, sstep(0.02, 0.2, q5));
+    const fall = sstep(0.3, 0.46, q5);
+    const rVisible = i === 5 && q5 > 0.005 && fall < 0.999 || (i === 4 && f > 0.6 && false);
+    this.reject.visible = rVisible;
+    const shake = sstep(0.2, 0.24, q5) * (1 - sstep(0.26, 0.3, q5)) * Math.sin(q5 * 220) * 0.07;
+    this.reject.position.set(SP * 5 + shake, -0.15 - 3.0 * fall * fall, rz + 0.0 * fall);
+    this.reject.rotation.set(0.1 + 0.9 * fall, -0.25, -0.9 * fall);
+    this.reject.scale.setScalar(0.62);
+    this.rejectBucket.mats.forEach((m) => { m.userData.k = sstep(0, 0.05, q5) * (1 - sstep(0.38, 0.48, q5)); });
+
+    // 07 tree: card lands, row lights, receipts appear
+    const q6 = qOf(6);
+    const T = this.tree;
+    const landed = sstep(0.5, 0.62, q6);
+    T.sol.userData.k = landed; T.solDim.userData.k = 1 - landed; T.bar.userData.k = landed;
+    T.log.userData.k = sstep(0.66, 0.78, q6); T.rep.userData.k = sstep(0.76, 0.88, q6);
+    this.treeGroup.rotation.y = 0.12 - 0.18 * q6;
+
+    // fade by activity
+    for (let j = 0; j < STEPS; j += 1) {
+      const a = act(j);
+      this.buckets[j].apply(lerp(DIM, 1, a));
+    }
+    let cm = 1;
+    if (i === 4) cm = 1 - sstep(0.5, 1, fc); else if (i === 5) cm = sstep(0.36, 0.46, q5);
+    this.cardBucket.apply(cm * this.cardW);
+    this.rejectBucket.apply(1);
+
+    // camera: dolly with the stations, a short yaw drift, nothing wilder
+    const c0 = this.camFor(i), c1 = hasNext ? this.camFor(i + 1) : c0;
+    const yaw = lerp(c0[0], c1[0], f), h = lerp(c0[1], c1[1], f), d = lerp(c0[2], c1[2], f), tz = lerp(c0[3], c1[3], f);
+    const tx = SP * (i + f);
+    const drift = Math.sin(p * 40) * 0.0;
+    this.camera.position.set(tx + Math.sin(yaw + drift) * d, h, tz + Math.cos(yaw) * d);
+    this.camera.lookAt(tx, 0.05, tz);
+    this.camera.updateMatrixWorld();
+
+    this.updateTags(i, f, q5, q2, goodZ, rz, fall);
+    this.grid.position.x = 0;
+  }
+
+  updateTags(i, f, q5, q2, goodZ, rz, fall) {
+    const v = new THREE.Vector3();
+    const w = this.w, h = this.h;
+    for (const t of this.tags) {
+      const a = this.act(t.station);
+      let q = this.qNow(t.station);
+      let o = a * t.show(q);
+      let text = t.text;
+      let ax = SP * t.station + t.anchor.x, ay = t.anchor.y, az = t.anchor.z;
+      if (t.custom === 'hash') {
+        text = q < 0.7 ? 'sha-256 · before' : q < 0.84 ? 'sha-256 · before = after' : 'sha-256 · before = after ✓';
+        t.el.classList.toggle('is-ok', q >= 0.84);
+      } else if (t.custom === 'gate') {
+        // the gate the card is currently at
+        let k = -1;
+        this.doorZ.forEach((z, n) => { if (goodZ < z + 1.5 && goodZ > z - 1.0) k = n; });
+        o = a * (k >= 0 && q5 > 0.42 ? 1 : 0);
+        if (k >= 0) { text = `0${k + 1} ${this.doorNames[k]}`; az = this.doorZ[k]; ay = 1.95; ax = SP * 5; }
+      } else if (t.custom === 'reject') {
+        o = a * (sstep(0.18, 0.24, q5) * (1 - sstep(0.4, 0.48, q5)));
+        text = 'rejected'; ax = SP * 5; ay = 0.95 - 3.0 * fall * fall; az = rz;
+      }
+      t.el.style.opacity = o.toFixed(3);
+      if (o < 0.01) { t.el.style.visibility = 'hidden'; continue; }
+      t.el.style.visibility = 'visible';
+      if (text !== t.last) { t.el.textContent = text; t.last = text; t.tw = t.el.offsetWidth; }
+      v.set(ax, ay, az).project(this.camera);
+      const half = (t.tw || 80) / 2 + 8;
+      const px = Math.min(w - half, Math.max(half, (v.x * 0.5 + 0.5) * w)), py = Math.min(h - 16, Math.max(16, (-v.y * 0.5 + 0.5) * h));
+      t.el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%)`;
+    }
+  }
+
+  /* ----------------------------- loop ----------------------------- */
+  frame(timeMs) {
+    if (this.disposed) return;
+    const t = timeMs * (timeMs < 1e6 ? 1 : 0.001);
+    const dt = Math.min(0.1, Math.max(0.001, t - this.lastTime));
+    this.lastTime = t;
+    // light inertia; always converges to the scroll position, never plays on its own
+    const prev = this.progress;
+    const k = 1 - Math.exp(-dt * 12);
+    this.progress += (targetProgress - this.progress) * k;
+    if (Math.abs(targetProgress - this.progress) < 0.00005) this.progress = targetProgress;
+    this.velocity = lerp(this.velocity, Math.abs(this.progress - prev) / dt, 0.2);
+    this.update(this.progress, dt);
+
+    if (this.post) {
+      this.post.mat.uniforms.uCA.value = Math.min(0.004, this.velocity * 0.05);
+      this.post.mat.uniforms.uTime.value = (t * 60) % 1000;
+      this.renderer.setRenderTarget(this.post.target);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+      this.renderer.render(this.post.scene, this.post.cam);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+
+    // quality watchdog: step down if sustained frames are slow while scrolling
+    if (this.velocity > 0.01) {
+      this.frameMs.push(dt * 1000);
+      if (this.frameMs.length >= 90) {
+        const avg = this.frameMs.reduce((a, b) => a + b, 0) / this.frameMs.length;
+        this.frameMs.length = 0;
+        if (avg > 34) this.degrade();
+      }
+    }
+  }
+
+  snap() { this.progress = targetProgress; this.velocity = 0; }
 
   destroy() {
-    this.stop();
-    this.observer.disconnect();
+    this.disposed = true;
+    this.ro.disconnect();
+    this.tagLayer.remove();
     this.renderer.dispose();
   }
-
-  loop() {
-    if (!this.running) return;
-    this.time = this.clock.getElapsedTime();
-    this.applyState();
-    this.renderer.render(this.scene, this.camera);
-    this.frameId = requestAnimationFrame(() => this.loop());
-  }
-
-  render(time, progress) {
-    if (!this.visible && !isReduced) return;
-    this.time = time;
-    this.setProgress(progress);
-    this.renderer.render(this.scene, this.camera);
-  }
-}
-
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
-}
-
-function smoothstep(edge0, edge1, value) {
-  const x = clamp01((value - edge0) / Math.max(.0001, edge1 - edge0));
-  return x * x * (3 - 2 * x);
-}
-
-function trackKey(progress, keys) {
-  if (progress <= keys[0][0]) return keys[0][1];
-  for (let index = 1; index < keys.length; index += 1) {
-    if (progress <= keys[index][0]) {
-      const [t0, v0] = keys[index - 1];
-      const [t1, v1] = keys[index];
-      return v0 + (v1 - v0) * smoothstep(0, 1, (progress - t0) / Math.max(1e-6, t1 - t0));
-    }
-  }
-  return keys[keys.length - 1][1];
 }
 
 reduced.addEventListener?.('change', () => {
+  teardown();
   setReducedState();
-  if (storyTrigger) storyTrigger.kill();
-  if (lenis) {
-    gsap.ticker.remove(lenisTicker);
-    lenis.destroy();
-    lenis = null;
-  }
-  scene?.destroy();
-  scene = null;
-  ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
   setupScroll();
   setupLenis();
 });
-
-window.addEventListener('resize', () => {
-  scene?.resize();
-}, { passive: true });
 window.addEventListener('scroll', () => {
   if (!isReduced) return;
-  const progress = clamp01((window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight));
-  setStep(Math.min(6, Math.floor(progress * 7)));
+  const p = clamp01((window.scrollY - story.offsetTop) / Math.max(1, story.offsetHeight - window.innerHeight));
+  setStep(stepFromProgress(p));
 }, { passive: true });
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) scene?.stop();
-  else if (!isReduced && scene?.visible) scene?.start();
-});
 
 setReducedState();
 setupScroll();
 setupLenis();
-window.addEventListener('load', () => {
-  ScrollTrigger.refresh();
-}, { once: true });
+window.addEventListener('load', () => ScrollTrigger.refresh(), { once: true });
+window.__cdavc = { get world() { return world; }, get lenis() { return lenis; } };
