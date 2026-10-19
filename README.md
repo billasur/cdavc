@@ -61,9 +61,12 @@ Qwen local-model smoke run is recorded in
 
 ## Showcase site
 
-The scroll-controlled 3-D live demo lives in `showcase/`. It visualizes the
-pain of unverified local patches, then walks through the contract, model,
-verification gates and synchronized result. Preview it locally with:
+The scroll-controlled 3-D live demo lives in `showcase/`. It pins one
+full-viewport task-patch scene and uses scroll as the timeline: contract,
+bounded local model patch, locked-test hash, AST contract, isolated worktree,
+regression and verified merge. Three.js, GSAP/ScrollTrigger and Lenis are
+vendored under `showcase/vendor/`; the page has no CDN fonts or runtime fetches.
+Preview it locally with:
 
 ```bash
 python3 -m http.server 4173 --directory showcase
@@ -78,6 +81,13 @@ vercel deploy --cwd showcase
 The showcase uses measured smoke evidence from the repository and does not
 claim a benchmark improvement. The local model and verification process remain
 local; Vercel hosts only the explanatory visual demo.
+
+Verify the checked-in browser libraries offline with:
+
+```bash
+cd showcase
+npm run verify-vendor --offline
+```
 
 ## Run tests
 

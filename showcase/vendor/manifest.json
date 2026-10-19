@@ -22,6 +22,7 @@
       "version": "0.180.0",
       "license": "MIT",
       "entries": {
+        "build/three.core.min.js": "three.core.min.js",
         "build/three.module.min.js": "three.module.min.js"
       }
     }
@@ -31,6 +32,7 @@
     "ScrollTrigger.min.js": "b0b14d67b55b0c43c756ac0b106cfcb09d0879945f6ead64451065b0672916a2",
     "lenis.min.js": "53195c9797e7ce7bf9d7fa9242b08209e57f46de4c9dac126a6494fa780e3346",
     "lenis.mjs": "b7a2f6896b9ce086d8192ff17c91aad457447976764971fe5011c42169602e9e",
+    "three.core.min.js": "61ba0df005b05991361d040d8ff670e1aadfd0ce7aeebd1fdb0725957a8957de",
     "three.module.min.js": "e2b5ee6bccd38fd6d8a2428546b83c5f2426d84b152ef82be8055556e3b40eb6",
     "LENIS-LICENSE": "bba15b1137346a73ed8c35e7f20961a69e0ed842d956a50339240c3e7b08c089",
     "THREE-LICENSE": "bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601"

@@ -1,10 +1,16 @@
 # CD-AVC showcase handoff
 
-**Recorded:** 2026-10-19  
-**Repository:** `/Users/billasur/Projects/cdavc`  
-**Branch:** `main`  
-**Last committed revision:** `6349b7a build: vendor showcase browser libraries`  
-**Current Git state:** `main...origin/main [ahead 6]`; showcase work is still uncommitted.
+**Recorded:** 2026-10-19
+
+**Repository:** `/Users/billasur/Projects/cdavc`
+
+**Branch:** `main`
+
+**Showcase base revision:** `6349b7a build: vendor showcase browser libraries`
+
+**Handoff commit:** `3afd1f4 docs: add showcase handoff`
+
+**Git state when recorded:** `main...origin/main [ahead 6]`; showcase work was still uncommitted.
 
 ## Goal
 
@@ -219,6 +225,8 @@ generated benchmark artifacts. They are not part of this showcase handoff:
 - `src/cdavc/providers.py`
 - `src/cdavc/benchmark.py`
 - `tests/test_benchmark.py`
+- `Makefile`
+- `.gitignore`
 - `benchmarks/`
 - `results/`
 

@@ -1,9 +1,9 @@
 # Offline showcase vendor bundle
 
-This directory contains checked-in browser artifacts for the planned showcase
-rebuild. The current `showcase/index.html` intentionally remains unchanged;
-these files are available for a later local-script or ESM integration without
-adding a network dependency.
+This directory contains the checked-in browser artifacts used by the showcase
+rebuild. `index.html` loads the local classic GSAP, ScrollTrigger and Lenis
+bundles; `story.js` imports the local Three.js ESM entry point. No CDN or
+runtime package fetch is required.
 
 ## Pinned sources
 
@@ -24,8 +24,8 @@ The exact package entry copied into each browser artifact is recorded in
   loaded first.
 - `lenis.min.js` is the classic browser bundle. `lenis.mjs` is the local ESM
   entry point; use one entry point, not both.
-- `three.module.min.js` is an ESM build and has no bare package import to
-  resolve. Import it from a local relative path.
+- `three.module.min.js` is an ESM build with one local relative dependency,
+  `three.core.min.js`; both are checked in and served from this directory.
 - The files are served directly by a static host. They do not require a build
   step, CDN URL, or runtime package fetch.
 - `npm run verify-vendor` uses only Node built-ins and works without
