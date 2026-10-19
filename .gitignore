@@ -17,5 +17,6 @@ execution_report.md
 .env
 results/*.jsonl
 results/REPORT.md
+results/candidates/
 .opencode/
 ogcode.json
