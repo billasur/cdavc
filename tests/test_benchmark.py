@@ -518,6 +518,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda _arm, _task: MockProvider([candidate]),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=1,
             )
             with patch.object(BenchmarkRunner, "_run_command", spy):
                 records = runner.run()
@@ -543,6 +544,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda _arm, _task: MockProvider([candidate]),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=1,
             ).run()
             cage = next(record for record in records if record["arm"] == "cdavc")
             self.assertFalse(cage["pass"])
@@ -584,6 +586,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda _arm, _task: MockProvider([candidate]),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=1,
             )
             with patch.object(BenchmarkRunner, "_run_command", spy):
                 records = runner.run()
@@ -625,6 +628,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda _arm, _task: MockProvider([prose, prose]),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=1,
             ).run()
             cage = next(record for record in records if record["arm"] == "cdavc")
             self.assertFalse(cage["pass"])
@@ -639,14 +643,15 @@ class BenchmarkTests(unittest.TestCase):
             runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
             self.assertEqual(runner._samples_for("baseline_single", task), 1)
             self.assertEqual(runner._samples_for("baseline_retry", task), 3)
-            self.assertEqual(runner._samples_for("cdavc", task), 3)
+            self.assertEqual(runner._samples_for("cdavc", task), 4)
 
-    def test_sample_budget_never_exceeds_what_the_task_allows(self):
+    def test_cage_keeps_its_own_draw_budget(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self._git_project(Path(directory))
             task = self._task(max_retries=0)
             runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
-            self.assertEqual(runner._samples_for("cdavc", task), 1)
+            self.assertEqual(runner._samples_for("cdavc", task), 4)
+            self.assertEqual(runner._samples_for("baseline_retry", task), 1)
             with self.assertRaises(BenchmarkError):
                 BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], samples=0)
             with self.assertRaises(BenchmarkError):
@@ -742,6 +747,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda _arm, _task: MockProvider([candidate]),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=1,
             ).run()
             cage = next(record for record in records if record["arm"] == "cdavc")
             self.assertFalse(cage["pass"])
@@ -804,6 +810,7 @@ class BenchmarkTests(unittest.TestCase):
                 lambda arm, _task: SequenceProvider(record=arm == "cdavc"),
                 tasks=[task],
                 records_path=root / "records.jsonl",
+                samples=2,
             ).run()
             cage = next(record for record in records if record["arm"] == "cdavc")
             self.assertEqual(len(prompts), 2)

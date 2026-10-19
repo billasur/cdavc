@@ -562,12 +562,13 @@ class BenchmarkRunner:
             return int(self.samples)
         if arm == "baseline_single":
             return 1
-        retries = min(task.max_retries, self.retry_cap) + 1
         if arm == "baseline_retry":
-            return retries
-        # The cage spends its budget on independent draws rather than on
-        # repairs, but it never outspends what the task allows.
-        return max(1, min(retries, DEFAULT_SAMPLES))
+            return min(task.max_retries, self.retry_cap) + 1
+        # The cage spends a fixed budget on independent draws rather than on
+        # repairs, so its budget is independent of the task's retry allowance.
+        # Every record reports its own samples_drawn; the comparison must use
+        # those measured counts, not the configured budgets.
+        return DEFAULT_SAMPLES
 
     def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, attempt: int) -> ProviderCompletion:
         del task, arm
