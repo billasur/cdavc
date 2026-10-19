@@ -109,6 +109,72 @@ make coverage PYTHON=.venv/bin/python
 The current suite reports at least 96% line coverage. The remaining lines are
 platform-specific memory detection and defensive subprocess/error branches.
 
+## How to reproduce the benchmark
+
+The benchmark is local-only and resumable. It evaluates the same fixed set of
+30 original HumanEval/MBPP-style Python tasks in three arms:
+
+- `baseline_single`: one model completion, scored only by the held-out test;
+- `baseline_retry`: the same plain baseline with bounded retries, where a retry
+  receives only the previous failing evaluator output;
+- `cdavc`: the same local model behind locked evaluator hashes, an AST contract
+  check, an isolated git worktree, the public/held-out tests, the regression
+  gate and bounded retries.
+
+The task source and evaluator boundary are documented in
+[`benchmarks/README.md`](benchmarks/README.md). The hidden evaluator is never
+included in the initial prompt. Do not modify the corpus after inspecting
+results; create a new corpus version for a new experiment.
+
+### CI/offline smoke run
+
+This completes in under two minutes on a normal development machine and does
+not contact a model server:
+
+```bash
+make benchmark-mock PYTHON=.venv/bin/python
+```
+
+It appends one JSON object per completed task/arm to
+`results/benchmark.jsonl` and writes `results/REPORT.md`. If interrupted, run
+the same command again; completed `task_id`/`arm` pairs are skipped. The mock
+provider reports token counts as unavailable rather than estimating them.
+
+### Long local-model run
+
+Start a local OpenAI-compatible server separately (for example, llama.cpp or
+MLX bound to `127.0.0.1`). The benchmark rejects non-local endpoints and never
+uses cloud inference. From the repository root, run:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m cdavc.benchmark . \
+  --tasks benchmarks/tasks.json \
+  --endpoint http://127.0.0.1:8080/v1/chat/completions \
+  --model 'your-local-model-name' \
+  --quantisation 'Q4_K_M' \
+  --version 'your-model-version-or-checksum' \
+  --hardware 'Apple M3 MacBook Air 16 GB' \
+  --seed 20261019 \
+  --timeout 300 \
+  --retry-cap 3
+```
+
+Leave that process running overnight if needed. Each task/arm record is flushed
+and fsynced to `results/benchmark.jsonl` before the next arm starts, so a
+crash or interruption loses at most the in-progress task/arm. Re-run the same
+command to resume. The report is regenerated from the JSONL at
+`results/REPORT.md` and contains only measured values, including paired
+pass-rate differences with a 95% confidence interval, measured time/token
+overhead, and cage-hurt cases. A missing provider token count or memory value
+is shown as unavailable; no value is estimated.
+
+The harness records the selected model, quantisation, version, hardware string,
+seed, provider-reported token usage, harness peak memory measurement and its
+measurement source on every row. On macOS, peak memory is the benchmark
+harness process's `resource.getrusage` high-water mark; the source is explicit
+in each JSONL record because a separately managed model server is not folded
+into that number.
+
 ## Run the deterministic demo
 
 ```bash
