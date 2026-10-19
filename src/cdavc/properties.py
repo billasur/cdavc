@@ -330,11 +330,47 @@ def _g_intervals(entry: Mapping[str, Any], rng: random.Random, count: int) -> It
         yield (intervals,)
 
 
+def _rpn_divides_by_zero(tokens: Sequence[str]) -> bool:
+    """Simulate a well-formed expression and report a zero divisor.
+
+    Replacing literal ``"0"`` tokens is not enough: an intermediate result can
+    still be zero, and the oracle would then raise instead of the candidate.
+    Such a case is a separate contract (``ValueError``), so the generator
+    skips it rather than charging the candidate for our own division.
+    """
+
+    stack: list[int] = []
+    for token in tokens:
+        if token not in {"+", "-", "*", "/"}:
+            stack.append(int(token))
+            continue
+        if len(stack) < 2:
+            # Malformed expressions are the candidate's contract to enforce,
+            # not a division hazard for the generator.
+            return False
+        right = stack.pop()
+        left = stack.pop()
+        if token == "+":
+            stack.append(left + right)
+        elif token == "-":
+            stack.append(left - right)
+        elif token == "*":
+            stack.append(left * right)
+        else:
+            if right == 0:
+                return True
+            stack.append(math.trunc(left / right))
+    return False
+
+
 def _g_rpn(entry: Mapping[str, Any], rng: random.Random, count: int) -> Iterator[tuple[Any, ...]]:
     yield (["5", "2", "/"],)
     yield (["-7", "2", "/"],)
     yield (["2", "+"],)
-    for _ in range(count):
+    emitted = 0
+    attempts = 0
+    while emitted < count and attempts < count * 4:
+        attempts += 1
         tokens: list[str] = [str(rng.randint(-9, 9))]
         depth = 1
         for _ in range(rng.randint(1, 5)):
@@ -347,9 +383,9 @@ def _g_rpn(entry: Mapping[str, Any], rng: random.Random, count: int) -> Iterator
         while depth > 1:
             tokens.append(rng.choice(["+", "-", "*", "/"]))
             depth -= 1
-        if any(token == "/" for token in tokens):
-            # A zero divisor is a separate contract; keep generated cases safe.
-            tokens = [token if token != "0" else "1" for token in tokens]
+        if _rpn_divides_by_zero(tokens):
+            continue
+        emitted += 1
         yield (tokens,)
 
 

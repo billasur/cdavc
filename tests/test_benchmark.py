@@ -728,6 +728,25 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(cage["static_reasks"], 1)
             self.assertEqual(cage["json_reasks"], 0)
 
+    def test_cage_rejects_files_created_outside_the_implementation_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            task = self._task(max_retries=0, regression_command=None)
+            candidate = self._response(
+                "from pathlib import Path\n\n"
+                "Path('stray.txt').write_text('side effect')\n\n"
+                "def answer() -> int:\n    return 42\n"
+            )
+            records = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([candidate]),
+                tasks=[task],
+                records_path=root / "records.jsonl",
+            ).run()
+            cage = next(record for record in records if record["arm"] == "cdavc")
+            self.assertFalse(cage["pass"])
+            self.assertIn("outside the implementation contract: stray.txt", cage["failure"])
+
     def test_patch_writer_refuses_escapes_and_symlinks(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

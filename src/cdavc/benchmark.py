@@ -26,7 +26,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
@@ -360,6 +360,7 @@ class BenchmarkRunner:
         candidate: Mapping[str, str] = {}
         try:
             with self._execution_directory(arm) as workspace:
+                baseline_changes = self._workspace_changes(workspace)
                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
                 for draw in range(1, budget + 1):
                     prompt = self._prompt(task, arm, failure)
@@ -412,7 +413,12 @@ class BenchmarkRunner:
                         candidate = self._store_candidate(arm, task, workspace)
                         if arm == "cdavc":
                             gates = self._run_cage_gates(
-                                task, workspace, hashes, digest=digest, properties=properties
+                                task,
+                                workspace,
+                                hashes,
+                                digest=digest,
+                                properties=properties,
+                                baseline_changes=baseline_changes,
                             )
                             public_gate_passes += 1
                         else:
@@ -701,6 +707,7 @@ class BenchmarkRunner:
         *,
         digest: dict[tuple[str, str], Mapping[str, Any]] | None = None,
         properties: dict[str, Any] | None = None,
+        baseline_changes: Collection[str] | None = None,
     ) -> list[str]:
         results: list[str] = []
         if properties is None:
@@ -730,7 +737,62 @@ class BenchmarkRunner:
             self._run_command(task.regression_command, workspace, "regression test", include_output=True)
             results.append("regression")
         _assert_test_hashes(workspace, hashes)
+        if baseline_changes is not None:
+            self._assert_workspace_clean(task, workspace, baseline_changes)
         return results
+
+    def _workspace_changes(self, workspace: Path) -> set[str]:
+        """Paths reported by ``git status``; empty outside a git worktree."""
+
+        try:
+            result = subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=all"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return set()
+        if result.returncode != 0:
+            return set()
+        changes: set[str] = set()
+        for line in result.stdout.splitlines():
+            if len(line) < 4:
+                continue
+            path = line[3:]
+            if " -> " in path:
+                path = path.split(" -> ", 1)[1]
+            path = path.strip().strip('"')
+            # Interpreter caches are written by running any Python at all and
+            # are gitignored in a normal checkout; they are not side effects a
+            # candidate chose.
+            if "__pycache__" in Path(path).parts or path.endswith((".pyc", ".pyo")):
+                continue
+            changes.add(path)
+        return changes
+
+    def _assert_workspace_clean(
+        self,
+        task: BenchmarkTask,
+        workspace: Path,
+        baseline: Collection[str],
+    ) -> None:
+        """Reject a candidate that writes anywhere but its implementation files.
+
+        The worktree is a copy of a possibly dirty checkout, so the comparison
+        is against the status captured before the first draw rather than
+        against an empty status.  This sits next to the SHA-256 test check: the
+        hash proves the tests were not edited, this proves nothing else was
+        created or deleted either.
+        """
+
+        allowed = set(task.implementation_files) | set(task.test_files)
+        unexpected = sorted(self._workspace_changes(workspace) - set(baseline) - allowed)
+        if unexpected:
+            raise _GateFailure(
+                f"candidate changed files outside the implementation contract: {unexpected[0]}"
+            )
 
     def _static_contract_failure(self, task: BenchmarkTask, workspace: Path) -> str | None:
         """Return the first source-only contract violation, or ``None``.
@@ -1006,12 +1068,20 @@ class BenchmarkRunner:
         digest: dict[tuple[str, str], Mapping[str, Any]] = {}
         properties: dict[str, Any] = {}
         with self._execution_directory("baseline_single") as workspace:
+            baseline_changes = self._workspace_changes(workspace)
             for relative in resolved.implementation_files:
                 target = workspace / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text((stored / relative).read_text())
             try:
-                gates = self._run_cage_gates(resolved, workspace, hashes, digest=digest, properties=properties)
+                gates = self._run_cage_gates(
+                    resolved,
+                    workspace,
+                    hashes,
+                    digest=digest,
+                    properties=properties,
+                    baseline_changes=baseline_changes,
+                )
             except Exception as exc:  # a replay failure is data, not a crash
                 return {
                     "passed": False,
