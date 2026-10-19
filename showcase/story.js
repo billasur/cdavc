@@ -595,9 +595,9 @@ class World {
     this.camera.aspect = this.aspect;
     // keep the card readable on narrow canvases
     const base = Math.tan(THREE.MathUtils.degToRad(15));
-    this.baseTan = Math.max(base, (this.compact ? 5.9 : 7.0) / this.aspect / 2 / 8.6);
+    this.baseTan = Math.max(base, (this.compact ? 5.9 : 7.9) / this.aspect / 2 / 8.6);
     this.camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(this.baseTan));
-    const shift = this.compact ? 0 : -0.10 * w;
+    const shift = this.compact ? 0 : -0.115 * w;
     if (shift) this.camera.setViewOffset(w, h, shift, 0, w, h); else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
     this.setupPost();
@@ -881,4 +881,4 @@ setReducedState();
 setupScroll();
 setupLenis();
 window.addEventListener('load', () => ScrollTrigger.refresh(), { once: true });
-window.__cdavc = { get world() { return world; }, get lenis() { return lenis; } };
+if (new URLSearchParams(location.search).has('debug')) window.__cdavc = { get world() { return world; }, get lenis() { return lenis; } };

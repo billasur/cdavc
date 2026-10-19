@@ -161,11 +161,12 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
-  transition: opacity .22s var(--ease), transform .22s var(--ease);
+  transition: opacity .12s var(--ease), transform .12s var(--ease);
 }
 .story-panel.is-current {
   opacity: 1;
   transform: none;
+  transition: opacity .28s var(--ease) .1s, transform .28s var(--ease) .1s;
 }
 .story-kicker {
   margin: 0 0 23px;
