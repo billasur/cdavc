@@ -1,0 +1,2 @@
+{"data_provenance":"measured","model":"openai/gpt-oss-20b","seed":1,"arms":"baseline_single,baseline_retry,cdavc","tasks":"benchmarks_dev/tasks.json","branch":"night-run","commit":"745a1f8",
+ "provider":"groq","extra":{"reasoning_effort":"low"},"tpm":8000,"prompt_layout":"stable-prefix","label":"openai/gpt-oss-20b via groq; NOT comparable to REPORT30 (Qwen2.5-7B local)"}

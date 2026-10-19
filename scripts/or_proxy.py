@@ -83,7 +83,13 @@ class H(BaseHTTPRequestHandler):
                                 TOK[-1:] = [(TOK[-1][0], u)] if TOK else []
                     except ValueError:
                         pass
-                log({"t": time.time(), "try": tries, "status": status, "secs": round(time.time() - t0, 2),
+                usage = {}
+                if ok:
+                    try:
+                        usage = json.loads(data).get("usage", {})
+                    except ValueError:
+                        pass
+                log({"usage": {k: usage.get(k) for k in ("prompt_tokens", "completion_tokens", "prompt_tokens_details") if k in usage}, "t": time.time(), "try": tries, "status": status, "secs": round(time.time() - t0, 2),
                      "rl": {k: v for k, v in hdr.items() if k.lower().startswith(("x-ratelimit", "retry-after"))}})
                 if ok or status not in (429, 500, 502, 503, 504, 599):
                     break

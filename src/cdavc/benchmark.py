@@ -231,6 +231,7 @@ class BenchmarkRunner:
         timeout_seconds: float = 30.0,
         retry_cap: int = 3,
         arms: tuple[str, ...] | None = None,
+        prompt_layout: str = "default",
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -259,6 +260,9 @@ class BenchmarkRunner:
         self.hardware = hardware
         self.timeout_seconds = timeout_seconds
         self.retry_cap = retry_cap
+        if prompt_layout not in {"default", "stable-prefix"}:
+            raise BenchmarkError("prompt_layout must be default or stable-prefix")
+        self.prompt_layout = prompt_layout
         self.arms = tuple(arms) if arms else ARMS
         if any(a not in ARMS for a in self.arms):
             raise BenchmarkError(f"unknown arm in {self.arms}")
@@ -466,6 +470,20 @@ class BenchmarkRunner:
             elif arm == "cdavc":
                 repair = self._cage_repair(task, previous_failure)
         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
+        if self.prompt_layout == "stable-prefix":
+            # H-b: contract and rules first (identical across arms/attempts), volatile parts last.
+            return (
+                f"Implement task {task.task_id}: {task.title}.\n"
+                + specification
+                + f"Allowed implementation files: {', '.join(task.implementation_files)}\n"
+                f"Required symbols: {', '.join(task.symbols) or '(none)'}\n"
+                f"Public invariants: {', '.join(task.invariants) or '(see tests)'}\n"
+                f'Return only JSON in the form {{"files": {{"{target_example}": "complete file contents"}}}}. '
+                "Use repository-relative paths, modify only allowed implementation files, and never modify tests.\n"
+                f"Benchmark arm: {arm}.\n"
+                f"Deterministic seed: {self.seed}.\n"
+                + repair
+            )
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
             f"Benchmark arm: {arm}.\n"
@@ -974,6 +992,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
     parser.add_argument("--arms", default=None, help="comma-separated subset of arms to run (default: all three)")
+    parser.add_argument("--prompt-layout", default="default", choices=["default", "stable-prefix"], help="H-b: stable-prefix puts volatile arm/seed/failure text last")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
@@ -1014,6 +1033,7 @@ def main(argv: list[str] | None = None) -> int:
             hardware=args.hardware,
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
+            prompt_layout=args.prompt_layout,
             arms=tuple(args.arms.split(",")) if args.arms else None,
         )
         records = runner.run()
