@@ -875,6 +875,155 @@ def _c_records(module: ModuleType, arguments: tuple[Any, ...]) -> None:
     assert result == expected, f"expected {expected!r}, got {result!r}"
 
 
+# --------------------------------------------------------------------------
+# Dev-corpus differential property.
+#
+# Iteration happens on ``benchmarks/dev``, whose tasks are checked by
+# comparing the candidate against a frozen reference implementation over
+# generated inputs.  The reference is a repository file committed with the dev
+# corpus, so this stays table-driven and is hashed with the rest of it.  The
+# held-out table does not use this check.
+# --------------------------------------------------------------------------
+
+_REFERENCE_CACHE: dict[str, ModuleType] = {}
+
+
+def _load_reference(path: str) -> ModuleType:
+    module = _REFERENCE_CACHE.get(path)
+    if module is None:
+        location = Path(path)
+        if not location.is_file():
+            raise PropertyTableError(f"dev reference does not exist: {location}")
+        spec = importlib.util.spec_from_file_location(
+            f"cdavc_dev_reference_{len(_REFERENCE_CACHE)}", location
+        )
+        if spec is None or spec.loader is None:
+            raise PropertyTableError(f"cannot import dev reference: {location}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _REFERENCE_CACHE[path] = module
+    return module
+
+
+_DEV_WORDS = ("alpha", "beta", "gamma", "delta", "echo", "foxtrot", "golf", "hotel")
+_DEV_IPS = (
+    "0.0.0.0",
+    "127.0.0.1",
+    "255.255.255.255",
+    "256.1.1.1",
+    "01.2.3.4",
+    "1.2.3",
+    "1.2.3.4.5",
+    "a.b.c.d",
+    "192.168.0.10",
+    "",
+)
+_DEV_DAYS = ("Monday", "tuesday", "WEDNESDAY", "Thursday", "friday", "Saturday", "sunday")
+_DEV_CSVS = ("", "1", "1, 2,,3", " 4 ,5 ", "1,a", "-2,-3", "7,8,9")
+_DEV_CSVS_OK = ("", "1", "1, 2,,3", " 4 ,5 ", "-2,-3", "7,8,9")
+
+def _shape_same_pair_lists(rng: random.Random) -> tuple[Any, ...]:
+    size = rng.randint(0, 5)
+    return (
+        [rng.randint(-9, 9) for _ in range(size)],
+        [rng.randint(-9, 9) for _ in range(size)],
+    )
+
+
+_DEV_SHAPES: dict[str, Callable[[random.Random], tuple[Any, ...]]] = {
+    "int": lambda rng: (rng.randint(0, 60),),
+    "int2": lambda rng: (rng.randint(-20, 20), rng.randint(-20, 20)),
+    "int3": lambda rng: (rng.randint(0, 20), rng.randint(0, 6), rng.randint(-2, 22)),
+    "intlist": lambda rng: ([rng.randint(-9, 9) for _ in range(rng.randint(0, 7))],),
+    "poslist": lambda rng: ([rng.randint(1, 12) for _ in range(rng.randint(1, 6))],),
+    "numlist": lambda rng: ([round(rng.uniform(-10, 10), 3) for _ in range(rng.randint(1, 6))],),
+    "text": lambda rng: (" ".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(0, 5))),),
+    "text2": lambda rng: (
+        " ".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(1, 4))),
+        " ".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(1, 4))),
+    ),
+    "text_int": lambda rng: (
+        " ".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(1, 4))),
+        rng.randint(0, 24),
+    ),
+    "records": lambda rng: (
+        [
+            {"name": rng.choice(_DEV_WORDS), "score": rng.randint(0, 9)}
+            for _ in range(rng.randint(1, 5))
+        ],
+    ),
+    "mapping": lambda rng: (
+        {rng.choice(_DEV_WORDS): rng.choice(_DEV_WORDS) for _ in range(rng.randint(1, 4))},
+    ),
+    "smallint": lambda rng: (rng.randint(0, 18),),
+    "int_signed": lambda rng: (rng.randint(-50, 50),),
+    "int2nonneg": lambda rng: (rng.randint(0, 20), rng.randint(0, 20)),
+    "clamp": lambda rng: (
+        rng.randint(-50, 50),
+        (low := rng.randint(-20, 20)),
+        low + rng.randint(0, 20),
+    ),
+    "pair_lists": lambda rng: (
+        [rng.randint(-9, 9) for _ in range(rng.randint(0, 5))],
+        [rng.randint(-9, 9) for _ in range(rng.randint(0, 5))],
+    ),
+    "same_pair_lists": _shape_same_pair_lists,
+    "records_int": lambda rng: (
+        [
+            {"name": rng.choice(_DEV_WORDS), "score": rng.randint(0, 9)}
+            for _ in range(rng.randint(0, 5))
+        ],
+    ),
+    "records_min": lambda rng: (
+        [
+            {"name": rng.choice(_DEV_WORDS), "score": rng.randint(0, 9)}
+            for _ in range(rng.randint(0, 5))
+        ],
+        rng.randint(0, 9),
+    ),
+    "list_width": lambda rng: (
+        [rng.randint(0, 30) for _ in range(rng.randint(0, 6))],
+        rng.randint(1, 5),
+    ),
+    "binary": lambda rng: ("".join(rng.choice("01") for _ in range(rng.randint(1, 8))),),
+    "hexcolor": lambda rng: ("#" + "".join(rng.choice("0123456789abcdef") for _ in range(6)),),
+    "rgb": lambda rng: (rng.randint(0, 255), rng.randint(0, 255), rng.randint(0, 255)),
+    "ipv4ish": lambda rng: (rng.choice(_DEV_IPS),),
+    "weekday": lambda rng: (rng.choice(_DEV_DAYS),),
+    "int_csv": lambda rng: (rng.choice(_DEV_CSVS),),
+    "int_csv_ok": lambda rng: (rng.choice(_DEV_CSVS_OK),),
+    "text_width": lambda rng: (
+        " ".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(0, 5))),
+        rng.randint(4, 18),
+    ),
+    "snake": lambda rng: (
+        "_".join(rng.choice(_DEV_WORDS) for _ in range(rng.randint(0, 4))),
+    ),
+}
+
+
+def _g_dev_reference(
+    entry: Mapping[str, Any], rng: random.Random, count: int
+) -> Iterator[tuple[Any, ...]]:
+    shape = _DEV_SHAPES[str(entry.get("shape", "int"))]
+    for _ in range(count):
+        yield shape(rng)
+
+
+def _check_dev_reference(
+    module: ModuleType, arguments: tuple[Any, ...], entry: Mapping[str, Any]
+) -> None:
+    symbol = str(entry["symbol"])
+    candidate = getattr(module, symbol, None)
+    if not callable(candidate):
+        raise AssertionError(f"{symbol} is not callable")
+    reference = getattr(_load_reference(str(entry["reference"])), symbol)
+    expected = reference(*copy.deepcopy(arguments))
+    actual = candidate(*copy.deepcopy(arguments))
+    if actual != expected:
+        raise AssertionError(f"expected {expected!r}, got {actual!r}")
+
+
 CHECKS: dict[str, Callable[..., None]] = {
     "count_vowels_identity": _c_count_vowels,
     "palindrome_normal_form": _c_palindrome,
@@ -906,6 +1055,7 @@ CHECKS: dict[str, Callable[..., None]] = {
     "rpn_reference": _c_rpn,
     "format_duration_reference": _c_duration,
     "stable_sort_reference": _c_records,
+    "dev_reference_matches": _check_dev_reference,
 }
 
 GENERATORS: dict[str, Callable[[Mapping[str, Any], random.Random, int], Iterator[tuple[Any, ...]]]] = {
@@ -939,9 +1089,12 @@ GENERATORS: dict[str, Callable[[Mapping[str, Any], random.Random, int], Iterator
     "rpn_reference": _g_rpn,
     "format_duration_reference": _g_durations,
     "stable_sort_reference": _g_records,
+    "dev_reference_matches": _g_dev_reference,
 }
 
-NEEDS_ENTRY = {"roman_parse_corpus", "roman_format_corpus"}
+NEEDS_ENTRY = {"roman_parse_corpus", "roman_format_corpus", "dev_reference_matches"}
+
+REQUIRES_CORPUS = {"roman_parse_corpus", "roman_format_corpus"}
 
 
 # --------------------------------------------------------------------------
@@ -962,8 +1115,14 @@ def load_table(path: Path | str) -> dict[str, Any]:
         for entry in entries:
             if not isinstance(entry, Mapping) or entry.get("property") not in CHECKS:
                 raise PropertyTableError(f"unknown property in {task_id}: {entry!r}")
-            if entry["property"] in NEEDS_ENTRY and "corpus" not in entry:
+            if entry["property"] in REQUIRES_CORPUS and "corpus" not in entry:
                 raise PropertyTableError(f"{entry['property']} requires a frozen corpus in {task_id}")
+            if entry["property"] == "dev_reference_matches" and not (
+                isinstance(entry.get("symbol"), str) and isinstance(entry.get("reference"), str)
+            ):
+                raise PropertyTableError(
+                    f"dev_reference_matches requires symbol and reference in {task_id}"
+                )
     return dict(tasks)
 
 

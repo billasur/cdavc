@@ -15,11 +15,29 @@ from cdavc.benchmark import (
     BenchmarkTask,
     _canonical_target,
     _sample_seed,
+    select_tasks,
     paired_pass_rate_difference,
     render_report,
 )
 from cdavc.benchmark import main as benchmark_main
 from cdavc.providers import MockProvider, OpenAICompatibleProvider, ProviderCompletion
+
+
+def _sha256_for_test(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _task_with_id(task_id: str) -> BenchmarkTask:
+    return BenchmarkTask(
+        task_id=task_id,
+        source="test-fixture-v1",
+        implementation_files=(f"benchmarks/dev/tasks/{task_id}/solution.py",),
+        test_files=("benchmarks/dev/public_tests.py",),
+        symbols=("answer",),
+        test_command=("python", "benchmarks/dev/public_tests.py", task_id),
+    )
 
 
 class BenchmarkTests(unittest.TestCase):
@@ -107,7 +125,7 @@ class BenchmarkTests(unittest.TestCase):
             line_count = len(records_path.read_text().splitlines())
             with patch.object(BenchmarkRunner, "_provider_for", side_effect=AssertionError("resumed")):
                 resumed = runner.run()
-            self.assertEqual(len(resumed), 3)
+            self.assertEqual(len(resumed), len(ARMS))
             self.assertEqual(len(records_path.read_text().splitlines()), line_count)
 
             (root / "tests" / "test_answer.py").write_text("changed\n")
@@ -118,6 +136,36 @@ class BenchmarkTests(unittest.TestCase):
                     tasks=[task],
                     records_path=records_path,
                 ).run()
+
+    def test_properties_path_selects_a_dev_table_and_stays_repository_relative(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._git_project(Path(directory))
+            (root / "benchmarks" / "dev").mkdir(parents=True)
+            table = root / "benchmarks" / "dev" / "properties.json"
+            table.write_text('{"tasks": {}}')
+            task = self._task()
+            runner = BenchmarkRunner(
+                root,
+                lambda _arm, _task: MockProvider([]),
+                tasks=[task],
+                properties_path=Path("benchmarks/dev/properties.json"),
+            )
+            self.assertEqual(runner._property_table_hash(), _sha256_for_test(table))
+            with self.assertRaises(BenchmarkError):
+                BenchmarkRunner(
+                    root,
+                    lambda _arm, _task: MockProvider([]),
+                    tasks=[task],
+                    properties_path=table,
+                )
+
+    def test_only_flag_limits_a_run_to_the_named_tasks(self):
+        tasks = [_task_with_id(item) for item in ("dev_001", "dev_002", "dev_003")]
+        selected = select_tasks(tasks, "dev_003,dev_001")
+        self.assertEqual([task.task_id for task in selected], ["dev_001", "dev_003"])
+        self.assertEqual(len(select_tasks(tasks, None)), 3)
+        with self.assertRaises(BenchmarkError):
+            select_tasks(tasks, "dev_001,dev_999")
 
     def test_resume_rejects_mixed_experiment_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -189,7 +237,12 @@ class BenchmarkTests(unittest.TestCase):
             )
             bad = self._response("def answer() -> int:\n    return 0\n")
             good = self._response("def answer() -> int:\n    return 42\n")
-            prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
+            prompts = {
+                "baseline_single": [],
+                "baseline_retry_blind": [],
+                "baseline_retry_oracle": [],
+                "cdavc": [],
+            }
 
             class SequenceProvider:
                 available = True
@@ -205,7 +258,11 @@ class BenchmarkTests(unittest.TestCase):
             def provider_factory(arm, _task):
                 if arm == "baseline_single":
                     return SequenceProvider([bad], arm)
-                if arm == "baseline_retry":
+                if arm == "baseline_retry_oracle":
+                    return SequenceProvider([bad, good], arm)
+                if arm == "baseline_retry_blind":
+                    # Same two draws, but the repair context comes from the
+                    # public command only; no hidden text reaches this arm.
                     return SequenceProvider([bad, good], arm)
                 return SequenceProvider([good], arm)
 
@@ -216,12 +273,18 @@ class BenchmarkTests(unittest.TestCase):
                 records_path=root / "records.jsonl",
             ).run()
             single = next(record for record in records if record["arm"] == "baseline_single")
-            retry = next(record for record in records if record["arm"] == "baseline_retry")
+            blind = next(record for record in records if record["arm"] == "baseline_retry_blind")
+            oracle = next(record for record in records if record["arm"] == "baseline_retry_oracle")
             self.assertFalse(single["pass"])
-            self.assertTrue(retry["pass"])
-            self.assertEqual(retry["attempts"], 2)
-            self.assertIn("hidden assertion failed", prompts["baseline_retry"][1])
+            self.assertTrue(oracle["pass"])
+            self.assertEqual(oracle["attempts"], 2)
+            self.assertIn("hidden assertion failed", prompts["baseline_retry_oracle"][1])
             self.assertNotIn("hidden assertion failed", prompts["baseline_single"][0])
+            # The blind arm is scored on the public test alone, which this
+            # wrong answer satisfies; that is the information asymmetry.
+            self.assertTrue(blind["pass"])
+            self.assertEqual(blind["attempts"], 2)
+            self.assertNotIn("hidden assertion failed", prompts["baseline_retry_blind"][1])
 
     def test_cage_enforces_ast_hash_hidden_and_regression_gates_without_leaking_hidden_content(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -374,7 +437,8 @@ class BenchmarkTests(unittest.TestCase):
         for task_id, baseline_pass, cdavc_pass in (("a", True, True), ("b", True, False), ("c", False, True)):
             for arm, passed, wall, token_in in (
                 ("baseline_single", baseline_pass, 1.0, 10),
-                ("baseline_retry", baseline_pass, 1.5, 12),
+                ("baseline_retry_blind", baseline_pass, 1.5, 12),
+                ("baseline_retry_oracle", baseline_pass, 1.6, 12),
                 ("cdavc", cdavc_pass, 2.0, 15),
             ):
                 records.append(
@@ -642,16 +706,18 @@ class BenchmarkTests(unittest.TestCase):
             task = self._task(max_retries=2)
             runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
             self.assertEqual(runner._samples_for("baseline_single", task), 1)
-            self.assertEqual(runner._samples_for("baseline_retry", task), 3)
-            self.assertEqual(runner._samples_for("cdavc", task), 4)
+            self.assertEqual(runner._samples_for("baseline_retry_blind", task), 3)
+            self.assertEqual(runner._samples_for("baseline_retry_oracle", task), 3)
+            # Equal budget: the cage gets no extra draw over the baselines.
+            self.assertEqual(runner._samples_for("cdavc", task), 3)
 
     def test_cage_keeps_its_own_draw_budget(self):
         with tempfile.TemporaryDirectory() as directory:
             root = self._git_project(Path(directory))
             task = self._task(max_retries=0)
             runner = BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], retry_cap=3)
-            self.assertEqual(runner._samples_for("cdavc", task), 4)
-            self.assertEqual(runner._samples_for("baseline_retry", task), 1)
+            self.assertEqual(runner._samples_for("cdavc", task), 3)
+            self.assertEqual(runner._samples_for("baseline_retry_blind", task), 1)
             with self.assertRaises(BenchmarkError):
                 BenchmarkRunner(root, lambda _arm, _task: MockProvider([]), tasks=[task], samples=0)
             with self.assertRaises(BenchmarkError):
@@ -768,7 +834,7 @@ class BenchmarkTests(unittest.TestCase):
             prompt = runner._prompt(task, "cdavc", "property gate failed", digest=digest)
             self.assertIn("merge_sorted_multiset([1], [1]): expected [1, 1], got [1]", prompt)
             self.assertIn("must satisfy all of them", prompt)
-            self.assertNotIn("merge_sorted_multiset", runner._prompt(task, "baseline_retry", "", digest=digest))
+            self.assertNotIn("merge_sorted_multiset", runner._prompt(task, "baseline_retry_blind", "", digest=digest))
 
     def test_property_failure_is_replayed_in_the_next_draw_prompt(self):
         with tempfile.TemporaryDirectory() as directory:

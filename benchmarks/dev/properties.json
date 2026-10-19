@@ -1,0 +1,404 @@
+{
+  "tasks": {
+    "dev_001": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_001.py",
+        "shape": "intlist",
+        "symbol": "second_largest"
+      }
+    ],
+    "dev_002": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_002.py",
+        "shape": "text_int",
+        "symbol": "caesar_shift"
+      }
+    ],
+    "dev_003": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_003.py",
+        "shape": "text",
+        "symbol": "title_case"
+      }
+    ],
+    "dev_004": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_004.py",
+        "shape": "text",
+        "symbol": "collapse_spaces"
+      }
+    ],
+    "dev_005": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_005.py",
+        "shape": "text2",
+        "symbol": "count_substring"
+      }
+    ],
+    "dev_006": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_006.py",
+        "shape": "text_width",
+        "symbol": "truncate"
+      }
+    ],
+    "dev_007": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_007.py",
+        "shape": "snake",
+        "symbol": "snake_to_camel"
+      }
+    ],
+    "dev_008": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_008.py",
+        "shape": "text2",
+        "symbol": "is_anagram"
+      }
+    ],
+    "dev_009": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_009.py",
+        "shape": "int_signed",
+        "symbol": "digit_sum"
+      }
+    ],
+    "dev_010": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_010.py",
+        "shape": "int",
+        "symbol": "is_armstrong"
+      }
+    ],
+    "dev_011": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_011.py",
+        "shape": "smallint",
+        "symbol": "factorial"
+      }
+    ],
+    "dev_012": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_012.py",
+        "shape": "int2nonneg",
+        "symbol": "binomial"
+      }
+    ],
+    "dev_013": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_013.py",
+        "shape": "int_signed",
+        "symbol": "is_perfect_square"
+      }
+    ],
+    "dev_014": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_014.py",
+        "shape": "clamp",
+        "symbol": "clamp"
+      }
+    ],
+    "dev_015": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_015.py",
+        "shape": "int_signed",
+        "symbol": "sign"
+      }
+    ],
+    "dev_016": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_016.py",
+        "shape": "poslist",
+        "symbol": "mean"
+      }
+    ],
+    "dev_017": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_017.py",
+        "shape": "poslist",
+        "symbol": "median"
+      }
+    ],
+    "dev_018": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_018.py",
+        "shape": "poslist",
+        "symbol": "variance_population"
+      }
+    ],
+    "dev_019": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_019.py",
+        "shape": "numlist",
+        "symbol": "normalize_vector"
+      }
+    ],
+    "dev_020": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_020.py",
+        "shape": "same_pair_lists",
+        "symbol": "dot_product"
+      }
+    ],
+    "dev_021": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_021.py",
+        "shape": "intlist",
+        "symbol": "cumulative_sum"
+      }
+    ],
+    "dev_022": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_022.py",
+        "shape": "intlist",
+        "symbol": "pairwise_differences"
+      }
+    ],
+    "dev_023": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_023.py",
+        "shape": "pair_lists",
+        "symbol": "interleave"
+      }
+    ],
+    "dev_024": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_024.py",
+        "shape": "intlist",
+        "symbol": "take_while_positive"
+      }
+    ],
+    "dev_025": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_025.py",
+        "shape": "intlist",
+        "symbol": "drop_while_negative"
+      }
+    ],
+    "dev_026": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_026.py",
+        "shape": "intlist",
+        "symbol": "partition_parity"
+      }
+    ],
+    "dev_027": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_027.py",
+        "shape": "records",
+        "symbol": "count_by_name"
+      }
+    ],
+    "dev_028": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_028.py",
+        "shape": "mapping",
+        "symbol": "invert_mapping"
+      }
+    ],
+    "dev_029": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_029.py",
+        "shape": "records_min",
+        "symbol": "filter_by_score"
+      }
+    ],
+    "dev_030": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_030.py",
+        "shape": "records_int",
+        "symbol": "sort_records"
+      }
+    ],
+    "dev_031": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_031.py",
+        "shape": "records_int",
+        "symbol": "pluck"
+      }
+    ],
+    "dev_032": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_032.py",
+        "shape": "list_width",
+        "symbol": "bucket_counts"
+      }
+    ],
+    "dev_033": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_033.py",
+        "shape": "binary",
+        "symbol": "binary_to_int"
+      }
+    ],
+    "dev_034": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_034.py",
+        "shape": "smallint",
+        "symbol": "int_to_binary"
+      }
+    ],
+    "dev_035": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_035.py",
+        "shape": "hexcolor",
+        "symbol": "hex_to_rgb"
+      }
+    ],
+    "dev_036": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_036.py",
+        "shape": "rgb",
+        "symbol": "rgb_to_hex"
+      }
+    ],
+    "dev_037": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_037.py",
+        "shape": "ipv4ish",
+        "symbol": "is_valid_ipv4"
+      }
+    ],
+    "dev_038": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_038.py",
+        "shape": "weekday",
+        "symbol": "weekday_abbrev"
+      }
+    ],
+    "dev_039": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_039.py",
+        "shape": "int_csv_ok",
+        "symbol": "parse_ints"
+      }
+    ],
+    "dev_040": [
+      {
+        "cases": 12,
+        "property": "dev_reference_matches",
+        "pure": true,
+        "reference": "benchmarks/dev/references/dev_040.py",
+        "shape": "text_width",
+        "symbol": "wrap_text"
+      }
+    ]
+  }
+}
