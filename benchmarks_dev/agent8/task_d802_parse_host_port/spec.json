@@ -1,0 +1,15 @@
+{
+  "task_id": "task_d802_parse_host_port",
+  "title": "Parse host:port text",
+  "description": "Implement parse_host_port(text). Parse a string of the form 'host:port' and return a tuple (host, port) where host is a str and port is an int. Raise TypeError if text is not a str. Strip surrounding whitespace from the whole string; raise ValueError on an empty string. The string must contain exactly one ':' (else ValueError); strip whitespace around both parts. Raise ValueError if the host is empty. The port part must be non-empty ASCII digits only (else ValueError): leading zeros are allowed, signs and decimal points are not. Convert to int and raise ValueError unless 1 <= port <= 65535. No further host validation is performed.",
+  "implementation_files": ["benchmarks_dev/agent8/task_d802_parse_host_port/solution_stub.py"],
+  "symbols": ["parse_host_port"],
+  "invariants": [
+    "Exactly one ':' is required; zero or multiple colons are ValueError.",
+    "Port text like '00080' is valid and yields 80; '+80', '8.0', and '-1' are ValueError.",
+    "Boundary ports 1 and 65535 are valid; 0 and 65536 are ValueError.",
+    "Host is returned stripped; no further host validation is performed.",
+    "TypeError only for non-str input; every malformed string is ValueError."
+  ],
+  "max_retries": 2
+}

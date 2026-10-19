@@ -1,0 +1,15 @@
+{
+  "task_id": "task_d801_normalize_user_record",
+  "title": "Normalize and validate a user record",
+  "description": "Implement normalize_user_record(record). Validate a user record dict and return a normalized copy with exactly the keys 'name', 'email', 'age', 'tags'. Raise TypeError if record is not a dict. Raise KeyError naming the first missing key if any of 'name', 'email', 'age' is absent. 'name' must be a str (else TypeError); strip it and raise ValueError if it is then empty. 'email' must be a str (else TypeError); strip and lowercase it, then raise ValueError unless it contains exactly one '@' with a non-empty local part and a non-empty domain that contains at least one '.'. 'age' must be an int that is not a bool (else TypeError) and within 0..150 inclusive (else ValueError). Optional 'tags' defaults to []; if present it must be a list of str (TypeError for a non-list or a non-str element); strip each tag, drop empty tags, and remove duplicates keeping first-occurrence order. Extra keys are ignored.",
+  "implementation_files": ["benchmarks_dev/agent8/task_d801_normalize_user_record/solution_stub.py"],
+  "symbols": ["normalize_user_record"],
+  "invariants": [
+    "The return value has exactly the keys 'name', 'email', 'age', 'tags'; extra input keys are dropped.",
+    "bool is rejected for 'age' with TypeError even though bool subclasses int.",
+    "Email normalization happens before validation: surrounding whitespace is stripped and case is lowered.",
+    "Duplicate tags are removed after stripping, preserving first-occurrence order; empty stripped tags are dropped.",
+    "KeyError is raised for missing required keys, TypeError for wrong types, ValueError for well-typed but invalid values."
+  ],
+  "max_retries": 2
+}

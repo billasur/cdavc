@@ -1,0 +1,15 @@
+{
+  "task_id": "task_d803_convert_length",
+  "title": "Convert length units with validation",
+  "description": "Implement convert_length(value, from_unit, to_unit). Convert a length between the units mm, cm, m, km, in, ft (1 mm = 0.001 m, 1 cm = 0.01 m, 1 km = 1000 m, 1 in = 0.0254 m, 1 ft = 0.3048 m). Units must be str (else TypeError); they are stripped and lowercased, so 'KM' and ' cm ' are valid; an unknown unit raises ValueError. value must be an int or float that is not a bool (else TypeError); NaN or infinity raises ValueError; a negative value raises ValueError. Return the converted value as a float rounded to 6 decimal places.",
+  "implementation_files": ["benchmarks_dev/agent8/task_d803_convert_length/solution_stub.py"],
+  "symbols": ["convert_length"],
+  "invariants": [
+    "Unit matching is case-insensitive and ignores surrounding whitespace.",
+    "bool values are TypeError even though bool subclasses int; numeric strings are TypeError too.",
+    "NaN and +/-inf are ValueError, not TypeError.",
+    "The result is always a float rounded to 6 decimal places (10 mm -> 0.393701 in).",
+    "Zero is a valid value; any negative value is ValueError."
+  ],
+  "max_retries": 2
+}

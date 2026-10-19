@@ -1,0 +1,15 @@
+{
+  "task_id": "task_d804_merge_intervals",
+  "title": "Merge intervals with validation",
+  "description": "Implement merge_intervals(intervals). Merge a list of [start, end] interval pairs and return a sorted list of merged [start, end] lists. intervals must be a list (else TypeError); each element must be a list or tuple of length 2 (else TypeError); each endpoint must be an int or float that is not a bool (else TypeError) and finite (NaN or infinity raises ValueError); start must not exceed end (else ValueError). Intervals that overlap or touch (next start <= current end) merge into one. The result is sorted by start and endpoints keep their original numeric values. An empty list returns [].",
+  "implementation_files": ["benchmarks_dev/agent8/task_d804_merge_intervals/solution_stub.py"],
+  "symbols": ["merge_intervals"],
+  "invariants": [
+    "Touching intervals merge: [[1, 2], [2, 3]] -> [[1, 3]].",
+    "Input order does not matter; the output is sorted by start.",
+    "Containment is absorbed: [[1, 10], [2, 3]] -> [[1, 10]].",
+    "Returned intervals are plain two-element lists even when the input pairs were tuples.",
+    "bool endpoints are TypeError; NaN/inf endpoints are ValueError; start > end is ValueError."
+  ],
+  "max_retries": 2
+}

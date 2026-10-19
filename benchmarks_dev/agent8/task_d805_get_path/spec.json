@@ -1,0 +1,15 @@
+{
+  "task_id": "task_d805_get_path",
+  "title": "Dotted-path lookup in nested dicts",
+  "description": "Implement get_path(data, path, default). Walk a dotted path through nested dicts and return the value found. data must be a dict (else TypeError). path must be a str (else TypeError); an empty path or any empty segment (leading, trailing, or doubled dots) raises ValueError. At each step the current value must be a dict (else TypeError). If a segment is missing: return default when one was passed, otherwise raise KeyError naming the missing segment. Passing default=None explicitly is valid and distinct from omitting it. A stored value of None is a real value and is returned, not treated as missing. Segments are matched exactly; spaces are not trimmed.",
+  "implementation_files": ["benchmarks_dev/agent8/task_d805_get_path/solution_stub.py"],
+  "symbols": ["get_path"],
+  "invariants": [
+    "The sentinel distinguishes 'no default passed' (KeyError on a missing segment) from default=None (returns None on a missing segment).",
+    "Traversing into a non-dict value (path 'a.b' where data['a'] is 5) raises TypeError.",
+    "Split is on '.'; spaces are not trimmed and segments are matched exactly.",
+    "Empty path and empty segments ('', '.a', 'a.', 'a..b') are ValueError.",
+    "The found value is returned unchanged whatever its type, including None."
+  ],
+  "max_retries": 2
+}
