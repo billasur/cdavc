@@ -480,8 +480,9 @@ class BenchmarkRunner:
 
         Targeted, negative and regression tests are public repository assets,
         so their sanitised traceback is forwarded like a human engineer would
-        see it.  A hidden-gate rejection stays categorical and is answered with
-        the task's declared invariants instead of the failing assertion.
+        see it, cut to the first failing assertion (experiment 2).  A
+        hidden-gate rejection stays categorical and is answered with the
+        task's declared invariants instead of the failing assertion.
         """
 
         category = _failure_category(failure)
@@ -490,7 +491,8 @@ class BenchmarkRunner:
             return context + _invariant_guidance(task)
         detail = failure.split(":", 1)[1].strip() if ":" in failure else ""
         if detail:
-            return context + f"Public gate output:\n{detail}\n"
+            excerpt = _first_failure_excerpt(detail)
+            return context + f"Public gate output (first failure):\n{excerpt}\n"
         return context
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
@@ -1247,6 +1249,53 @@ def _safe_failure(exc: Exception) -> str:
     if isinstance(exc, BenchmarkError):
         return str(exc)
     return f"{type(exc).__name__} during candidate execution"
+
+
+_UNITTEST_FAILURE_TITLE = re.compile(r"^(FAIL|ERROR):")
+_FAILURE_MARKERS = (
+    "traceback (most recent call last)",
+    "assertionerror",
+    " failed",
+    "error:",
+)
+
+
+def _first_failure_excerpt(output: str, *, max_chars: int = 800) -> str:
+    """Reduce test-runner output to the first failing assertion region.
+
+    A repair prompt should carry what a human engineer would read first -
+    the first failing assertion - not stdout noise or later failure
+    blocks.  unittest-style output is cut to the first FAIL/ERROR block;
+    other output is cut to start at its first failure-looking line.
+    Output with no recognisable failure is returned whole.  Every path is
+    bounded to ``max_chars``; an over-long region keeps its head and its
+    tail (where the assertion message lives) with an elision marker.
+    """
+
+    text = output.strip()
+    if not text:
+        return text
+    lines = text.splitlines()
+    titles = [i for i, line in enumerate(lines) if _UNITTEST_FAILURE_TITLE.match(line)]
+    if titles:
+        first = titles[0]
+        start = first - 1 if first and set(lines[first - 1].strip()) == {"="} else first
+        stop = titles[1] if len(titles) > 1 else len(lines)
+        if stop < len(lines) and stop > start and set(lines[stop - 1].strip()) == {"="}:
+            stop -= 1
+        region = lines[start:stop]
+    else:
+        start = next(
+            (i for i, line in enumerate(lines) if any(marker in line.lower() for marker in _FAILURE_MARKERS)),
+            0,
+        )
+        region = lines[start:]
+    excerpt = "\n".join(region).strip()
+    if len(excerpt) > max_chars:
+        head = max_chars * 2 // 3
+        tail = max_chars - head
+        excerpt = excerpt[:head].rstrip() + "\n[...]\n" + excerpt[-tail:].lstrip()
+    return excerpt
 
 
 def _failure_category(failure: str) -> str:
