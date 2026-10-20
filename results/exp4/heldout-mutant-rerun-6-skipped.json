@@ -1,0 +1,132 @@
+[
+ {
+  "task_id": "task_h01_parse_config",
+  "reference_passes": true,
+  "mutants_total": 12,
+  "killed": 11,
+  "survived": 1,
+  "timeouts": 0,
+  "kill_rate": 0.9166666666666666,
+  "wilson95": [
+   0.6461200862787543,
+   0.9851349057603306
+  ],
+  "surviving_mutants": [
+   {
+    "mutant_id": "m0005",
+    "operator": "const_shift",
+    "lineno": 12,
+    "detail": "3 - 1"
+   }
+  ]
+ },
+ {
+  "task_id": "task_h02_eval_expression",
+  "reference_passes": true,
+  "mutants_total": 12,
+  "killed": 11,
+  "survived": 1,
+  "timeouts": 0,
+  "kill_rate": 0.9166666666666666,
+  "wilson95": [
+   0.6461200862787543,
+   0.9851349057603306
+  ],
+  "surviving_mutants": [
+   {
+    "mutant_id": "m0034",
+    "operator": "const_shift",
+    "lineno": 56,
+    "detail": "1 + 1"
+   }
+  ]
+ },
+ {
+  "task_id": "task_h03_parse_csv_line",
+  "reference_passes": true,
+  "mutants_total": 12,
+  "killed": 12,
+  "survived": 0,
+  "timeouts": 1,
+  "kill_rate": 1.0,
+  "wilson95": [
+   0.7575059904469021,
+   1.0
+  ],
+  "surviving_mutants": []
+ },
+ {
+  "task_id": "task_h04_compare_versions",
+  "reference_passes": true,
+  "mutants_total": 12,
+  "killed": 9,
+  "survived": 3,
+  "timeouts": 0,
+  "kill_rate": 0.75,
+  "wilson95": [
+   0.4676946629183366,
+   0.9110583323051143
+  ],
+  "surviving_mutants": [
+   {
+    "mutant_id": "m0003",
+    "operator": "const_shift",
+    "lineno": 20,
+    "detail": "0 + 1"
+   },
+   {
+    "mutant_id": "m0005",
+    "operator": "arith_swap",
+    "lineno": 20,
+    "detail": "width - len(left)"
+   },
+   {
+    "mutant_id": "m0013",
+    "operator": "const_shift",
+    "lineno": 24,
+    "detail": "1 - 1"
+   }
+  ]
+ },
+ {
+  "task_id": "task_h05_parse_log_line",
+  "reference_passes": true,
+  "mutants_total": 12,
+  "killed": 10,
+  "survived": 2,
+  "timeouts": 0,
+  "kill_rate": 0.8333333333333334,
+  "wilson95": [
+   0.5519691353881888,
+   0.9530348582430792
+  ],
+  "surviving_mutants": [
+   {
+    "mutant_id": "m0013",
+    "operator": "const_shift",
+    "lineno": 11,
+    "detail": "4 - 1"
+   },
+   {
+    "mutant_id": "m0047",
+    "operator": "const_shift",
+    "lineno": 24,
+    "detail": "6 + 1"
+   }
+  ]
+ },
+ {
+  "task_id": "task_h401_connected_components",
+  "reference_passes": true,
+  "mutants_total": 7,
+  "killed": 7,
+  "survived": 0,
+  "timeouts": 1,
+  "kill_rate": 1.0,
+  "wilson95": [
+   0.6456695613241317,
+   1.0
+  ],
+  "surviving_mutants": []
+ }
+]

@@ -245,7 +245,7 @@ def _run_hidden_tests(task_dir: Path, solution: Path, timeout: float) -> tuple[i
     start = time.monotonic()
     try:
         proc = subprocess.run(
-            [sys.executable, str(task_dir / "hidden_tests.py"), str(solution)],
+            [sys.executable, str((task_dir / "hidden_tests.py").resolve()), str(Path(solution).resolve())],
             capture_output=True,
             timeout=timeout,
         )
