@@ -2,9 +2,13 @@ import * as THREE from 'three';
 
 /**
  * CD-AVC Showcase v6
- * Dual-Theme Architecture (W1: Dark Green / W2: Warm Charcoal & Monochromatic Off-White)
- * Direction A: "Thread" with Judgement Moment (Wall of Cubes, Drops & Cage Enclosure)
- * 100% Scroll-Scrubbed Bidirectionally, Zero Autoplay, Solid Physical Presence
+ * Theme W2 by default (Warm Charcoal & Monochromatic Off-White) / Switchable to W1 (Dark Green)
+ * Direction A: "Thread"
+ * Hero: Solid Tactile Rectangle with 3-Tier Crystallisation Lattice (Recursive Branching)
+ * Stage 1: One shot, can fail (Root rectangle turns red)
+ * Stage 2: More shots, no judgement (Rectangles bloom out 1 -> 2 -> 4 -> 8 in radial crystal lattice)
+ * Stage 3: A cage that checks before it accepts (Sequential collapse 8 -> 4 -> 2 -> 1, vitrine cage seals accepted core)
+ * 100% Scroll-Scrubbed Bidirectionally, Zero Autoplay
  */
 
 // Initialize Smooth Scrolling with Lenis
@@ -58,8 +62,9 @@ class ThreadStoryStage {
 
   initTheme() {
     const urlParams = new URLSearchParams(window.location.search);
-    const themeParam = (urlParams.get('theme') || 'w1').toLowerCase();
-    this.isW2 = themeParam === 'w2';
+    // User preference: Love W2! Default to W2 unless explicitly requested w1
+    const themeParam = (urlParams.get('theme') || 'w2').toLowerCase();
+    this.isW2 = themeParam !== 'w1';
 
     if (this.isW2) {
       document.documentElement.setAttribute('data-theme', 'w2');
@@ -81,17 +86,18 @@ class ThreadStoryStage {
     this.colors = this.isW2
       ? {
           bg: 0x161514,
-          heroBase: 0x2c2a28,
-          heroEdge: 0xe0ddd7,
+          heroBase: 0x32302e,
+          heroEdge: 0xeae7e1,
           thread: 0x8e8d8a,
+          connector: 0xf5f3ee,
           dashes: 0x484643,
           keyLight: 0xfffaee,
-          fillLight: 0x8a8782,
+          fillLight: 0xb0ada7,
           rimLight: 0xebe8e1,
           heroPoint: 0xfffdfa,
           acceptedEmissive: 0xf4f4f2,
           acceptedCore: 0xeae7e1,
-          cageWire: 0xf0ede6,
+          cageWire: 0xf5f2eb,
           cageGlass: 0xffffff,
           failRed: 0xff3838,
         }
@@ -100,6 +106,7 @@ class ThreadStoryStage {
           heroBase: 0x19251e,
           heroEdge: 0xd8ff64,
           thread: 0xd8ff64,
+          connector: 0xd8ff64,
           dashes: 0x2d3e33,
           keyLight: 0xf5f7f5,
           fillLight: 0x3d5244,
@@ -122,7 +129,7 @@ class ThreadStoryStage {
 
     this.isMobile = window.innerWidth <= 860 || document.body.classList.contains('is-mobile-preview');
     const fov = this.isMobile ? 42 : 38;
-    const camZ = this.isMobile ? 240 : 205;
+    const camZ = this.isMobile ? 260 : 230;
 
     this.camera = new THREE.PerspectiveCamera(fov, width / height, 1, 1200);
     this.camera.position.set(0, 0, camZ);
@@ -137,27 +144,27 @@ class ThreadStoryStage {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     // Studio 3-point lighting setup for solid physical presence
-    const ambColor = this.isW2 ? 0x22201e : 0x0e1511;
-    const ambientLight = new THREE.AmbientLight(ambColor, 1.3);
+    const ambColor = this.isW2 ? 0x2c2927 : 0x0e1511;
+    const ambientLight = new THREE.AmbientLight(ambColor, 1.65);
     this.scene.add(ambientLight);
 
     // Key light: illuminates top and upper-right facets
-    this.keyLight = new THREE.DirectionalLight(this.colors.keyLight, 2.2);
-    this.keyLight.position.set(65, 85, 90);
+    this.keyLight = new THREE.DirectionalLight(this.colors.keyLight, 2.3);
+    this.keyLight.position.set(70, 85, 95);
     this.scene.add(this.keyLight);
 
-    // Fill light: softens front-left facet so mass is tactile
-    this.fillLight = new THREE.DirectionalLight(this.colors.fillLight, 0.9);
-    this.fillLight.position.set(-55, 30, 80);
+    // Fill light: softens front-left facet
+    this.fillLight = new THREE.DirectionalLight(this.colors.fillLight, 1.25);
+    this.fillLight.position.set(-60, 25, 75);
     this.scene.add(this.fillLight);
 
     // Rim light: outlines silhouette and back edges
-    this.rimLight = new THREE.DirectionalLight(this.colors.rimLight, 1.3);
-    this.rimLight.position.set(-65, -50, -60);
+    this.rimLight = new THREE.DirectionalLight(this.colors.rimLight, 1.5);
+    this.rimLight.position.set(-55, -45, -60);
     this.scene.add(this.rimLight);
 
-    // Hero Local Point Light
-    this.heroLight = new THREE.PointLight(this.colors.heroPoint, 1.1, 160);
+    // Local Hero Point Light
+    this.heroLight = new THREE.PointLight(this.colors.heroPoint, 1.2, 170);
     this.scene.add(this.heroLight);
   }
 
@@ -191,136 +198,131 @@ class ThreadStoryStage {
     });
     this.scene.add(new THREE.LineSegments(dashGeo, dashMat));
 
-    // Base aesthetic rotation angles (isometric 3-facet view from first frame)
-    this.baseRotX = 0.42;
-    this.baseRotY = 0.58;
-    this.baseRotZ = 0.08;
+    // Base aesthetic rotation angles (isometric 3-facet view)
+    this.baseRotX = 0.36;
+    this.baseRotY = 0.52;
+    this.baseRotZ = 0.04;
 
     // -------------------------------------------------------------
-    // 2. Solid Hero Block (36x36x36, 2x larger, solid material)
+    // 2. Crystallisation Lattice of Rectangles
+    // Radial Balanced Recursive Tree: Root (1) -> Tier 1 (2) -> Tier 2 (4) -> Tier 3 (8)
+    // Exactly 15 connected crystalline rectangles in balanced 3D space
+    // Calibrated with 6-unit right shift on desktop to clear text column with 40px margin
     // -------------------------------------------------------------
-    this.heroSize = 36;
-    this.heroGeo = new THREE.BoxGeometry(this.heroSize, this.heroSize, this.heroSize);
-    this.heroEdgeGeo = new THREE.EdgesGeometry(this.heroGeo);
+    this.latticeGroup = new THREE.Group();
+    this.latticeOffsetX = this.isMobile ? 0 : 6;
+    this.latticeGroup.position.set(this.latticeOffsetX, 22, 0);
+    this.latticeGroup.rotation.set(this.baseRotX, this.baseRotY, this.baseRotZ);
+    this.scene.add(this.latticeGroup);
 
-    this.heroGroup = new THREE.Group();
-    this.heroGroup.position.set(0, 22, 0);
-    this.heroGroup.rotation.set(this.baseRotX, this.baseRotY, this.baseRotZ);
-    this.scene.add(this.heroGroup);
+    // Node configurations: Root (0), Tier 1 (1,2), Tier 2 (3,4,5,6), Tier 3 (7..14)
+    this.nodeConfigs = [
+      // Level 0 (Original Root Rectangle R0)
+      { id: 0, level: 0, parent: -1, offset: [0, 0, 0], rot: [0, 0, 0], dims: [42, 24, 24] },
 
-    this.heroCoreMat = new THREE.MeshStandardMaterial({
-      color: this.colors.heroBase,
-      roughness: 0.30,
-      metalness: 0.50,
-    });
-    this.heroMesh = new THREE.Mesh(this.heroGeo, this.heroCoreMat);
-    this.heroGroup.add(this.heroMesh);
+      // Level 1: 2 rectangles branching laterally from Root (R1A Right, R1B Left)
+      { id: 1, level: 1, parent: 0, offset: [32, 0, 4], rot: [0, 0.08, -0.05], dims: [34, 19, 19] },
+      { id: 2, level: 1, parent: 0, offset: [-32, 0, -4], rot: [0, -0.08, 0.05], dims: [34, 19, 19] },
 
-    this.heroEdgeMat = new THREE.LineBasicMaterial({
-      color: this.colors.heroEdge,
-      transparent: true,
-      opacity: this.isW2 ? 0.50 : 0.75,
-    });
-    this.heroEdge = new THREE.LineSegments(this.heroEdgeGeo, this.heroEdgeMat);
-    this.heroGroup.add(this.heroEdge);
+      // Level 2: 2 rectangles branching from EACH Level 1 rectangle (4 total)
+      // From Node 1:
+      { id: 3, level: 2, parent: 1, offset: [20, 20, -8], rot: [0.08, 0.12, -0.12], dims: [28, 15, 15] },
+      { id: 4, level: 2, parent: 1, offset: [20, -20, 8], rot: [-0.08, 0.12, 0.12], dims: [28, 15, 15] },
+      // From Node 2:
+      { id: 5, level: 2, parent: 2, offset: [-20, 20, 8], rot: [0.08, -0.12, 0.12], dims: [28, 15, 15] },
+      { id: 6, level: 2, parent: 2, offset: [-20, -20, -8], rot: [-0.08, -0.12, -0.12], dims: [28, 15, 15] },
 
-    // -------------------------------------------------------------
-    // 3. Stage 2 Stacked Blocks (Retry Baseline: 3 stacked solid blocks)
-    // -------------------------------------------------------------
-    this.stackGroup = new THREE.Group();
-    this.stackGroup.visible = false;
-    this.stackGroup.position.set(0, 22, 0);
-    this.stackGroup.rotation.set(this.baseRotX, this.baseRotY, this.baseRotZ);
-    this.scene.add(this.stackGroup);
+      // Level 3: 2 rectangles branching from EACH Level 2 rectangle (8 total)
+      // From Node 3 (Top-Right):
+      { id: 7, level: 3, parent: 3, offset: [15, 10, -6], rot: [0.10, 0.14, -0.14], dims: [22, 12, 12] },
+      { id: 8, level: 3, parent: 3, offset: [5, 16, 8], rot: [0.06, 0.16, -0.08], dims: [22, 12, 12] },
+      // From Node 4 (Bottom-Right):
+      { id: 9, level: 3, parent: 4, offset: [15, -10, 6], rot: [-0.10, 0.14, 0.14], dims: [22, 12, 12] },
+      { id: 10, level: 3, parent: 4, offset: [5, -16, -8], rot: [-0.06, 0.16, 0.08], dims: [22, 12, 12] },
+      // From Node 5 (Top-Left):
+      { id: 11, level: 3, parent: 5, offset: [-15, 10, 6], rot: [0.10, -0.14, 0.14], dims: [22, 12, 12] },
+      { id: 12, level: 3, parent: 5, offset: [-5, 16, -8], rot: [0.06, -0.16, 0.08], dims: [22, 12, 12] },
+      // From Node 6 (Bottom-Left):
+      { id: 13, level: 3, parent: 6, offset: [-15, -10, -6], rot: [-0.10, -0.14, -0.14], dims: [22, 12, 12] },
+      { id: 14, level: 3, parent: 6, offset: [-5, -16, 8], rot: [-0.06, -0.16, -0.08], dims: [22, 12, 12] },
+    ];
 
-    this.stackCubes = [];
-    const stackYOffsets = [44, 0, -44];
-    for (let i = 0; i < 3; i++) {
-      const sGroup = new THREE.Group();
-      const sMat = new THREE.MeshStandardMaterial({
+    this.nodes = [];
+    this.nodeConfigs.forEach((cfg) => {
+      const nGroup = new THREE.Group();
+
+      // Rectangular box geometry
+      const [w, h, d] = cfg.dims;
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const edgeGeo = new THREE.EdgesGeometry(geo);
+
+      const mat = new THREE.MeshStandardMaterial({
         color: this.colors.heroBase,
-        roughness: 0.32,
-        metalness: 0.48,
+        roughness: 0.28,
+        metalness: 0.45,
         transparent: true,
-        opacity: 1,
+        opacity: 1.0,
       });
-      const sMesh = new THREE.Mesh(this.heroGeo, sMat);
-      const sEdge = new THREE.LineSegments(this.heroEdgeGeo, this.heroEdgeMat);
-      sGroup.add(sMesh);
-      sGroup.add(sEdge);
-      sGroup.position.y = stackYOffsets[i];
-      // Distinct stagger rotation so all 3 blocks are immediately clear
-      sGroup.rotation.y = (i - 1) * 0.14;
-      this.stackGroup.add(sGroup);
-      this.stackCubes.push({ group: sGroup, mat: sMat, baseY: stackYOffsets[i] });
-    }
+      const mesh = new THREE.Mesh(geo, mat);
+      nGroup.add(mesh);
 
-    // -------------------------------------------------------------
-    // 4. Stage 3 Wall of Candidate Cubes (Judgement Moment: 3x3 Grid)
-    // -------------------------------------------------------------
-    this.wallGroup = new THREE.Group();
-    this.wallGroup.visible = false;
-    this.wallGroup.position.set(0, 22, 0);
-    this.wallGroup.rotation.set(this.baseRotX, this.baseRotY, this.baseRotZ);
-    this.scene.add(this.wallGroup);
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: this.colors.heroEdge,
+        transparent: true,
+        opacity: this.isW2 ? 0.75 : 0.85,
+      });
+      const edge = new THREE.LineSegments(edgeGeo, edgeMat);
+      nGroup.add(edge);
 
-    this.candidateSize = 26;
-    this.candidateGeo = new THREE.BoxGeometry(this.candidateSize, this.candidateSize, this.candidateSize);
-    this.candidateEdgeGeo = new THREE.EdgesGeometry(this.candidateGeo);
+      nGroup.rotation.set(cfg.rot[0], cfg.rot[1], cfg.rot[2]);
+      this.latticeGroup.add(nGroup);
 
-    this.candidateCubes = [];
-    // 3x3 Grid: Center is index 4. Spacing: 40 units. Shifted slightly right (+8) to clear text.
-    const spacing = 40;
-    this.gridOffsetX = 8;
-    let index = 0;
-    for (let row = 1; row >= -1; row--) {
-      for (let col = -1; col <= 1; col++) {
-        const isCenter = row === 0 && col === 0;
-        const posX = this.gridOffsetX + col * spacing;
-        const posY = row * spacing;
+      // Connector line linking to parent rectangle
+      let connector = null;
+      let connectorMat = null;
+      let lineGeo = null;
+      if (cfg.parent >= 0) {
+        const linePositions = new Float32Array(6);
+        lineGeo = new THREE.BufferGeometry();
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
 
-        const cGroup = new THREE.Group();
-        cGroup.position.set(posX, posY, 0);
-
-        const cMat = new THREE.MeshStandardMaterial({
-          color: this.colors.heroBase,
-          roughness: 0.30,
-          metalness: 0.50,
+        connectorMat = new THREE.LineBasicMaterial({
+          color: this.colors.connector,
           transparent: true,
-          opacity: 1,
+          opacity: 0,
         });
-        const cMesh = new THREE.Mesh(this.candidateGeo, cMat);
-        const cEdgeMat = new THREE.LineBasicMaterial({
-          color: this.colors.heroEdge,
-          transparent: true,
-          opacity: this.isW2 ? 0.45 : 0.65,
-        });
-        const cEdge = new THREE.LineSegments(this.candidateEdgeGeo, cEdgeMat);
-        cGroup.add(cMesh);
-        cGroup.add(cEdge);
-
-        this.wallGroup.add(cGroup);
-        this.candidateCubes.push({
-          group: cGroup,
-          mat: cMat,
-          edgeMat: cEdgeMat,
-          isCenter: isCenter,
-          basePos: new THREE.Vector3(posX, posY, 0),
-          dropVelocity: 0.85 + (index % 3) * 0.25,
-          tiltAngle: ((index % 4) - 1.5) * 0.28,
-        });
-        index++;
+        connector = new THREE.Line(lineGeo, connectorMat);
+        connector.visible = false;
+        this.latticeGroup.add(connector);
       }
-    }
+
+      this.nodes.push({
+        id: cfg.id,
+        level: cfg.level,
+        parent: cfg.parent,
+        relOffset: new THREE.Vector3(...cfg.offset),
+        group: nGroup,
+        mesh: mesh,
+        mat: mat,
+        edgeMat: edgeMat,
+        connector: connector,
+        connectorMat: connectorMat,
+        lineGeo: lineGeo,
+      });
+    });
+
+    // Root node references for Stage 1 & accepted Stage 3
+    this.rootNode = this.nodes[0];
 
     // -------------------------------------------------------------
-    // 5. Stage 3 CD-AVC Verification Cage (Enclosing candidate hero)
+    // 3. Stage 3 CD-AVC Verification Cage (Vitrine Enclosure)
+    // Tailored to enclose the 42x24x24 root rectangle with precision
     // -------------------------------------------------------------
     this.cageGroup = new THREE.Group();
     this.cageGroup.visible = false;
+    this.latticeGroup.add(this.cageGroup);
 
-    const cageOuterSize = 42;
-    const cageGeo = new THREE.BoxGeometry(cageOuterSize, cageOuterSize, cageOuterSize);
+    const cageGeo = new THREE.BoxGeometry(50, 32, 32);
     const cageWireGeo = new THREE.EdgesGeometry(cageGeo);
 
     this.cageWireMat = new THREE.LineBasicMaterial({
@@ -331,21 +333,18 @@ class ThreadStoryStage {
     this.cageLines = new THREE.LineSegments(cageWireGeo, this.cageWireMat);
     this.cageGroup.add(this.cageLines);
 
-    // Light Frosted Glass Membrane
-    const glassSize = 40.5;
-    const glassGeo = new THREE.BoxGeometry(glassSize, glassSize, glassSize);
+    // Light Frosted Glass Vitrine Membrane
+    const glassGeo = new THREE.BoxGeometry(48.5, 30.5, 30.5);
     this.cageGlassMat = new THREE.MeshStandardMaterial({
       color: this.colors.cageGlass,
       roughness: 0.15,
-      metalness: 0.1,
+      metalness: 0.10,
       transparent: true,
       opacity: 0,
       depthWrite: false,
     });
     this.cageGlass = new THREE.Mesh(glassGeo, this.cageGlassMat);
     this.cageGroup.add(this.cageGlass);
-
-    this.scene.add(this.cageGroup);
   }
 
   initScrollTrigger() {
@@ -421,195 +420,186 @@ class ThreadStoryStage {
 
     const stage0Sub = document.querySelector('[data-stage="0"] .accent-sub');
 
-    // Continuous scroll rotation adding to the base isometric pose
-    const scrubRotX = this.baseRotX + this.progress * Math.PI * 0.8;
-    const scrubRotY = this.baseRotY + this.progress * Math.PI * 1.5;
+    // Subtle, unhurried isometric parallax (never flips or spins wildly)
+    const scrubRotX = this.baseRotX + Math.sin(this.progress * Math.PI) * 0.12;
+    const scrubRotY = this.baseRotY + (this.progress - 0.5) * 0.36;
 
-    // =========================================================================
-    // STAGE 1: SINGLE MODEL (0.00 - 0.34)
-    // Opens on solid block with presence. Transitions to solid red at fail moment.
-    // =========================================================================
+    this.latticeGroup.position.set(this.latticeOffsetX, threadY, 0);
+    this.latticeGroup.rotation.set(scrubRotX, scrubRotY, this.baseRotZ);
+
+    // Responsive scaling to ensure whole radial lattice fits with generous margins
+    const latticeScale = this.isMobile ? 0.66 : 0.80;
+    this.latticeGroup.scale.setScalar(latticeScale);
+
+    // Smoothstep interpolation helper
+    const smoothstep = (min, max, val) => {
+      const x = Math.max(0, Math.min(1, (val - min) / (max - min)));
+      return x * x * (3 - 2 * x);
+    };
+
+    // -------------------------------------------------------------
+    // PROGRESS PHASE FACTORS
+    // -------------------------------------------------------------
+
+    // 1. Stage 0: Fail Risk on Single Shot (p in [0.16, 0.32])
+    const failRisk = smoothstep(0.16, 0.30, this.progress) * (1.0 - smoothstep(0.32, 0.35, this.progress));
+
+    // 2. Stage 1: Crystallisation Growth (p in [0.34, 0.64])
+    const g1 = smoothstep(0.34, 0.44, this.progress); // Level 1 blooms out
+    const g2 = smoothstep(0.44, 0.54, this.progress); // Level 2 blooms out
+    const g3 = smoothstep(0.54, 0.63, this.progress); // Level 3 blooms out
+
+    // 3. Stage 2: CD-AVC Sequential Collapse (p in [0.64, 0.86])
+    // Collapses in the exact reverse / sequential order:
+    // Level 3 collapses first (0.65 -> 0.72)
+    const c3 = 1.0 - smoothstep(0.65, 0.72, this.progress);
+    // Level 2 collapses second (0.72 -> 0.79)
+    const c2 = 1.0 - smoothstep(0.72, 0.79, this.progress);
+    // Level 1 collapses third (0.79 -> 0.85)
+    const c1 = 1.0 - smoothstep(0.79, 0.85, this.progress);
+
+    // 4. Stage 3: Verification Acceptance & Cage Enclosure (p in [0.84, 0.92])
+    const tAccept = smoothstep(0.83, 0.89, this.progress);
+    const tCage = smoothstep(0.84, 0.91, this.progress);
+
+    // Determine level factors and failure states
+    let f1, f2, f3;
+    let isFailing3 = false;
+    let isFailing2 = false;
+    let isFailing1 = false;
+
+    if (this.progress < 0.64) {
+      // Growth phase (Stage 1)
+      f1 = g1;
+      f2 = g2;
+      f3 = g3;
+    } else {
+      // Collapse phase (Stage 2)
+      f1 = c1;
+      f2 = c2;
+      f3 = c3;
+      // Mark candidate shoots as failing invariants as they prune
+      isFailing3 = this.progress >= 0.64 && c3 > 0.001;
+      isFailing2 = this.progress >= 0.71 && c2 > 0.001;
+      isFailing1 = this.progress >= 0.78 && c1 > 0.001;
+    }
+
+    const levelFactors = [1.0, f1, f2, f3];
+    const levelFailing = [false, isFailing1, isFailing2, isFailing3];
+
+    // -------------------------------------------------------------
+    // UPDATE ROOT NODE (R0)
+    // -------------------------------------------------------------
     if (this.progress < 0.34) {
-      this.heroGroup.visible = true;
-      this.stackGroup.visible = false;
-      this.wallGroup.visible = false;
-      this.cageGroup.visible = false;
-
-      this.heroGroup.position.set(0, threadY, 0);
-      this.heroGroup.scale.setScalar(1.0);
-      this.heroGroup.rotation.set(scrubRotX, scrubRotY, this.baseRotZ);
-
-      // Fail risk transition (0.16 to 0.34)
-      const failRisk = Math.max(0, Math.min(1, (this.progress - 0.16) / 0.16));
-      if (failRisk > 0) {
-        // Smoothly lerp to solid red
+      // Stage 0: Solid single block with presence. Red at fail moment.
+      if (failRisk > 0.01) {
         const activeColor = new THREE.Color(this.colors.heroBase).lerp(
           new THREE.Color(this.colors.failRed),
           failRisk
         );
-        this.heroCoreMat.color.copy(activeColor);
-        this.heroCoreMat.emissive.setHex(this.colors.failRed).multiplyScalar(failRisk * 0.38);
-        this.heroEdgeMat.color.setHex(this.colors.failRed);
-
+        this.rootNode.mat.color.copy(activeColor);
+        this.rootNode.mat.emissive.setHex(this.colors.failRed).multiplyScalar(failRisk * 0.45);
+        this.rootNode.edgeMat.color.setHex(this.colors.failRed);
         if (stage0Sub) stage0Sub.style.color = '#ff4747';
       } else {
-        this.heroCoreMat.color.setHex(this.colors.heroBase);
-        this.heroCoreMat.emissive.setHex(0x000000);
-        this.heroEdgeMat.color.setHex(this.colors.heroEdge);
-
+        this.rootNode.mat.color.setHex(this.colors.heroBase);
+        this.rootNode.mat.emissive.setHex(0x000000);
+        this.rootNode.edgeMat.color.setHex(this.colors.heroEdge);
         if (stage0Sub) stage0Sub.style.color = '';
       }
-
-      this.threadMat.opacity = this.isW2 ? 0.35 : 0.30;
-    }
-    // =========================================================================
-    // STAGE 2: RETRY BASELINE (0.34 - 0.62)
-    // "Retry = a few stacked blocks." 3 stacked solid blocks blind to judgement.
-    // =========================================================================
-    else if (this.progress < 0.62) {
+    } else if (this.progress < 0.83) {
       if (stage0Sub) stage0Sub.style.color = '';
-
-      this.heroGroup.visible = false;
-      this.stackGroup.visible = true;
-      this.wallGroup.visible = false;
-      this.cageGroup.visible = false;
-
-      this.stackGroup.position.set(0, threadY, 0);
-      this.stackGroup.scale.setScalar(1.0);
-      // Maintain pristine isometric angle with subtle scroll tilt so all 3 blocks remain cleanly visible
-      const stackTilt = (this.progress - 0.34) * 0.45;
-      this.stackGroup.rotation.set(
-        this.baseRotX + stackTilt * 0.2,
-        this.baseRotY + stackTilt * 0.5,
-        this.baseRotZ
-      );
-
-      // Stack assembly / slide into place (0.34 - 0.40)
-      const stackSpread = Math.min(1.0, (this.progress - 0.34) / 0.06);
-      this.stackCubes.forEach((c) => {
-        c.group.position.y = c.baseY * stackSpread;
-        c.mat.color.setHex(this.colors.heroBase);
-        c.mat.emissive.setHex(0x000000);
-        c.mat.opacity = 1.0;
-      });
-
-      this.threadMat.opacity = this.isW2 ? 0.35 : 0.30;
-    }
-    // =========================================================================
-    // STAGE 3: CD-AVC & JUDGEMENT MOMENT (0.62 - 1.00)
-    // Scale up candidate cubes until they fill the screen (wall of cubes).
-    // Rejected ones turn red and drop out. Accepted one stays green (W1) or
-    // luminous off-white (W2) and settles into cage. Scales back down for results.
-    // =========================================================================
-    else {
+      this.rootNode.mat.color.setHex(this.colors.heroBase);
+      this.rootNode.mat.emissive.setHex(0x000000);
+      this.rootNode.edgeMat.color.setHex(this.colors.heroEdge);
+    } else {
       if (stage0Sub) stage0Sub.style.color = '';
-
-      this.heroGroup.visible = false;
-      this.stackGroup.visible = false;
-      this.wallGroup.visible = true;
-
-      // Sub-phases:
-      // Sub-phase A: Wall Expansion & Scale Up (0.62 -> 0.72)
-      const pWall = Math.min(1.0, (this.progress - 0.62) / 0.10);
-
-      // Sub-phase B: Judgement & Rejection Drop (0.72 -> 0.82)
-      const pDrop = Math.max(0, Math.min(1, (this.progress - 0.72) / 0.10));
-
-      // Sub-phase C: Cage Enclosure & Scaling Back Down (0.82 -> 0.92)
-      const pCage = Math.max(0, Math.min(1, (this.progress - 0.82) / 0.10));
-
-      // Scale: grows from 1.0 up to 1.45 to fill stage, then scales back down to 1.0 with cage
-      let currentScale = 1.0 + pWall * 0.45;
-      if (pCage > 0) {
-        currentScale = 1.45 - pCage * 0.45;
+      // Stage 3 Verification: Root core illuminates in pure accepted color
+      if (this.isW2) {
+        // Monochromatic Luminous Off-White
+        const targetColor = new THREE.Color(0xf4f4f2);
+        this.rootNode.mat.color.copy(new THREE.Color(this.colors.heroBase).lerp(targetColor, tAccept));
+        this.rootNode.mat.emissive.setHex(0xffffff).multiplyScalar(tAccept * 0.45);
+        this.rootNode.edgeMat.color.copy(new THREE.Color(this.colors.heroEdge).lerp(new THREE.Color(0xffffff), tAccept));
+      } else {
+        // Phosphor Green
+        const targetColor = new THREE.Color(0xd8ff64);
+        this.rootNode.mat.color.copy(new THREE.Color(this.colors.heroBase).lerp(targetColor, tAccept));
+        this.rootNode.mat.emissive.setHex(0xd8ff64).multiplyScalar(tAccept * 0.55);
+        this.rootNode.edgeMat.color.setHex(0xd8ff64);
       }
-      this.wallGroup.scale.setScalar(currentScale);
-      this.wallGroup.position.set(0, threadY, 0);
-      this.wallGroup.rotation.set(
-        this.baseRotX + (this.progress - 0.62) * 0.3,
-        this.baseRotY + (this.progress - 0.62) * 0.6,
-        this.baseRotZ
-      );
+    }
 
-      // Animate each of the 9 candidate cubes
-      this.candidateCubes.forEach((c) => {
-        if (c.isCenter) {
-          // Center accepted cube stays rock-solid
-          c.group.position.copy(c.basePos);
-          c.group.scale.setScalar(1.0);
-          c.mat.opacity = 1.0;
+    // -------------------------------------------------------------
+    // UPDATE RECURSIVE CHILD NODES & CONNECTORS (1 to 14)
+    // -------------------------------------------------------------
+    for (let i = 1; i < this.nodes.length; i++) {
+      const node = this.nodes[i];
+      const parentNode = this.nodes[node.parent];
+      const f = levelFactors[node.level];
+      const isFailing = levelFailing[node.level];
 
-          if (pDrop > 0.05) {
-            if (this.isW2) {
-              // W2: Pure Luminous Monochromatic Off-White
-              c.mat.color.setHex(0xf4f4f2);
-              c.mat.emissive.setHex(0xffffff).multiplyScalar(0.40);
-              c.edgeMat.color.setHex(0xffffff);
-            } else {
-              // W1: Pure Vivid Phosphor Green
-              c.mat.color.setHex(0xd8ff64);
-              c.mat.emissive.setHex(0xd8ff64).multiplyScalar(0.55);
-              c.edgeMat.color.setHex(0xd8ff64);
-            }
-          } else {
-            c.mat.color.setHex(this.colors.heroBase);
-            c.mat.emissive.setHex(0x000000);
-            c.edgeMat.color.setHex(this.colors.heroEdge);
+      if (f > 0.005) {
+        node.group.visible = true;
+        node.group.scale.setScalar(Math.max(0.001, f));
+
+        // Position branches outward from parent by relative offset scaled by factor f
+        node.group.position.x = parentNode.group.position.x + node.relOffset.x * f;
+        node.group.position.y = parentNode.group.position.y + node.relOffset.y * f;
+        node.group.position.z = parentNode.group.position.z + node.relOffset.z * f;
+
+        // Material styling: turn red when failing invariants during collapse
+        if (isFailing) {
+          node.mat.color.setHex(this.colors.failRed);
+          node.mat.emissive.setHex(this.colors.failRed).multiplyScalar(0.42);
+          node.edgeMat.color.setHex(this.colors.failRed);
+          if (node.connectorMat) {
+            node.connectorMat.color.setHex(this.colors.failRed);
+            node.connectorMat.opacity = Math.min(1.0, f * 0.90);
           }
         } else {
-          // The 8 rejected cubes
-          if (pDrop > 0) {
-            // Turn solid red and drop out downwards
-            c.mat.color.setHex(this.colors.failRed);
-            c.mat.emissive.setHex(this.colors.failRed).multiplyScalar(0.40);
-            c.edgeMat.color.setHex(this.colors.failRed);
-
-            // Smooth drop acceleration downwards
-            const dropDistance = Math.pow(pDrop, 2) * 220 * c.dropVelocity;
-            c.group.position.x = c.basePos.x + c.tiltAngle * dropDistance * 0.25;
-            c.group.position.y = c.basePos.y - dropDistance;
-            c.group.rotation.z = c.tiltAngle * pDrop * 2.0;
-
-            // Fade out
-            const fadeAlpha = Math.max(0, 1.0 - pDrop * 1.25);
-            c.mat.opacity = fadeAlpha;
-            c.edgeMat.opacity = fadeAlpha * 0.5;
-            c.group.visible = fadeAlpha > 0.01;
-          } else {
-            c.group.visible = true;
-            c.group.position.copy(c.basePos);
-            c.group.rotation.set(0, 0, 0);
-            c.group.scale.setScalar(1.0);
-            c.mat.color.setHex(this.colors.heroBase);
-            c.mat.emissive.setHex(0x000000);
-            c.mat.opacity = 1.0;
-            c.edgeMat.color.setHex(this.colors.heroEdge);
-            c.edgeMat.opacity = this.isW2 ? 0.45 : 0.65;
+          node.mat.color.setHex(this.colors.heroBase);
+          node.mat.emissive.setHex(0x000000);
+          node.edgeMat.color.setHex(this.colors.heroEdge);
+          if (node.connectorMat) {
+            node.connectorMat.color.setHex(this.colors.connector);
+            node.connectorMat.opacity = Math.min(1.0, f * 0.80);
           }
         }
-      });
 
-      // Verification Cage Descent & Tight Enclosure
-      if (pCage > 0) {
-        this.cageGroup.visible = true;
-        this.cageGroup.position.set(this.gridOffsetX, threadY, 0);
-        this.cageGroup.rotation.copy(this.wallGroup.rotation);
-        this.cageGroup.scale.setScalar(currentScale);
-
-        // Descend from top and seal
-        const cageDrop = (1.0 - pCage) * 45;
-        this.cageGroup.position.y = threadY + cageDrop;
-
-        const cageAlpha = Math.min(1.0, pCage * 1.5);
-        this.cageWireMat.opacity = cageAlpha * (this.isW2 ? 0.85 : 0.90);
-        this.cageGlassMat.opacity = cageAlpha * (this.isW2 ? 0.15 : 0.09);
-
-        this.threadMat.opacity = (this.isW2 ? 0.35 : 0.30) + pCage * 0.25;
+        // Connector filament linking parent and child
+        if (node.connector && node.lineGeo) {
+          node.connector.visible = f > 0.02;
+          const posAttr = node.lineGeo.attributes.position;
+          posAttr.setXYZ(0, parentNode.group.position.x, parentNode.group.position.y, parentNode.group.position.z);
+          posAttr.setXYZ(1, node.group.position.x, node.group.position.y, node.group.position.z);
+          posAttr.needsUpdate = true;
+        }
       } else {
-        this.cageGroup.visible = false;
-        this.cageWireMat.opacity = 0;
-        this.cageGlassMat.opacity = 0;
+        node.group.visible = false;
+        node.group.scale.setScalar(0.001);
+        node.group.position.copy(parentNode.group.position);
+        if (node.connector) node.connector.visible = false;
       }
+    }
+
+    // -------------------------------------------------------------
+    // CD-AVC VERIFICATION CAGE DESCENT & ENCLOSURE
+    // -------------------------------------------------------------
+    if (tCage > 0.001) {
+      this.cageGroup.visible = true;
+      // Descends from above and seals around Root Node
+      const cageDrop = (1.0 - tCage) * 35;
+      this.cageGroup.position.set(0, cageDrop, 0);
+
+      this.cageWireMat.opacity = tCage * (this.isW2 ? 0.90 : 0.92);
+      this.cageGlassMat.opacity = tCage * (this.isW2 ? 0.16 : 0.10);
+      this.threadMat.opacity = (this.isW2 ? 0.35 : 0.30) + tCage * 0.25;
+    } else {
+      this.cageGroup.visible = false;
+      this.cageWireMat.opacity = 0;
+      this.cageGlassMat.opacity = 0;
+      this.threadMat.opacity = this.isW2 ? 0.35 : 0.30;
     }
   }
 
@@ -649,16 +639,21 @@ class ThreadStoryStage {
     window.history.replaceState({}, '', url.toString());
 
     this.initTheme();
+
     // Reapply theme colors to dynamic materials
     this.threadMat.color.setHex(this.colors.thread);
-    this.heroCoreMat.color.setHex(this.colors.heroBase);
-    this.heroEdgeMat.color.setHex(this.colors.heroEdge);
     this.keyLight.color.setHex(this.colors.keyLight);
     this.fillLight.color.setHex(this.colors.fillLight);
     this.rimLight.color.setHex(this.colors.rimLight);
     this.heroLight.color.setHex(this.colors.heroPoint);
     this.cageWireMat.color.setHex(this.colors.cageWire);
     this.cageGlassMat.color.setHex(this.colors.cageGlass);
+
+    this.nodes.forEach((n) => {
+      n.mat.color.setHex(this.colors.heroBase);
+      n.edgeMat.color.setHex(this.colors.heroEdge);
+      if (n.connectorMat) n.connectorMat.color.setHex(this.colors.connector);
+    });
 
     // Update progress state with new theme colors
     this.updateProgress(this.progress);
@@ -671,7 +666,7 @@ class ThreadStoryStage {
 
     this.isMobile = window.innerWidth <= 860 || document.body.classList.contains('is-mobile-preview');
     this.camera.fov = this.isMobile ? 42 : 38;
-    this.camera.position.z = this.isMobile ? 240 : 205;
+    this.camera.position.z = this.isMobile ? 260 : 230;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
@@ -695,9 +690,9 @@ class ThreadStoryStage {
 
     // Confident pulsation when verified in Stage 3
     if (this.progress >= 0.85) {
-      this.heroLight.intensity = 1.1 + Math.sin(Date.now() * 0.004) * 0.25;
+      this.heroLight.intensity = 1.2 + Math.sin(Date.now() * 0.004) * 0.25;
     } else {
-      this.heroLight.intensity = 1.1;
+      this.heroLight.intensity = 1.2;
     }
 
     this.renderer.render(this.scene, this.camera);

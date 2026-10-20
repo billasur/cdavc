@@ -204,17 +204,19 @@ a {
   transform: translateY(-50%);
   opacity: 0;
   visibility: hidden;
+  display: none;
   pointer-events: none;
-  transition: opacity 0.3s var(--ease), visibility 0.3s;
 }
 
 .story-sentence:not(.is-active) {
+  display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
 .story-sentence.is-active {
+  display: block !important;
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
