@@ -24,6 +24,11 @@
     <div class="header-inner">
       <a class="brand" href="#top" aria-label="CD-AVC">CD—AVC</a>
       <div class="header-right">
+        <div class="theme-switchers" role="group" aria-label="Visual Theme">
+          <a class="theme-btn" id="btn-theme-w1" href="?theme=w1" aria-label="Theme W1 (Dark Green)">W1</a>
+          <span class="theme-divider">/</span>
+          <a class="theme-btn" id="btn-theme-w2" href="?theme=w2" aria-label="Theme W2 (Warm Charcoal)">W2</a>
+        </div>
         <span class="report-badge">REPORT30 · 23 / 30</span>
         <a class="repo-link" href="https://github.com/billasur/cdavc" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
       </div>
@@ -64,42 +69,42 @@
       </div>
     </section>
 
-    <!-- Results Section: Typographic Editorial Comparison -->
+    <!-- Results Section: Typographic Editorial Comparison with 2x Larger Type & High Contrast -->
     <section class="results-section" id="results">
       <div class="results-inner">
         <div class="results-header">
           <span class="results-kicker">MEASURED VERIFICATION</span>
-          <h2 class="results-headline">+23.3 pp measured gain over single-shot.</h2>
+          <h2 class="results-headline"><span class="gain-number">+23.3 pp</span> measured gain over single-shot.</h2>
         </div>
 
         <div class="table-wrap">
-          <table class="results-table">
+          <table class="results-table primary-table">
             <thead>
               <tr>
-                <th>Harness Condition</th>
-                <th>Pass Rate</th>
-                <th>Passes</th>
-                <th>Verification Invariant</th>
+                <th scope="col">Harness Condition</th>
+                <th scope="col">Pass Rate</th>
+                <th scope="col">Passes</th>
+                <th scope="col">Verification Invariant</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Single model</td>
-                <td>53.3%</td>
-                <td>16 / 30</td>
-                <td>One uninspected attempt</td>
+                <td class="col-name">Single model</td>
+                <td class="col-rate"><span class="rate-large">53.3%</span></td>
+                <td class="col-passes">16 / 30</td>
+                <td class="col-inv">One uninspected attempt</td>
               </tr>
               <tr>
-                <td>Retry baseline</td>
-                <td>80.0%</td>
-                <td>24 / 30</td>
-                <td>Blind retries on failure</td>
+                <td class="col-name">Retry baseline</td>
+                <td class="col-rate"><span class="rate-large">80.0%</span></td>
+                <td class="col-passes">24 / 30</td>
+                <td class="col-inv">Blind retries on failure</td>
               </tr>
               <tr class="highlight-row">
-                <td>CD-AVC Cage</td>
-                <td>76.7%</td>
-                <td>23 / 30</td>
-                <td>Deterministic gates (CI [0.079, 0.387])</td>
+                <td class="col-name">CD-AVC Cage</td>
+                <td class="col-rate"><span class="rate-large">76.7%</span></td>
+                <td class="col-passes">23 / 30</td>
+                <td class="col-inv">Deterministic gates (CI [0.079, 0.387])</td>
               </tr>
             </tbody>
           </table>
@@ -114,30 +119,32 @@
           <div class="secondary-header">
             <span class="secondary-kicker">PLAN-90 PILOT BENCHMARK (NOT COMPARABLE TO REPORT30)</span>
           </div>
-          <table class="results-table secondary-table">
-            <thead>
-              <tr>
-                <th>Condition</th>
-                <th>Pass Rate</th>
-                <th>Passes</th>
-                <th>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Retry baseline</td>
-                <td>93.3%</td>
-                <td>28 / 30</td>
-                <td>Extended prompt iterations</td>
-              </tr>
-              <tr class="highlight-row">
-                <td>CD-AVC Cage</td>
-                <td>83.3%</td>
-                <td>25 / 30</td>
-                <td>Strict verification cage</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="secondary-scroll-wrap">
+            <table class="results-table secondary-table">
+              <thead>
+                <tr>
+                  <th scope="col">Condition</th>
+                  <th scope="col">Pass Rate</th>
+                  <th scope="col">Passes</th>
+                  <th scope="col">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="col-name">Retry baseline</td>
+                  <td class="col-rate"><span class="rate-medium">93.3%</span></td>
+                  <td class="col-passes">28 / 30</td>
+                  <td class="col-inv">Extended prompt iterations</td>
+                </tr>
+                <tr class="highlight-row">
+                  <td class="col-name">CD-AVC Cage</td>
+                  <td class="col-rate"><span class="rate-medium">83.3%</span></td>
+                  <td class="col-passes">25 / 30</td>
+                  <td class="col-inv">Strict verification cage</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
