@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e13_parse_query",
+  "title": "URL query string parser",
+  "description": "Implement parse_query(qs) returning a dict from str keys to a str or a list of str. One leading '?' is stripped (only one: '??a=1' gives key '?a'). Pairs are separated by '&'; empty pairs ('a=1&&b=2', a trailing '&') are skipped. Each pair is split at the FIRST '=' ('a=b=c' gives {'a': 'b=c'}); a pair without '=' ('flag') has value ''. In both key and value, '+' becomes a space first and then percent-decoding is applied (so '%2B' stays a literal '+'); percent sequences are UTF-8; an invalid percent sequence ('%zz', a trailing '%') is kept literally; invalid UTF-8 bytes become U+FFFD. A pair whose decoded key is empty is skipped. A key name ending with '[]' has the '[]' removed and its value goes into a list. A key that appears several times (with or without '[]', in any mix) maps to a list of all its values in order; a key seen once without '[]' maps to a plain str. Dict order follows first appearance of each key. qs must be a str (TypeError).",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e13_parse_query/solution_stub.py"
+  ],
+  "symbols": [
+    "parse_query"
+  ],
+  "invariants": [
+    "Repeats collect: 'a=1&a=2&a=3' -> {'a': ['1', '2', '3']}; 'x[]=1' -> {'x': ['1']}; 'x=1&x[]=2' -> {'x': ['1', '2']}.",
+    "'+' is a space but '%2B' is a plus: 'q=a+b' -> 'a b', 'q=a%2Bb' -> 'a+b'.",
+    "Invalid escapes stay literal ('%zz', '100%'); '%E4' alone becomes U+FFFD; '%E2%82%AC' decodes to the euro sign.",
+    "Splits at the first '=' only; no '=' means an empty value; empty pairs and empty keys are dropped.",
+    "Only one leading '?' is removed; the result keeps first-appearance key order."
+  ],
+  "max_retries": 2
+}

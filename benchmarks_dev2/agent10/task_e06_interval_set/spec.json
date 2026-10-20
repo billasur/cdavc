@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e06_interval_set",
+  "title": "Half-open integer interval set",
+  "description": "Implement class IntervalSet holding a set of integers as half-open ranges [start, end). Methods: add(start, end), remove(start, end), contains(x), total(), intervals(). add and remove require ints (bool rejected, TypeError) with start <= end (else ValueError); start == end is a no-op. add merges overlapping AND touching ranges ([1,3) plus [3,5) becomes [1,5)). remove cuts ranges and may split one range in two. intervals() returns a new sorted list of (start, end) tuples that is normalised (no empty, overlapping or touching ranges); mutating the returned list must not change the set. contains(x) is True when start <= x < end for some range (x must be an int, bool rejected, else TypeError). total() is the count of integers covered. add and remove return None. Negative numbers are allowed.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e06_interval_set/solution_stub.py"
+  ],
+  "symbols": [
+    "IntervalSet"
+  ],
+  "invariants": [
+    "Touching ranges merge: add(1,3) then add(3,5) gives [(1, 5)].",
+    "A bridging add merges every range it touches: ranges [1,2),[4,5),[7,8) plus add(2,7) give [(1, 8)].",
+    "remove can split: [1,10) minus [4,6) gives [(1, 4), (6, 10)]; removing a touching range changes nothing.",
+    "Ranges are half-open: contains(end) is False, contains(start) is True.",
+    "intervals() returns a copy; start > end raises ValueError; non-int or bool raises TypeError."
+  ],
+  "max_retries": 2
+}

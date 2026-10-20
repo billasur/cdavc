@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e10_check_brackets",
+  "title": "Bracket checker that skips string literals",
+  "description": "Implement check_brackets(s). It returns -1 when all brackets are balanced, otherwise the 0-based index of the first problem. Pairs are (), [], {}. Brackets inside string literals are ignored. A literal starts at ' or \" and ends at the next identical quote that is not escaped; inside a literal a backslash escapes the next character. Outside literals a backslash is an ordinary character. Scan left to right: a closing bracket that does not match the most recently opened bracket (or arrives with nothing open) is the problem and its own index is returned immediately. At the end of input: if a string literal is still open, return the index of its opening quote (this wins over unclosed brackets); otherwise if brackets are still open, return the index of the most recently opened one; otherwise -1. s must be a str (TypeError).",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e10_check_brackets/solution_stub.py"
+  ],
+  "symbols": [
+    "check_brackets"
+  ],
+  "invariants": [
+    "'(]' returns 1, ')' returns 0, '([)]' returns 2: a mismatched closer reports its own index.",
+    "'((' returns 1 and '(()' returns 0: unclosed openers report the innermost unclosed opener (top of stack at the end).",
+    "Brackets inside quotes are ignored: 'f(\"a)\")' is balanced; an escaped quote r'(\"a\\\\\"\")' does not end the literal.",
+    "An unterminated literal returns the index of its opening quote even if brackets are also open ('( \"abc' returns 2).",
+    "Outside a literal a backslash is ordinary: r'\\\\(' returns 1."
+  ],
+  "max_retries": 2
+}

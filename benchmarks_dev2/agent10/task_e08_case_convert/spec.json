@@ -1,0 +1,20 @@
+{
+  "task_id": "task_e08_case_convert",
+  "title": "camelCase and snake_case conversion with acronyms",
+  "description": "Implement camel_to_snake(name) and snake_to_camel(name, upper_first=False); both require a str (TypeError). camel_to_snake lowercases the name and inserts '_' at word boundaries: between a lowercase letter or digit and a following uppercase letter ('fooBar' gives 'foo_bar', 'v2Beta' gives 'v2_beta', 'base64Encode' gives 'base64_encode'), and between an acronym and the capitalised word that follows it ('HTTPServer' gives 'http_server', 'parseXMLFile' gives 'parse_xml_file'). Digits stay attached to the letters before them ('ipV4' gives 'ip_v4'). Underscores already in the input are kept and an '_' is never inserted next to an existing '_' ('foo_Bar' gives 'foo_bar'). snake_to_camel splits on '_' and ignores empty parts (so leading, trailing and doubled underscores vanish); every part is lowercased first; the first part stays lowercase (or is capitalised when upper_first is true) and each later part gets an uppercase first letter ('http_server' gives 'httpServer', 'HTTP_SERVER' gives 'httpServer', 'a_1_b' gives 'a1B'). Empty string returns ''.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e08_case_convert/solution_stub.py"
+  ],
+  "symbols": [
+    "camel_to_snake",
+    "snake_to_camel"
+  ],
+  "invariants": [
+    "Acronym handling: 'HTTPServer' -> 'http_server', 'getHTTPResponseCode' -> 'get_http_response_code', 'ABC' -> 'abc'.",
+    "Digits: 'base64Encode' -> 'base64_encode', 'v2Beta' -> 'v2_beta', 'HTTP2Server' -> 'http2_server'.",
+    "No doubled underscores: 'foo_Bar' -> 'foo_bar'; existing underscores are kept ('already_snake' unchanged).",
+    "snake_to_camel lowercases every part before capitalising, drops empty parts, and honours upper_first.",
+    "Non-str input raises TypeError; '' returns ''."
+  ],
+  "max_retries": 2
+}

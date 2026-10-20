@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e11_min_coins",
+  "title": "Fewest coins with deterministic tie-break",
+  "description": "Implement min_coins(coins, amount). coins is a list or tuple of positive ints (denominations; duplicates and any order are allowed), amount is an int >= 0. Return a list of coin values sorted descending that sums to amount using the fewest coins. When several multisets have the same number of coins, return the one that is lexicographically largest as a descending list (so with coins [1, 3, 4, 5] and amount 8 the answer is [5, 3], not [4, 4]). amount 0 returns []. If amount cannot be formed return None (empty coins with amount > 0 is None). Errors: coins not a list/tuple, or any coin not an int (bool rejected), or amount not an int (bool rejected) raise TypeError; a coin <= 0 or a negative amount raises ValueError. Coins are not required to be a canonical system (greedy is wrong for [1, 3, 4] and 6).",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e11_min_coins/solution_stub.py"
+  ],
+  "symbols": [
+    "min_coins"
+  ],
+  "invariants": [
+    "Fewest coins wins even when greedy would use more: min_coins([1, 3, 4], 6) == [3, 3].",
+    "Ties go to the lexicographically largest descending list: min_coins([1, 3, 4, 5], 8) == [5, 3].",
+    "Duplicates in coins are harmless; the result is sorted descending; amount 0 gives [].",
+    "Impossible amounts give None (min_coins([2], 3) is None, min_coins([], 5) is None), not an exception.",
+    "Type problems raise TypeError, non-positive coins or negative amounts raise ValueError."
+  ],
+  "max_retries": 2
+}

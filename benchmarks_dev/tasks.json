@@ -1,0 +1,632 @@
+{
+ "benchmark_id": "benchmarks_dev",
+ "source": "CD-AVC-night-run-original",
+ "tasks": [
+  {
+   "task_id": "task_d01_dedupe_stable",
+   "title": "Stable de-duplication with key function",
+   "description": "Implement dedupe(items, key=None). Return a list of the elements of the iterable items with duplicates removed, keeping the FIRST occurrence of each and preserving original order. Two elements are duplicates when their keys are equal, where the key is key(element) if key is given, else the element itself. Keys are compared with Python dict semantics (hash plus ==). items may be any iterable, including a generator, and is consumed once. Do not mutate input lists.",
+   "implementation_files": [
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/solution.py"
+   ],
+   "symbols": [
+    "dedupe"
+   ],
+   "invariants": [
+    "First occurrence wins; relative order of kept elements is the input order.",
+    "With key given, the kept element is the original element, not the key.",
+    "Keys use dict semantics, so 1, True and 1.0 are the same key, and None is a valid key.",
+    "Works for any iterable (generators, tuples, strings) and returns a new list; an input list is not mutated.",
+    "key is called exactly once per element, in input order.",
+    "Empty input returns []."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/public_tests.py",
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/hidden_tests.py",
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d01_dedupe_stable/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d02_multi_key_sort",
+   "title": "Stable multi-key sort with missing fields",
+   "description": "Implement sort_records(records, keys). records is a list of dicts. keys is a list of (field, descending) pairs, most significant first. Return a NEW list sorted by the first key, ties broken by the next key, and so on. Records whose field is missing (key not in the dict) sort AFTER all records that have it, for both ascending and descending keys; a field whose value is None counts as present. Records that tie on every key keep their original relative order. Do not mutate the input list or its dicts. An empty keys list returns a copy in original order.",
+   "implementation_files": [
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/solution.py"
+   ],
+   "symbols": [
+    "sort_records"
+   ],
+   "invariants": [
+    "Result is a new list; the input list and its dicts are unchanged.",
+    "Sort is stable: full ties keep input order, even when a key is descending.",
+    "Descending reverses value order only; it does not reverse the order of tied records.",
+    "A record missing a field sorts after all records that have it, for ascending and descending alike; records missing the same field tie on that key and fall through to the next key.",
+    "Mixed keys: later keys only break ties of earlier keys.",
+    "Values of one field are assumed mutually comparable among present records.",
+    "Empty keys returns a shallow copy in the original order."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/public_tests.py",
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/hidden_tests.py",
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d02_multi_key_sort/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d03_sliding_windows",
+   "title": "Sliding windows with step and partial tail",
+   "description": "Implement windows(seq, size, step=1, keep_partial=False). Return a list of lists (each a slice of seq). Windows start at indexes 0, step, 2*step, ... A window starting at i holds seq[i:i+size]. Only full windows (length size) are returned by default. If keep_partial is True, also return trailing shorter windows, but only ones that contain at least one element not already present in an earlier returned window; that is, a partial window starting at i is kept only when i is 0 or the previous window start (i - step) did not already reach the end of seq (i - step + size < len(seq)). Raise ValueError if size < 1 or step < 1. An empty seq returns [].",
+   "implementation_files": [
+    "benchmarks_dev/agent7/task_d03_sliding_windows/solution.py"
+   ],
+   "symbols": [
+    "windows"
+   ],
+   "invariants": [
+    "Full windows: starts i = 0, step, 2*step, ... while i + size <= len(seq).",
+    "size > len(seq): [] by default; with keep_partial a single window equal to the whole seq (if seq non-empty).",
+    "keep_partial never adds a window whose elements were all already covered (no redundant trailing subsets when step < size).",
+    "step > size skips elements between windows; the skipped elements never appear, but a trailing partial still appears when keep_partial and it starts before len(seq).",
+    "ValueError for size < 1 or step < 1, even for an empty seq.",
+    "Works for any sequence supporting len and slicing (list, tuple, str); windows are returned as lists of elements."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent7/task_d03_sliding_windows/public_tests.py",
+    "benchmarks_dev/agent7/task_d03_sliding_windows/hidden_tests.py",
+    "benchmarks_dev/agent7/task_d03_sliding_windows/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d03_sliding_windows/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d03_sliding_windows/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d03_sliding_windows/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d04_merge_intervals",
+   "title": "Merge half-open intervals",
+   "description": "Implement merge_intervals(intervals). intervals is an iterable of (start, end) pairs of numbers representing half-open ranges [start, end). Return a new sorted list of (start, end) tuples where overlapping OR touching ranges (one's end equals the next's start) are merged into one. Empty ranges (start == end) are dropped. Raise ValueError if any pair has start > end. Input need not be sorted and must not be mutated.",
+   "implementation_files": [
+    "benchmarks_dev/agent7/task_d04_merge_intervals/solution.py"
+   ],
+   "symbols": [
+    "merge_intervals"
+   ],
+   "invariants": [
+    "Output is sorted by start, contains tuples, and no two output ranges overlap or touch.",
+    "Touching ranges merge: (1, 3) and (3, 5) become (1, 5).",
+    "A range fully contained in another is absorbed.",
+    "Empty ranges (start == end) are dropped, even when inside another range or touching one.",
+    "start > end raises ValueError, checked for every pair including ones that would be dropped or absorbed.",
+    "Input of any order, any iterable, and input lists are not mutated.",
+    "Empty input returns []."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent7/task_d04_merge_intervals/public_tests.py",
+    "benchmarks_dev/agent7/task_d04_merge_intervals/hidden_tests.py",
+    "benchmarks_dev/agent7/task_d04_merge_intervals/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d04_merge_intervals/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d04_merge_intervals/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d04_merge_intervals/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d05_rank_ties",
+   "title": "Rank scores with tie handling",
+   "description": "Implement rank(scores, method='min'). Return a list of ranks, one per score, in the ORIGINAL order of scores; higher score gets a better (smaller) rank, and ranks start at 1. Equal scores are tied (1 and 1.0 are equal). method selects tie handling: 'min' gives every tied score the lowest rank of its group (1, 2, 2, 4), 'dense' gives consecutive ranks with no gaps (1, 2, 2, 3), 'average' gives every tied score the mean of the ranks its group would occupy, as a float (1.0, 2.5, 2.5, 4.0). 'min' and 'dense' return ints. Raise ValueError for an unknown method or if any score is NaN. Empty input returns [].",
+   "implementation_files": [
+    "benchmarks_dev/agent7/task_d05_rank_ties/solution.py"
+   ],
+   "symbols": [
+    "rank"
+   ],
+   "invariants": [
+    "Result list has the same length and order as scores.",
+    "Descending: the highest score is rank 1.",
+    "'min' skips ranks after a tie group (competition ranking); 'dense' does not.",
+    "'average' of a group of k tied scores starting at rank r is r + (k - 1) / 2, returned as float.",
+    "Ties use ==, so 2 and 2.0 tie; negative scores and zero are ordinary values.",
+    "ValueError for unknown method (checked even for empty input) and for NaN scores.",
+    "Input is not mutated and may be any iterable of numbers."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent7/task_d05_rank_ties/public_tests.py",
+    "benchmarks_dev/agent7/task_d05_rank_ties/hidden_tests.py",
+    "benchmarks_dev/agent7/task_d05_rank_ties/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d05_rank_ties/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d05_rank_ties/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent7/task_d05_rank_ties/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d801_normalize_user_record",
+   "title": "Normalize and validate a user record",
+   "description": "Implement normalize_user_record(record). Validate a user record dict and return a normalized copy with exactly the keys 'name', 'email', 'age', 'tags'. Raise TypeError if record is not a dict. Raise KeyError naming the first missing key if any of 'name', 'email', 'age' is absent. 'name' must be a str (else TypeError); strip it and raise ValueError if it is then empty. 'email' must be a str (else TypeError); strip and lowercase it, then raise ValueError unless it contains exactly one '@' with a non-empty local part and a non-empty domain that contains at least one '.'. 'age' must be an int that is not a bool (else TypeError) and within 0..150 inclusive (else ValueError). Optional 'tags' defaults to []; if present it must be a list of str (TypeError for a non-list or a non-str element); strip each tag, drop empty tags, and remove duplicates keeping first-occurrence order. Extra keys are ignored.",
+   "implementation_files": [
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/solution.py"
+   ],
+   "symbols": [
+    "normalize_user_record"
+   ],
+   "invariants": [
+    "The return value has exactly the keys 'name', 'email', 'age', 'tags'; extra input keys are dropped.",
+    "bool is rejected for 'age' with TypeError even though bool subclasses int.",
+    "Email normalization happens before validation: surrounding whitespace is stripped and case is lowered.",
+    "Duplicate tags are removed after stripping, preserving first-occurrence order; empty stripped tags are dropped.",
+    "KeyError is raised for missing required keys, TypeError for wrong types, ValueError for well-typed but invalid values."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/public_tests.py",
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/hidden_tests.py",
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d801_normalize_user_record/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d802_parse_host_port",
+   "title": "Parse host:port text",
+   "description": "Implement parse_host_port(text). Parse a string of the form 'host:port' and return a tuple (host, port) where host is a str and port is an int. Raise TypeError if text is not a str. Strip surrounding whitespace from the whole string; raise ValueError on an empty string. The string must contain exactly one ':' (else ValueError); strip whitespace around both parts. Raise ValueError if the host is empty. The port part must be non-empty ASCII digits only (else ValueError): leading zeros are allowed, signs and decimal points are not. Convert to int and raise ValueError unless 1 <= port <= 65535. No further host validation is performed.",
+   "implementation_files": [
+    "benchmarks_dev/agent8/task_d802_parse_host_port/solution.py"
+   ],
+   "symbols": [
+    "parse_host_port"
+   ],
+   "invariants": [
+    "Exactly one ':' is required; zero or multiple colons are ValueError.",
+    "Port text like '00080' is valid and yields 80; '+80', '8.0', and '-1' are ValueError.",
+    "Boundary ports 1 and 65535 are valid; 0 and 65536 are ValueError.",
+    "Host is returned stripped; no further host validation is performed.",
+    "TypeError only for non-str input; every malformed string is ValueError."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent8/task_d802_parse_host_port/public_tests.py",
+    "benchmarks_dev/agent8/task_d802_parse_host_port/hidden_tests.py",
+    "benchmarks_dev/agent8/task_d802_parse_host_port/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d802_parse_host_port/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d802_parse_host_port/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d802_parse_host_port/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d803_convert_length",
+   "title": "Convert length units with validation",
+   "description": "Implement convert_length(value, from_unit, to_unit). Convert a length between the units mm, cm, m, km, in, ft (1 mm = 0.001 m, 1 cm = 0.01 m, 1 km = 1000 m, 1 in = 0.0254 m, 1 ft = 0.3048 m). Units must be str (else TypeError); they are stripped and lowercased, so 'KM' and ' cm ' are valid; an unknown unit raises ValueError. value must be an int or float that is not a bool (else TypeError); NaN or infinity raises ValueError; a negative value raises ValueError. Return the converted value as a float rounded to 6 decimal places.",
+   "implementation_files": [
+    "benchmarks_dev/agent8/task_d803_convert_length/solution.py"
+   ],
+   "symbols": [
+    "convert_length"
+   ],
+   "invariants": [
+    "Unit matching is case-insensitive and ignores surrounding whitespace.",
+    "bool values are TypeError even though bool subclasses int; numeric strings are TypeError too.",
+    "NaN and +/-inf are ValueError, not TypeError.",
+    "The result is always a float rounded to 6 decimal places (10 mm -> 0.393701 in).",
+    "Zero is a valid value; any negative value is ValueError."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent8/task_d803_convert_length/public_tests.py",
+    "benchmarks_dev/agent8/task_d803_convert_length/hidden_tests.py",
+    "benchmarks_dev/agent8/task_d803_convert_length/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d803_convert_length/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d803_convert_length/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d803_convert_length/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d804_merge_intervals",
+   "title": "Merge intervals with validation",
+   "description": "Implement merge_intervals(intervals). Merge a list of [start, end] interval pairs and return a sorted list of merged [start, end] lists. intervals must be a list (else TypeError); each element must be a list or tuple of length 2 (else TypeError); each endpoint must be an int or float that is not a bool (else TypeError) and finite (NaN or infinity raises ValueError); start must not exceed end (else ValueError). Intervals that overlap or touch (next start <= current end) merge into one. The result is sorted by start and endpoints keep their original numeric values. An empty list returns [].",
+   "implementation_files": [
+    "benchmarks_dev/agent8/task_d804_merge_intervals/solution.py"
+   ],
+   "symbols": [
+    "merge_intervals"
+   ],
+   "invariants": [
+    "Touching intervals merge: [[1, 2], [2, 3]] -> [[1, 3]].",
+    "Input order does not matter; the output is sorted by start.",
+    "Containment is absorbed: [[1, 10], [2, 3]] -> [[1, 10]].",
+    "Returned intervals are plain two-element lists even when the input pairs were tuples.",
+    "bool endpoints are TypeError; NaN/inf endpoints are ValueError; start > end is ValueError."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent8/task_d804_merge_intervals/public_tests.py",
+    "benchmarks_dev/agent8/task_d804_merge_intervals/hidden_tests.py",
+    "benchmarks_dev/agent8/task_d804_merge_intervals/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d804_merge_intervals/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d804_merge_intervals/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d804_merge_intervals/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d805_get_path",
+   "title": "Dotted-path lookup in nested dicts",
+   "description": "Implement get_path(data, path, default). Walk a dotted path through nested dicts and return the value found. data must be a dict (else TypeError). path must be a str (else TypeError); an empty path or any empty segment (leading, trailing, or doubled dots) raises ValueError. At each step the current value must be a dict (else TypeError). If a segment is missing: return default when one was passed, otherwise raise KeyError naming the missing segment. Passing default=None explicitly is valid and distinct from omitting it. A stored value of None is a real value and is returned, not treated as missing. Segments are matched exactly; spaces are not trimmed.",
+   "implementation_files": [
+    "benchmarks_dev/agent8/task_d805_get_path/solution.py"
+   ],
+   "symbols": [
+    "get_path"
+   ],
+   "invariants": [
+    "The sentinel distinguishes 'no default passed' (KeyError on a missing segment) from default=None (returns None on a missing segment).",
+    "Traversing into a non-dict value (path 'a.b' where data['a'] is 5) raises TypeError.",
+    "Split is on '.'; spaces are not trimmed and segments are matched exactly.",
+    "Empty path and empty segments ('', '.a', 'a.', 'a..b') are ValueError.",
+    "The found value is returned unchanged whatever its type, including None."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent8/task_d805_get_path/public_tests.py",
+    "benchmarks_dev/agent8/task_d805_get_path/hidden_tests.py",
+    "benchmarks_dev/agent8/task_d805_get_path/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d805_get_path/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d805_get_path/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent8/task_d805_get_path/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d901_rle_codec",
+   "title": "Run-length encode/decode round trip",
+   "description": "Implement rle_encode(text) and rle_decode(data). rle_encode compresses a string into run-length form: every maximal run of k identical characters is written as the decimal count k (no leading zeros), then a ':' separator, then the single character, so 'aaab' becomes '3:a1:b' and '1111' becomes '4:1'. The ':' separator is what makes digit characters in the input unambiguous. rle_decode reverses it: the input is a concatenation of groups, each group a decimal count >= 1, a ':', then exactly one character (which may be any character, including a digit or ':'). Both functions take a str (anything else raises TypeError). rle_encode('') == '' and rle_decode('') == ''. rle_decode raises ValueError on a group with no digits, a count of 0, a missing ':', or a count and ':' with no following character.",
+   "implementation_files": [
+    "benchmarks_dev/agent9/task_d901_rle_codec/solution.py"
+   ],
+   "symbols": [
+    "rle_encode",
+    "rle_decode"
+   ],
+   "invariants": [
+    "Round trip: rle_decode(rle_encode(text)) == text for every str text, including text containing digits or ':' characters.",
+    "rle_encode output is canonical: every group carries its count (even 1), counts have no leading zeros, and no two adjacent groups repeat the same character.",
+    "The ':' separator makes digit data unambiguous: '1111' encodes to '4:1', and '4:1' decodes to '1111'.",
+    "rle_decode raises ValueError for a bare character with no count, a zero count ('0:a'), a count with no ':' ('3'), and a count and ':' with no character ('1:a2:').",
+    "Empty string maps to empty string in both directions.",
+    "Non-str input raises TypeError in both functions."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent9/task_d901_rle_codec/public_tests.py",
+    "benchmarks_dev/agent9/task_d901_rle_codec/hidden_tests.py",
+    "benchmarks_dev/agent9/task_d901_rle_codec/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d901_rle_codec/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d901_rle_codec/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d901_rle_codec/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d902_bank_ledger",
+   "title": "Bank ledger with atomic transfers",
+   "description": "Implement a tiny ledger stored as a plain dict mapping owner names to integer balances (cents). Functions: open_account(ledger, owner) creates the owner with balance 0 and raises ValueError if the owner already exists; deposit(ledger, owner, amount) adds amount; withdraw(ledger, owner, amount) subtracts amount; transfer(ledger, from_owner, to_owner, amount) moves amount between two accounts; total(ledger) returns the sum of all balances. owner must be a str (else TypeError) and not empty or whitespace-only (else ValueError); touching an unknown owner raises KeyError. amount must be an int that is not a bool (else TypeError) and must be > 0 (else ValueError). withdraw and transfer raise ValueError on insufficient funds, and transfer with from_owner == to_owner raises ValueError. A failed operation must leave every balance unchanged.",
+   "implementation_files": [
+    "benchmarks_dev/agent9/task_d902_bank_ledger/solution.py"
+   ],
+   "symbols": [
+    "open_account",
+    "deposit",
+    "withdraw",
+    "transfer",
+    "total"
+   ],
+   "invariants": [
+    "Atomicity: a failed withdraw or transfer (insufficient funds, bad amount, unknown owner) leaves all balances unchanged.",
+    "Conservation: transfer never changes total(ledger); deposit increases and withdraw decreases it by exactly amount.",
+    "Balances never go negative; zero and negative amounts are ValueError, never applied.",
+    "bool amounts are TypeError even though bool subclasses int; float and str amounts are TypeError too.",
+    "Opening an existing owner is ValueError; unknown owners are KeyError on deposit, withdraw, transfer; unknown owner never gets created as a side effect.",
+    "owner must be a str: non-str is TypeError; empty or whitespace-only is ValueError.",
+    "transfer with from_owner == to_owner is ValueError and changes nothing."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent9/task_d902_bank_ledger/public_tests.py",
+    "benchmarks_dev/agent9/task_d902_bank_ledger/hidden_tests.py",
+    "benchmarks_dev/agent9/task_d902_bank_ledger/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d902_bank_ledger/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d902_bank_ledger/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d902_bank_ledger/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d903_kv_record_codec",
+   "title": "Key/value record dump/parse round trip",
+   "description": "Implement dump_record(record) and parse_record(text), a one-line serialization for dict[str, str]. dump_record joins entries as 'key=value' pairs separated by ';', with entries sorted by their raw (unescaped) key. Inside keys and values, '%' is escaped as '%25', '=' as '%3D', ';' as '%3B' (uppercase hex, applied to '%' first). Empty dict dumps to ''. parse_record reverses it: '' parses to {}, entries are split on ';', each entry must contain '=', key and value are split on the first '=' and then unescaped. Unescaping accepts only '%' followed by two uppercase hex digits from the set 0-9A-F; any other '%' usage (lone '%', one digit, lowercase hex, non-hex digits) raises ValueError. A duplicate key (after unescaping) raises ValueError. record must be a dict with str keys and str values (else TypeError); text must be a str (else TypeError). Empty keys and empty values are allowed.",
+   "implementation_files": [
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/solution.py"
+   ],
+   "symbols": [
+    "dump_record",
+    "parse_record"
+   ],
+   "invariants": [
+    "Round trip: parse_record(dump_record(record)) == record for every dict with str keys and str values, including keys/values containing '=', ';', '%', spaces, or empty strings.",
+    "dump_record output is deterministic: entries sorted by raw key, escapes uppercase ('%3B', not '%3b').",
+    "Escaping order matters: '%' is escaped first, so a literal '%3B' in the input survives the round trip unchanged.",
+    "Split on the FIRST '=' only: an escaped '=' never acts as the separator, and the separator is the first raw '='.",
+    "parse_record rejects an entry with no '=', a lone or malformed '%' escape, lowercase hex escapes, and duplicate keys: all ValueError.",
+    "dump_record({}) == '' and parse_record('') == ''."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/public_tests.py",
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/hidden_tests.py",
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d903_kv_record_codec/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d904_undo_history",
+   "title": "Undo/redo history with consistent current value",
+   "description": "Implement an undo/redo history as a dict {'past': [...], 'future': [...]}. new_history() returns {'past': [], 'future': []}. push(hist, value) appends value as the newest entry and clears the redo stack; it returns None. Both lists are used as stacks with the newest entry at the END: undo(hist) pops the last entry of 'past', appends it to 'future', and returns the value that was undone; redo(hist) pops the last entry of 'future', appends it back to 'past', and returns it. So after pushing 1 then 2 and one undo, hist == {'past': [1], 'future': [2]}. undo returns the undone value; if 'past' is empty it returns None and changes nothing. redo(hist) re-applies the most recently undone value (making it current again); if the redo stack is empty it returns None and changes nothing. current(hist) returns the newest value that is still applied, or None if nothing is applied. Every function takes the hist dict as produced by new_history; a non-dict, a dict missing 'past'/'future', or one where they are not lists raises TypeError. Values may be of any type, including None.",
+   "implementation_files": [
+    "benchmarks_dev/agent9/task_d904_undo_history/solution.py"
+   ],
+   "symbols": [
+    "new_history",
+    "push",
+    "undo",
+    "redo",
+    "current"
+   ],
+   "invariants": [
+    "push always empties the redo stack: after push, redo returns None.",
+    "undo on an empty past returns None and changes nothing; redo on an empty redo stack returns None and changes nothing.",
+    "The value returned by undo becomes the value returned by the next redo, and current() then equals it again.",
+    "After undoing every push, current() is None and the history is back to its initial state {'past': [], 'future': []} (plus whatever remains redoable).",
+    "current() is always the newest applied value; undo/redo never reorder values.",
+    "hist must be a dict with 'past' and 'future' lists; anything else is TypeError. Values of any type (including None) may be pushed.",
+    "undo/redo return values, never raise, on empty stacks."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent9/task_d904_undo_history/public_tests.py",
+    "benchmarks_dev/agent9/task_d904_undo_history/hidden_tests.py",
+    "benchmarks_dev/agent9/task_d904_undo_history/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d904_undo_history/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d904_undo_history/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d904_undo_history/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  },
+  {
+   "task_id": "task_d905_base_codec",
+   "title": "Integer base encode/decode round trip",
+   "description": "Implement to_base(number, base) and from_base(text, base) for bases 2 through 36 with digits '0'-'9' then 'a'-'z' (digit value 10..35). to_base(number, base): number must be an int that is not a bool (else TypeError) and must be >= 0 (else ValueError); returns the canonical lowercase representation with no leading zeros, so to_base(0, b) == '0' and to_base(255, 16) == 'ff'. from_base(text, base): text must be a str (else TypeError); it is stripped of surrounding whitespace and matched case-insensitively; the remaining string must be non-empty and contain only digits valid for the base (each digit's value must be < base), else ValueError; leading zeros are accepted ('007' -> 7); '+'/'-' signs are not accepted. base must be an int that is not a bool (else TypeError) in the range 2..36 inclusive (else ValueError) for both functions.",
+   "implementation_files": [
+    "benchmarks_dev/agent9/task_d905_base_codec/solution.py"
+   ],
+   "symbols": [
+    "to_base",
+    "from_base"
+   ],
+   "invariants": [
+    "Round trip: from_base(to_base(n, b), b) == n for every int n >= 0 and every base b in 2..36.",
+    "Canonical output: to_base never emits leading zeros (except the single '0' for zero) and always uses lowercase letters.",
+    "from_base accepts surrounding whitespace, mixed case, and leading zeros; it rejects empty/blank strings, signs, and any digit whose value >= base ('2' in base 2, 'z' in base 35).",
+    "base is validated identically in both functions: non-int or bool is TypeError, outside 2..36 is ValueError.",
+    "bool numbers are TypeError even though bool subclasses int; float and str numbers are TypeError too.",
+    "Digit 'z' (value 35) is valid only in base 36."
+   ],
+   "max_retries": 2,
+   "test_files": [
+    "benchmarks_dev/agent9/task_d905_base_codec/public_tests.py",
+    "benchmarks_dev/agent9/task_d905_base_codec/hidden_tests.py",
+    "benchmarks_dev/agent9/task_d905_base_codec/regression_tests.py"
+   ],
+   "test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d905_base_codec/public_tests.py",
+    "solution.py"
+   ],
+   "hidden_test_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d905_base_codec/hidden_tests.py",
+    "solution.py"
+   ],
+   "regression_command": [
+    "python",
+    "benchmarks_dev/agent9/task_d905_base_codec/regression_tests.py",
+    "solution.py"
+   ],
+   "source": "CD-AVC-night-run-original"
+  }
+ ]
+}

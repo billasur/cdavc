@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e01_roman_strict",
+  "title": "Strict Roman numerals",
+  "description": "Implement to_roman(n) and from_roman(s). to_roman: n must be an int (bool is rejected) else TypeError; 1..3999 inclusive else ValueError; returns the canonical uppercase subtractive form. from_roman: s must be a str else TypeError; it accepts only the canonical uppercase form of a number in 1..3999; anything else (empty, lowercase, surrounding spaces, non-canonical such as 'IIII', 'VX', 'IC', 'IIX', 'MMMM') raises ValueError.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e01_roman_strict/solution_stub.py"
+  ],
+  "symbols": [
+    "to_roman",
+    "from_roman"
+  ],
+  "invariants": [
+    "to_roman(1994) is 'MCMXCIV' and uses subtractive pairs (IV, IX, XL, XC, CD, CM) only.",
+    "from_roman accepts exactly the strings that to_roman can produce, so from_roman(to_roman(n)) == n for 1..3999.",
+    "Non-canonical numerals ('IIII', 'VX', 'IC', 'IIX', 'VV') and lowercase or padded input raise ValueError, not a number.",
+    "bool and float arguments to to_roman raise TypeError; out-of-range ints raise ValueError."
+  ],
+  "max_retries": 2
+}

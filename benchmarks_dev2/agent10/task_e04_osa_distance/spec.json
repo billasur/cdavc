@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e04_osa_distance",
+  "title": "Optimal string alignment distance with cutoff",
+  "description": "Implement osa_distance(a, b, max_distance=None). It is the optimal string alignment distance: the minimum number of single-character insertions, deletions, substitutions and adjacent transpositions, where no substring is edited more than once (so osa_distance('ca', 'abc') is 3, not 2). a and b must be str else TypeError. If max_distance is not None it must be an int (bool rejected, else TypeError) and >= 0 (else ValueError); then return the distance when it is <= max_distance, otherwise return max_distance + 1.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e04_osa_distance/solution_stub.py"
+  ],
+  "symbols": [
+    "osa_distance"
+  ],
+  "invariants": [
+    "An adjacent swap costs 1: osa_distance('ab', 'ba') == 1 and osa_distance('abc', 'acb') == 1.",
+    "It is the restricted (OSA) variant, not true Damerau-Levenshtein: osa_distance('ca', 'abc') == 3.",
+    "Plain Levenshtein cases hold: ('kitten', 'sitting') is 3, ('abc', '') is 3, equal strings are 0.",
+    "With max_distance, results above the limit are reported as max_distance + 1 and results at or below it are exact.",
+    "Non-str inputs and non-int or bool max_distance raise TypeError; negative max_distance raises ValueError."
+  ],
+  "max_retries": 2
+}

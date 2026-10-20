@@ -1,0 +1,20 @@
+{
+  "task_id": "task_e09_json_pointer",
+  "title": "JSON Pointer get and set",
+  "description": "Implement pointer_get(doc, pointer) and pointer_set(doc, pointer, value) with RFC 6901 style pointers. pointer must be a str (TypeError). '' refers to the whole document. A non-empty pointer must start with '/' (else ValueError). The pointer is split on '/'; in each token '~1' becomes '/' and '~0' becomes '~' (decode ~1 first, then ~0, so '~01' is the literal '~1'); a '~' not followed by 0 or 1 raises ValueError. For a dict the token is the key (missing key raises KeyError). For a list the token must be '0' or digits without leading zeros and without sign (otherwise ValueError); an index past the end raises IndexError. Traversing into a non-container (str, int, None) raises KeyError. pointer_get returns the addressed value; '-' is invalid there (ValueError). pointer_set returns a NEW deep-copied document and never mutates doc or keeps references to value: for a dict it sets or adds the key; for a list an existing index is replaced, '-' appends, and an index equal to len(list) also appends, a larger index raises IndexError. The parent path must already exist (missing intermediate key raises KeyError). pointer_set with '' returns a copy of value.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e09_json_pointer/solution_stub.py"
+  ],
+  "symbols": [
+    "pointer_get",
+    "pointer_set"
+  ],
+  "invariants": [
+    "Escapes: '/a~1b' addresses key 'a/b'; '/m~0n' addresses 'm~n'; '/~01' addresses '~1'.",
+    "'' is the whole document; '/' addresses the key '' (empty string).",
+    "List tokens: '01', '+1', '-1', 'x' and (for get) '-' raise ValueError; '5' on a 2-item list raises IndexError.",
+    "pointer_set does not mutate its input and appends with '-' or index == len; index > len raises IndexError.",
+    "Missing dict key or missing intermediate raises KeyError; traversing into a scalar raises KeyError; a non-str pointer raises TypeError."
+  ],
+  "max_retries": 2
+}

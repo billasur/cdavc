@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e07_format_bytes",
+  "title": "Human-readable byte sizes",
+  "description": "Implement format_bytes(n, binary=False). Decimal mode uses base 1000 and units B, kB, MB, GB, TB, PB; binary mode uses base 1024 and units B, KiB, MiB, GiB, TiB, PiB. n must be an int (bool rejected, TypeError) and >= 0 (ValueError). Values below the base print as '<n> B' with no decimals. Otherwise pick the largest unit whose value is >= 1, round to ONE decimal using round-half-up on the exact value (integer arithmetic, no float error), and print '<value> <unit>' with exactly one decimal ('1.0 kB'). If rounding reaches the base (999950 bytes is 999.95 kB which rounds to 1000.0) promote to the next unit ('1.0 MB'). PB / PiB is the largest unit and may print values of 1000 or more.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e07_format_bytes/solution_stub.py"
+  ],
+  "symbols": [
+    "format_bytes"
+  ],
+  "invariants": [
+    "999 is '999 B', 1000 is '1.0 kB', 1500 is '1.5 kB'; binary 1023 is '1023 B', 1024 is '1.0 KiB'.",
+    "Round half up: 1050 bytes is '1.1 kB', 1049 is '1.0 kB'.",
+    "Rollover: 999949 is '999.9 kB', 999950 is '1.0 MB'; binary 1048575 is '1.0 MiB'.",
+    "Always exactly one decimal for non-B units; never more than PB/PiB ('10000.0 PB' for 10**19).",
+    "Negative raises ValueError; float, str and bool raise TypeError."
+  ],
+  "max_retries": 2
+}

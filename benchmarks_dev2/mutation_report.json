@@ -1,0 +1,313 @@
+{
+  "status": "mutation kill rate of the test suites; no model benchmarked",
+  "root": "benchmarks_dev2",
+  "timeout_seconds": 10.0,
+  "max_mutants_per_task": 20,
+  "tasks": [
+    {
+      "task_id": "task_e01_roman_strict",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 0,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0063",
+          "operator": "const_shift",
+          "lineno": 31,
+          "detail": "1 - 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e02_cron_field",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 0,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0016",
+          "operator": "compare_swap",
+          "lineno": 30,
+          "detail": "a > b"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e03_wrap_text",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 18,
+      "survived": 2,
+      "timeouts": 1,
+      "kill_rate": 0.9,
+      "wilson95": [
+        0.6989663528135878,
+        0.9721335190383086
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0012",
+          "operator": "compare_swap",
+          "lineno": 24,
+          "detail": "len(w) > width"
+        },
+        {
+          "mutant_id": "m0015",
+          "operator": "compare_swap",
+          "lineno": 28,
+          "detail": "len(w) > width"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e04_osa_distance",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 0,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0070",
+          "operator": "compare_swap",
+          "lineno": 19,
+          "detail": "j > 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e05_brace_expand",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 17,
+      "survived": 3,
+      "timeouts": 0,
+      "kill_rate": 0.85,
+      "wilson95": [
+        0.6395811333571357,
+        0.9476312545132735
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0028",
+          "operator": "const_shift",
+          "lineno": 27,
+          "detail": "2 + 1"
+        },
+        {
+          "mutant_id": "m0037",
+          "operator": "const_shift",
+          "lineno": 32,
+          "detail": "1 - 1"
+        },
+        {
+          "mutant_id": "m0056",
+          "operator": "const_shift",
+          "lineno": 50,
+          "detail": "1 - 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e06_interval_set",
+      "reference_passes": true,
+      "mutants_total": 19,
+      "killed": 17,
+      "survived": 2,
+      "timeouts": 0,
+      "kill_rate": 0.8947368421052632,
+      "wilson95": [
+        0.6860591708809097,
+        0.9706414399668032
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0011",
+          "operator": "compare_swap",
+          "lineno": 35,
+          "detail": "b <= start"
+        },
+        {
+          "mutant_id": "m0012",
+          "operator": "compare_swap",
+          "lineno": 35,
+          "detail": "a >= end"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e07_format_bytes",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 1,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0016",
+          "operator": "const_shift",
+          "lineno": 11,
+          "detail": "5 - 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e08_case_convert",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 0,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0010",
+          "operator": "const_shift",
+          "lineno": 9,
+          "detail": "1 + 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e09_json_pointer",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 0,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0039",
+          "operator": "const_shift",
+          "lineno": 31,
+          "detail": "1 - 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e10_check_brackets",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 19,
+      "survived": 1,
+      "timeouts": 1,
+      "kill_rate": 0.95,
+      "wilson95": [
+        0.7638688045357189,
+        0.9911185512976646
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0001",
+          "operator": "const_shift",
+          "lineno": 7,
+          "detail": "1 + 1"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e11_min_coins",
+      "reference_passes": true,
+      "mutants_total": 20,
+      "killed": 17,
+      "survived": 3,
+      "timeouts": 0,
+      "kill_rate": 0.85,
+      "wilson95": [
+        0.6395811333571357,
+        0.9476312545132735
+      ],
+      "surviving_mutants": [
+        {
+          "mutant_id": "m0012",
+          "operator": "const_shift",
+          "lineno": 12,
+          "detail": "1 + 1"
+        },
+        {
+          "mutant_id": "m0016",
+          "operator": "const_shift",
+          "lineno": 14,
+          "detail": "1 + 1"
+        },
+        {
+          "mutant_id": "m0027",
+          "operator": "compare_swap",
+          "lineno": 20,
+          "detail": "key < cand[0]"
+        }
+      ]
+    },
+    {
+      "task_id": "task_e12_merge_sorted_lazy",
+      "reference_passes": true,
+      "mutants_total": 4,
+      "killed": 4,
+      "survived": 0,
+      "timeouts": 0,
+      "kill_rate": 1.0,
+      "wilson95": [
+        0.5101091596030786,
+        0.9999999999999999
+      ],
+      "surviving_mutants": []
+    },
+    {
+      "task_id": "task_e13_parse_query",
+      "reference_passes": true,
+      "mutants_total": 13,
+      "killed": 13,
+      "survived": 0,
+      "timeouts": 0,
+      "kill_rate": 1.0,
+      "wilson95": [
+        0.7719046248681998,
+        1.0
+      ],
+      "surviving_mutants": []
+    }
+  ],
+  "overall": {
+    "mutants": 236,
+    "killed": 219,
+    "kill_rate": 0.9279661016949152,
+    "wilson95": [
+      0.8876807024901965,
+      0.9545423265982615
+    ],
+    "skipped_tasks": []
+  }
+}

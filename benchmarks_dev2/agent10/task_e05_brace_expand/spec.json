@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e05_brace_expand",
+  "title": "Shell-style brace expansion",
+  "description": "Implement expand_braces(s) returning a list of strings. 'a{b,c}d' gives ['abd', 'acd']. Groups nest ('{a,b{c,d}}' gives ['a', 'bc', 'bd']). Several groups form a cartesian product in which the leftmost group varies slowest ('{a,b}{1,2}' gives ['a1', 'a2', 'b1', 'b2']). Empty alternatives are allowed ('x{,y}' gives ['x', 'xy']). A group with no top-level comma ('{a}', '{}', '{{a,b}}') is NOT expanded and stays as literal braces, but braces nested inside it are still expanded ('{x{1,2}}' gives ['{x1}', '{x2}'], '{{a,b}}' gives ['{a}', '{b}']). A backslash escapes the next character: the escaped character is literal (it never opens, closes or splits a group) and the backslash is removed. An unmatched '{' and any stray '}' are literal. Duplicates are kept. s must be a str else TypeError; '' gives [''].",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e05_brace_expand/solution_stub.py"
+  ],
+  "symbols": [
+    "expand_braces"
+  ],
+  "invariants": [
+    "Order is left to right with the leftmost group varying slowest.",
+    "A single-alternative group or empty group is literal: '{a}' stays '{a}' and '{}' stays '{}'.",
+    "Escapes: r'\\\\{a,b\\\\}' is the literal '{a,b}', and r'{a\\\\,b,c}' is ['a,b', 'c'].",
+    "Unmatched '{' ('{a,b') and stray '}' ('a}b') are literal.",
+    "Nested groups expand recursively; commas only split at the top level of their own group."
+  ],
+  "max_retries": 2
+}

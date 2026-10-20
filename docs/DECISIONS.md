@@ -27,3 +27,4 @@ Format: time (IST) - decision - why - alternatives.
 - 09:32 - H-a measured on allam-2-7b single arm: 0/8, 4 of 8 requests rejected by Groq with HTTP 400 for invalid JSON. No gain.
 - 09:34 - exp-3 control measured on 20B at t=0.7: retry 8/8 (9 attempts) vs fresh 8/8 (11 attempts): tie on pass rate.
 - 09:39 - seed-2 variance run on 20B at t=0.7: single 6/8, retry 8/8, cdavc 7/8. Arm ordering at seed 1 is not stable; stopped spending tokens per instruction.
+- dev2: 13 harder dev tasks drafted offline on branch night-run-dev2 (docs/DEV2.md). Not run on any model.

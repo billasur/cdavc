@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e12_merge_sorted_lazy",
+  "title": "Lazy stable merge of sorted iterables",
+  "description": "Implement merge_sorted(*iterables, key=None), a generator function that lazily merges already-sorted iterables into one sorted stream. The merge is stable: items that compare equal are yielded in iterable order (earlier iterable first) and, within one iterable, in their original order. When key is given, items are compared by key(item) and key is called exactly once per item. It must be lazy: nothing is read from any input before the first next(); it holds at most one pending item per input; after k items have been taken from the generator it has read at most (number of inputs) + (k - 1) items in total (an input is advanced only after its pending item has been yielded and the consumer asks for more). Inputs may be any iterables, including one-shot generators. With no iterables it yields nothing. Sortedness is not checked.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e12_merge_sorted_lazy/solution_stub.py"
+  ],
+  "symbols": [
+    "merge_sorted"
+  ],
+  "invariants": [
+    "Basic merge: merge_sorted([1, 4, 7], [2, 5], [3, 6]) yields 1..7 in order.",
+    "Stability with key: ties come out earlier-iterable first, items are never compared when keys are equal.",
+    "key is called exactly once per item; no input is touched before the first next().",
+    "Total items read after k items were taken is at most len(iterables) + k - 1 (do not read ahead).",
+    "Works with one-shot generators and empty iterables; no iterables gives an empty stream."
+  ],
+  "max_retries": 2
+}

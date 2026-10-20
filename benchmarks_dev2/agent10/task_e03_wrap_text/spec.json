@@ -1,0 +1,19 @@
+{
+  "task_id": "task_e03_wrap_text",
+  "title": "Greedy word wrap with paragraphs",
+  "description": "Implement wrap_text(text, width) returning a list of lines. width must be an int (bool rejected) else TypeError, and >= 1 else ValueError; text must be a str else TypeError. Paragraphs are separated by one or more blank lines (a line holding only whitespace is blank); each paragraph is wrapped on its own and consecutive paragraphs are separated by a single '' element in the output. Within a paragraph words are split on any whitespace, runs collapse to one space, and lines never start or end with a space. Wrapping is greedy: a word joins the current line when line + ' ' + word fits within width. A word longer than width always starts a new line and is hard-split into chunks of exactly width characters; its final chunk becomes the current line and later words may join it if they fit. Empty or all-whitespace text returns []; leading and trailing blank lines are ignored.",
+  "implementation_files": [
+    "benchmarks_dev2/agent10/task_e03_wrap_text/solution_stub.py"
+  ],
+  "symbols": [
+    "wrap_text"
+  ],
+  "invariants": [
+    "Greedy fill: 'aaa bbb ccc' at width 7 is ['aaa bbb', 'ccc']; a line may be exactly width long.",
+    "Runs of whitespace collapse; tabs and multiple spaces become one space.",
+    "Blank or whitespace-only lines separate paragraphs; several blank lines give one '' separator; leading and trailing blank lines produce nothing.",
+    "A long word starts a new line, is split into width-sized chunks, and its short tail can take following words ('ab abcdefghij c' at width 4 is ['ab', 'abcd', 'efgh', 'ij c']).",
+    "Bad width or text types raise TypeError; width < 1 raises ValueError."
+  ],
+  "max_retries": 2
+}
