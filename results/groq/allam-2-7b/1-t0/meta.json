@@ -1,0 +1,1 @@
+{"data_provenance":"measured","kind":"PARTIAL: 23 of 24 records (cdavc on task_d803 not run, stopped at the ~50K token budget)","model":"allam-2-7b","provider":"groq","seed":1,"tasks":"first 8 dev tasks","extra":{"temperature":0,"max_tokens":2000},"label":"allam-2-7b via groq; NOT comparable to REPORT30 (Qwen2.5-7B local)"}
