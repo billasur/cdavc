@@ -1,0 +1,1 @@
+PARTIAL: killed by token watchdog at 67,065 total tokens (hard stop 70K). 10 of 13 tasks (e01-e10) recorded. cdavc arm not run. Measured, openai/gpt-oss-20b via groq, temp 0.7, seed 1; NOT comparable to REPORT30 (Qwen2.5-7B local).
