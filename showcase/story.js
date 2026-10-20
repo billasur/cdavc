@@ -73,6 +73,8 @@ class ThreadStoryStage {
     // Pre-allocated scratch objects to ensure ZERO per-frame allocations
     this._dummy = new THREE.Object3D();
     this._color = new THREE.Color();
+    this._t1Color = new THREE.Color();
+    this._t2Color = new THREE.Color();
     this._baseColor = new THREE.Color();
     this._edgeColor = new THREE.Color();
     this._branchColor = new THREE.Color();
@@ -267,35 +269,52 @@ class ThreadStoryStage {
     this.treeGroup.add(this.rootEdge);
 
     // -------------------------------------------------------------
-    // 3. 14 Hollow Branching Cubes ("line wale") across 3 Tiers (1 -> 2 -> 4 -> 8)
-    // Tier 1: 2 hollow cubes branching from root (34px)
-    // Tier 2: 4 hollow cubes branching from Tier 1 (25px)
-    // Tier 3: 8 hollow cubes branching from Tier 2 (18px)
-    // (Removed 8->16 level to keep stage pristine, bold, and never clumsy)
     // -------------------------------------------------------------
-    this.tierSizes = [44, 34, 25, 18];
+    // 3. 20 Hollow Branching Cubes ("line wale") across 2 Tiers (1 -> 4 -> 16)
+    // Tier 0: Root solid cube (44px)
+    // Tier 1: 4 hollow cubes emerging from the 4 corners of root (32px)
+    // Tier 2: 16 hollow cubes (each Tier 1 cube grows 4 cubes from its corners, 20px)
+    // -------------------------------------------------------------
+    this.tierSizes = [44, 32, 20];
 
-    // Shared hollow wireframe material & edge material
-    this.hollowWireMat = new THREE.MeshBasicMaterial({
+    // Per-Tier materials for viral infection cascade
+    // Tier 1 materials (4 inner hollow cubes & filaments)
+    this.tier1WireMat = new THREE.MeshBasicMaterial({
       color: this.colors.hollowWire,
       wireframe: true,
       transparent: true,
       opacity: 0,
     });
-
-    this.hollowEdgeMat = new THREE.LineBasicMaterial({
+    this.tier1EdgeMat = new THREE.LineBasicMaterial({
       color: this.colors.heroEdge,
       transparent: true,
       opacity: 0,
     });
-
-    this.branchMat = new THREE.LineBasicMaterial({
+    this.tier1BranchMat = new THREE.LineBasicMaterial({
       color: this.colors.branchLine,
       transparent: true,
       opacity: 0,
     });
 
-    // Build the 15-node topological tree structure
+    // Tier 2 materials (16 outer hollow cubes & filaments)
+    this.tier2WireMat = new THREE.MeshBasicMaterial({
+      color: this.colors.hollowWire,
+      wireframe: true,
+      transparent: true,
+      opacity: 0,
+    });
+    this.tier2EdgeMat = new THREE.LineBasicMaterial({
+      color: this.colors.heroEdge,
+      transparent: true,
+      opacity: 0,
+    });
+    this.tier2BranchMat = new THREE.LineBasicMaterial({
+      color: this.colors.branchLine,
+      transparent: true,
+      opacity: 0,
+    });
+
+    // Build the 21-node topological tree structure (1 -> 4 -> 16)
     this.buildTreeTopology();
 
     // -------------------------------------------------------------
@@ -335,9 +354,6 @@ class ThreadStoryStage {
   }
 
   buildTreeTopology() {
-    const params = new URLSearchParams(window.location.search);
-    this.maxTier = params.get('tiers') === '2' ? 2 : 3;
-
     // Node 0 is the root solid cube at (0, 0, 0)
     this.nodes = [{
       id: 0,
@@ -349,16 +365,12 @@ class ThreadStoryStage {
 
     // -------------------------------------------------------------
     // Tier 1: 4 primary branches emerging from the 4 corners of the root solid cube
-    // D1: Top-Right    (+X, +Y, +Z)
-    // D2: Bottom-Left  (-X, -Y, -Z)
-    // D3: Top-Left     (-X, +Y, -Z)
-    // D4: Bottom-Right (+X, -Y, +Z)
     // -------------------------------------------------------------
     const t1Coords = [
-      new THREE.Vector3( 39.39,  31.52,  12.61), // 1: D1 (Top-Right)
-      new THREE.Vector3(-39.39, -31.52, -12.61), // 2: D2 (Bottom-Left)
-      new THREE.Vector3(-39.39,  31.52, -12.61), // 3: D3 (Top-Left)
-      new THREE.Vector3( 39.39, -31.52,  12.61), // 4: D4 (Bottom-Right)
+      new THREE.Vector3( 40.91,  32.73,  13.09), // 1: Top-Right
+      new THREE.Vector3(-40.91, -32.73, -13.09), // 2: Bottom-Left
+      new THREE.Vector3(-40.91,  32.73, -13.09), // 3: Top-Left
+      new THREE.Vector3( 40.91, -32.73,  13.09), // 4: Bottom-Right
     ];
 
     for (let i = 0; i < 4; i++) {
@@ -371,22 +383,27 @@ class ThreadStoryStage {
       });
     }
 
-    // -------------------------------------------------------------
-    // Tier 2: 8 sub-branches (2 branching from each of the 4 Tier 1 branches)
-    // -------------------------------------------------------------
     const t2Defs = [
-      // From Node 1 (D1 Top-Right):
-      { id: 5,  parent: 1, pos: new THREE.Vector3( 60.27,  48.22,  36.71) },
-      { id: 6,  parent: 1, pos: new THREE.Vector3( 66.67,  53.34,   3.91) },
-      // From Node 2 (D2 Bottom-Left):
-      { id: 7,  parent: 2, pos: new THREE.Vector3(-66.67, -53.34,  -3.91) },
-      { id: 8,  parent: 2, pos: new THREE.Vector3(-60.27, -48.22, -36.71) },
-      // From Node 3 (D3 Top-Left):
-      { id: 9,  parent: 3, pos: new THREE.Vector3(-66.67,  53.34,  -3.91) },
-      { id: 10, parent: 3, pos: new THREE.Vector3(-60.27,  48.22, -36.71) },
-      // From Node 4 (D4 Bottom-Right):
-      { id: 11, parent: 4, pos: new THREE.Vector3( 60.27, -48.22,  36.71) },
-      { id: 12, parent: 4, pos: new THREE.Vector3( 66.67, -53.34,   3.91) },
+      // 4 daughter cubes scattered across open corners of Node 1 (Top-Right):
+      { id:  5, parent: 1, pos: new THREE.Vector3( 20.13,  53.51,  -7.69) },
+      { id:  6, parent: 1, pos: new THREE.Vector3( 61.69,  53.51,  -7.69) },
+      { id:  7, parent: 1, pos: new THREE.Vector3( 61.69,  53.51,  33.87) },
+      { id:  8, parent: 1, pos: new THREE.Vector3( 61.69,  11.95,  33.87) },
+      // 4 daughter cubes scattered across open corners of Node 2 (Bottom-Left):
+      { id:  9, parent: 2, pos: new THREE.Vector3(-20.13, -53.51,   7.69) },
+      { id: 10, parent: 2, pos: new THREE.Vector3(-61.69, -53.51,   7.69) },
+      { id: 11, parent: 2, pos: new THREE.Vector3(-61.69, -53.51, -33.87) },
+      { id: 12, parent: 2, pos: new THREE.Vector3(-61.69, -11.95, -33.87) },
+      // 4 daughter cubes scattered across open corners of Node 3 (Top-Left):
+      { id: 13, parent: 3, pos: new THREE.Vector3(-20.13,  53.51, -33.87) },
+      { id: 14, parent: 3, pos: new THREE.Vector3(-61.69,  53.51, -33.87) },
+      { id: 15, parent: 3, pos: new THREE.Vector3(-61.69,  11.95, -33.87) },
+      { id: 16, parent: 3, pos: new THREE.Vector3(-61.69,  11.95,   7.69) },
+      // 4 daughter cubes scattered across open corners of Node 4 (Bottom-Right):
+      { id: 17, parent: 4, pos: new THREE.Vector3( 20.13, -53.51,  33.87) },
+      { id: 18, parent: 4, pos: new THREE.Vector3( 61.69, -53.51,  33.87) },
+      { id: 19, parent: 4, pos: new THREE.Vector3( 61.69, -11.95,  33.87) },
+      { id: 20, parent: 4, pos: new THREE.Vector3( 61.69, -11.95,  -7.69) },
     ];
 
     for (const def of t2Defs) {
@@ -399,48 +416,6 @@ class ThreadStoryStage {
       });
     }
 
-    // -------------------------------------------------------------
-    // Tier 3: 16 outer sub-branches (2 branching from each of the 8 Tier 2 nodes)
-    // -------------------------------------------------------------
-    if (this.maxTier >= 3) {
-      const t3Defs = [
-        // From Node 5:
-        { id: 13, parent: 5,  pos: new THREE.Vector3( 67.21,  53.77,  61.15) },
-        { id: 14, parent: 5,  pos: new THREE.Vector3( 79.97,  63.98,  43.01) },
-        // From Node 6:
-        { id: 15, parent: 6,  pos: new THREE.Vector3( 86.37,  69.10,  10.22) },
-        { id: 16, parent: 6,  pos: new THREE.Vector3( 81.77,  65.41, -13.47) },
-        // From Node 7:
-        { id: 17, parent: 7,  pos: new THREE.Vector3(-81.77, -65.41,  13.47) },
-        { id: 18, parent: 7,  pos: new THREE.Vector3(-86.37, -69.10, -10.22) },
-        // From Node 8:
-        { id: 19, parent: 8,  pos: new THREE.Vector3(-79.97, -63.98, -43.01) },
-        { id: 20, parent: 8,  pos: new THREE.Vector3(-67.21, -53.77, -61.15) },
-        // From Node 9:
-        { id: 21, parent: 9,  pos: new THREE.Vector3(-81.77,  65.41,  13.47) },
-        { id: 22, parent: 9,  pos: new THREE.Vector3(-86.37,  69.10, -10.22) },
-        // From Node 10:
-        { id: 23, parent: 10, pos: new THREE.Vector3(-79.97,  63.98, -43.01) },
-        { id: 24, parent: 10, pos: new THREE.Vector3(-67.21,  53.77, -61.15) },
-        // From Node 11:
-        { id: 25, parent: 11, pos: new THREE.Vector3( 67.21, -53.77,  61.15) },
-        { id: 26, parent: 11, pos: new THREE.Vector3( 79.97, -63.98,  43.01) },
-        // From Node 12:
-        { id: 27, parent: 12, pos: new THREE.Vector3( 86.37, -69.10,  10.22) },
-        { id: 28, parent: 12, pos: new THREE.Vector3( 81.77, -65.41, -13.47) },
-      ];
-
-      for (const def of t3Defs) {
-        this.nodes.push({
-          id: def.id,
-          tier: 3,
-          parent: def.parent,
-          targetPos: def.pos,
-          currentPos: new THREE.Vector3(0, 0, 0),
-        });
-      }
-    }
-
     // Create 3D visual representations for each hollow branching node (1 to N)
     for (let i = 1; i < this.nodes.length; i++) {
       const node = this.nodes[i];
@@ -449,10 +424,15 @@ class ThreadStoryStage {
       const boxGeo = new THREE.BoxGeometry(size, size, size);
       const edgeGeo = new THREE.EdgesGeometry(boxGeo);
 
-      // Hollow wireframe cube mesh (MeshBasicMaterial with wireframe: true)
-      const wireMesh = new THREE.Mesh(boxGeo, this.hollowWireMat);
+      const isT1 = node.tier === 1;
+      const wireMat = isT1 ? this.tier1WireMat : this.tier2WireMat;
+      const edgeMat = isT1 ? this.tier1EdgeMat : this.tier2EdgeMat;
+      const branchMat = isT1 ? this.tier1BranchMat : this.tier2BranchMat;
+
+      // Hollow wireframe cube mesh
+      const wireMesh = new THREE.Mesh(boxGeo, wireMat);
       // Outer crisp keynote edge lines
-      const edgeLines = new THREE.LineSegments(edgeGeo, this.hollowEdgeMat);
+      const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
 
       const cubeGroup = new THREE.Group();
       cubeGroup.add(wireMesh);
@@ -464,7 +444,7 @@ class ThreadStoryStage {
       const linePositions = new Float32Array(6);
       const lineGeo = new THREE.BufferGeometry();
       lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-      const connectorLine = new THREE.Line(lineGeo, this.branchMat);
+      const connectorLine = new THREE.Line(lineGeo, branchMat);
       connectorLine.visible = false;
       this.treeGroup.add(connectorLine);
 
@@ -562,109 +542,104 @@ class ThreadStoryStage {
     this.treeGroup.position.set(this.treeOffsetX, threadY, 0);
     this.treeGroup.rotation.set(scrubRotX, scrubRotY, this.baseRotZ);
 
-    // Responsive scaling (calibrated for 4-direction radial branching)
-    const baseScale = (this.maxTier >= 3) ? 0.50 : 0.58;
-    const groupScale = this.isMobile ? (baseScale * 0.76) : baseScale;
+    // Responsive scaling (calibrated for 1 -> 4 -> 16 self-similar radial branching)
+    const baseScale = 0.54;
+    const groupScale = this.isMobile ? (baseScale * 0.74) : baseScale;
     this.treeGroup.scale.setScalar(groupScale);
 
     // -------------------------------------------------------------
-    // PROGRESS BEAT FACTORS (Mitosis: 4-Direction Branching, Rejection, Merge, Enclosure)
+    // PROGRESS BEAT FACTORS (Mitosis: 1 -> 4 -> 16, Viral Infection Cascade, Cleansing)
     // -------------------------------------------------------------
 
     // 1. Stage 0 Fail Risk (Single shot failure pulse at p in [0.12, 0.27])
     const failRisk0 = smoothstep(0.12, 0.20, progress) * (1.0 - smoothstep(0.25, 0.28, progress));
 
     // 2. Stage 1 Mitosis Splits across p in [0.28, 0.68]
-    // Overlapping cubic eased transitions with zero dead pauses
-    let f1, f2, f3;
+    // Split 1 (p in [0.28, 0.48]): 4 hollow cubes emerge from 4 corners of root (32px)
+    // Split 2 (p in [0.44, 0.68]): 16 smaller hollow cubes emerge from corners of Tier 1 (20px)
+    const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.48 - 0.28)));
+    const s2Raw = Math.max(0, Math.min(1, (progress - 0.44) / (0.68 - 0.44)));
+    const g1 = easeInOutCubic(s1Raw);
+    const g2 = easeInOutCubic(s2Raw);
 
-    if (this.maxTier <= 2) {
-      // 2-tier tree (4 corner branches -> 8 sub-branches): bold, uncluttered, large cubes
-      const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.48 - 0.28)));
-      const s2Raw = Math.max(0, Math.min(1, (progress - 0.44) / (0.68 - 0.44)));
-      const g1 = easeInOutCubic(s1Raw);
-      const g2 = easeInOutCubic(s2Raw);
+    // 3. Stage 2 Sequential Reverse Merge across p in [0.73, 0.88]
+    // Step 1: 16 outer cubes collapse into their 4 parents (p in [0.73, 0.81])
+    // Step 2: 4 parent cubes collapse into root solid cube (p in [0.80, 0.88])
+    const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.73) / (0.81 - 0.73)));
+    const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.80) / (0.88 - 0.80)));
+    const c2 = easeInOutCubic(c2Raw); // 16 cubes pull back into 4 cubes
+    const c1 = easeInOutCubic(c1Raw); // 4 cubes pull back into root solid cube
 
-      const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.76) / (0.85 - 0.76)));
-      const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.83) / (0.91 - 0.83)));
-      const c2 = easeInOutCubic(c2Raw);
-      const c1 = easeInOutCubic(c1Raw);
-
-      f1 = (progress < 0.72) ? g1 : c1;
-      f2 = (progress < 0.72) ? g2 : c2;
-      f3 = 0.0;
-    } else {
-      // 3-tier tree (4 corner branches -> 8 sub-branches -> 16 outer branches)
-      const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.42 - 0.28)));
-      const s2Raw = Math.max(0, Math.min(1, (progress - 0.40) / (0.55 - 0.40)));
-      const s3Raw = Math.max(0, Math.min(1, (progress - 0.53) / (0.68 - 0.53)));
-
-      const g1 = easeInOutCubic(s1Raw);
-      const g2 = easeInOutCubic(s2Raw);
-      const g3 = easeInOutCubic(s3Raw);
-
-      const c3Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.74) / (0.82 - 0.74)));
-      const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.80) / (0.87 - 0.80)));
-      const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.85) / (0.91 - 0.85)));
-
-      const c3 = easeInOutCubic(c3Raw);
-      const c2 = easeInOutCubic(c2Raw);
-      const c1 = easeInOutCubic(c1Raw);
-
-      f1 = (progress < 0.72) ? g1 : c1;
-      f2 = (progress < 0.72) ? g2 : c2;
-      f3 = (progress < 0.72) ? g3 : c3;
-    }
-
-    // 3. Rejection Moment: When all outer branches are out, all cubes & filaments turn red
-    const redIntensity = smoothstep(0.68, 0.72, progress) * (1.0 - smoothstep(0.76, 0.80, progress));
-
-    // 4. Stage 3 Verification: Turn white and pull into cage
-    const tAccept = smoothstep(0.85, 0.92, progress);
-    const tCage = smoothstep(0.87, 0.95, progress);
+    const f1 = (progress < 0.72) ? g1 : c1;
+    const f2 = (progress < 0.72) ? g2 : c2;
+    const f3 = 0.0;
 
     // -------------------------------------------------------------
-    // COLOR & MATERIAL STATES
+    // VIRUS INFECTION CONTAGION CASCADE
+    // "First outer most layer becomes red and after merging back,
+    // inner layers one by one as red ones merge into them, become red
+    // until main solid one becomes red - like virus infection"
     // -------------------------------------------------------------
+
+    // Wave 1: Outermost layer (Tier 2: 16 cubes) turns RED first at p in [0.68, 0.73]
+    const infectT2 = smoothstep(0.68, 0.73, progress);
+
+    // Wave 2: As red outer cubes merge into Tier 1 (across [0.73, 0.81]),
+    // Tier 1 catches the infection and turns RED at p in [0.75, 0.80]
+    const infectT1 = smoothstep(0.75, 0.80, progress);
+
+    // Wave 3: As red Tier 1 cubes merge into Root Solid Cube (across [0.80, 0.88]),
+    // Root Solid Cube catches the infection and turns RED at p in [0.82, 0.87]
+    const infectT0 = smoothstep(0.82, 0.87, progress);
+
+    // Wave 4: CD-AVC Cleansing & Enclosure (p in [0.89, 0.94])
+    // The vitrine cage checks and cleanses the infection into purified luminous white
+    const tPurify = smoothstep(0.89, 0.94, progress);
+    const tCage = smoothstep(0.89, 0.95, progress);
+
+    // -------------------------------------------------------------
+    // COLOR & MATERIAL STATES (Per-Tier Contagion Assignment)
+    // -------------------------------------------------------------
+    // Tier 2 (16 Outer Cubes & Branches)
+    this._t2Color.copy(this._baseColor).lerp(this._redColor, infectT2);
+    this.tier2WireMat.color.copy(this._t2Color);
+    this.tier2EdgeMat.color.copy(this._t2Color);
+    this.tier2BranchMat.color.copy(this._t2Color);
+
+    // Tier 1 (4 Inner Cubes & Branches)
+    this._t1Color.copy(this._baseColor).lerp(this._redColor, infectT1);
+    this.tier1WireMat.color.copy(this._t1Color);
+    this.tier1EdgeMat.color.copy(this._t1Color);
+    this.tier1BranchMat.color.copy(this._t1Color);
+
+    // Tier 0 (Root Solid Cube)
     if (failRisk0 > 0.01) {
-      // Stage 0: Single shot fail moment (root solid cube turns red)
+      // Stage 0: Single shot failure pulse
       this._color.copy(this._baseColor).lerp(this._redColor, failRisk0);
       this.rootMat.color.copy(this._color);
       this.rootMat.emissive.copy(this._redColor).multiplyScalar(failRisk0 * 0.45);
       this.rootEdgeMat.color.copy(this._edgeColor).lerp(this._redColor, failRisk0);
       if (stage0Sub) stage0Sub.style.color = '#ff4747';
-    } else if (redIntensity > 0.01) {
-      // Rejection Beat: ALL 8 CUBES & BRANCHES TURN RED TOGETHER
-      this._color.copy(this._baseColor).lerp(this._redColor, redIntensity);
-      this.rootMat.color.copy(this._color);
-      this.rootMat.emissive.copy(this._redColor).multiplyScalar(redIntensity * 0.4);
-      this.rootEdgeMat.color.copy(this._redColor);
-
-      this.hollowWireMat.color.copy(this._redColor);
-      this.hollowEdgeMat.color.copy(this._redColor);
-      this.branchMat.color.copy(this._redColor);
-      if (stage0Sub) stage0Sub.style.color = '';
-    } else if (tAccept > 0.01) {
-      // Stage 3 Verification: Turn luminous white / phosphor accent
+    } else if (progress >= 0.89) {
+      // Wave 4: CD-AVC Cleansing from infected red to purified luminous white
       const targetColor = this.isW2 ? this._whiteColor : this._w1AccentColor;
-      this._color.copy(this._baseColor).lerp(targetColor, tAccept);
+      this._color.copy(this._redColor).lerp(targetColor, tPurify);
       this.rootMat.color.copy(this._color);
-      this.rootMat.emissive.copy(targetColor).multiplyScalar(tAccept * 0.5);
-      this.rootEdgeMat.color.copy(this._edgeColor).lerp(targetColor, tAccept);
-
-      this.hollowWireMat.color.setHex(this.colors.hollowWire);
-      this.hollowEdgeMat.color.setHex(this.colors.heroEdge);
-      this.branchMat.color.setHex(this.colors.branchLine);
+      this.rootMat.emissive.copy(this._redColor).lerp(targetColor, tPurify).multiplyScalar(0.50);
+      this.rootEdgeMat.color.copy(this._redColor).lerp(targetColor, tPurify);
+      if (stage0Sub) stage0Sub.style.color = '';
+    } else if (infectT0 > 0.01) {
+      // Wave 3: Viral infection reaching the root solid cube
+      this._color.copy(this._baseColor).lerp(this._redColor, infectT0);
+      this.rootMat.color.copy(this._color);
+      this.rootMat.emissive.copy(this._redColor).multiplyScalar(infectT0 * 0.60);
+      this.rootEdgeMat.color.copy(this._edgeColor).lerp(this._redColor, infectT0);
       if (stage0Sub) stage0Sub.style.color = '';
     } else {
       // Neutral solid keynote hero
       this.rootMat.color.copy(this._baseColor);
       this.rootMat.emissive.setHex(0x000000);
       this.rootEdgeMat.color.copy(this._edgeColor);
-
-      this.hollowWireMat.color.setHex(this.colors.hollowWire);
-      this.hollowEdgeMat.color.setHex(this.colors.heroEdge);
-      this.branchMat.color.setHex(this.colors.branchLine);
       if (stage0Sub) stage0Sub.style.color = '';
     }
 
@@ -705,11 +680,14 @@ class ThreadStoryStage {
       }
     }
 
-    // Update opacity for hollow wireframe and edges based on overall tree activity
-    const maxBranchF = Math.max(f1, f2, f3);
-    this.hollowWireMat.opacity = Math.min(1.0, maxBranchF * 0.75);
-    this.hollowEdgeMat.opacity = Math.min(1.0, maxBranchF * 0.90);
-    this.branchMat.opacity = Math.min(1.0, maxBranchF * 0.65);
+    // Update per-tier opacity based on tier factor
+    this.tier2WireMat.opacity = Math.min(1.0, f2 * 0.75);
+    this.tier2EdgeMat.opacity = Math.min(1.0, f2 * 0.90);
+    this.tier2BranchMat.opacity = Math.min(1.0, f2 * 0.65);
+
+    this.tier1WireMat.opacity = Math.min(1.0, f1 * 0.75);
+    this.tier1EdgeMat.opacity = Math.min(1.0, f1 * 0.90);
+    this.tier1BranchMat.opacity = Math.min(1.0, f1 * 0.65);
 
     // -------------------------------------------------------------
     // CD-AVC VERIFICATION CAGE DESCENT & ENCLOSURE
@@ -776,9 +754,12 @@ class ThreadStoryStage {
     this.cageWireMat.color.setHex(this.colors.cageWire);
     this.cageGlassMat.color.setHex(this.colors.cageGlass);
     this.rootEdgeMat.color.setHex(this.colors.heroEdge);
-    this.hollowWireMat.color.setHex(this.colors.hollowWire);
-    this.hollowEdgeMat.color.setHex(this.colors.heroEdge);
-    this.branchMat.color.setHex(this.colors.branchLine);
+    this.tier1WireMat.color.setHex(this.colors.hollowWire);
+    this.tier1EdgeMat.color.setHex(this.colors.heroEdge);
+    this.tier1BranchMat.color.setHex(this.colors.branchLine);
+    this.tier2WireMat.color.setHex(this.colors.hollowWire);
+    this.tier2EdgeMat.color.setHex(this.colors.heroEdge);
+    this.tier2BranchMat.color.setHex(this.colors.branchLine);
 
     this.updateProgress(this.smoothedProgress);
   }
