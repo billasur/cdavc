@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Direction 3 · Monumental Monolith</title>
+  <style>
+    :root {
+      --bg: #050706;
+      --text: #f0f3f1;
+      --muted: #5d6b63;
+      --rule: rgba(255, 255, 255, 0.08);
+      --accent: #d8ff64;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 32px clamp(24px, 5vw, 80px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+    .brand-mark {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      font-weight: 600;
+    }
+    .spec-mark {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    /* Full-viewport Monumental Chapters */
+    .monolith-wrap {
+      position: relative;
+    }
+    .thread {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgba(216, 255, 100, 0.25) 10%, rgba(216, 255, 100, 0.25) 90%, transparent);
+      transform: translateX(-50%);
+    }
+    .chapter {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      text-align: center;
+      padding: 120px 24px;
+    }
+    .chapter-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+    .chapter-title {
+      font-size: clamp(44px, 5.5vw, 80px);
+      font-weight: 500;
+      line-height: 1.0;
+      letter-spacing: -0.05em;
+      max-width: 800px;
+    }
+    .hero-stage-item {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      margin: 48px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .prism-box {
+      width: 52px;
+      height: 52px;
+      background: #090f0c;
+      border: 1px solid var(--accent);
+      box-shadow: 0 0 40px rgba(216, 255, 100, 0.3);
+      transform: rotate(45deg);
+    }
+    .cage-ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(216, 255, 100, 0.4);
+      border-radius: 50%;
+    }
+    /* Results */
+    .results-chapter {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-top: 1px solid var(--rule);
+      padding: 120px 24px;
+    }
+    .table-container {
+      width: 100%;
+      max-width: 760px;
+      text-align: left;
+    }
+    .results-headline {
+      font-size: clamp(36px, 4.5vw, 60px);
+      font-weight: 500;
+      letter-spacing: -0.04em;
+      margin-bottom: 48px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+    th {
+      padding: 16px 0;
+      color: var(--muted);
+      border-bottom: 1px solid var(--rule);
+      font-weight: 400;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+    td {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .highlight td {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .footnote {
+      margin-top: 32px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-mark">CD—AVC</div>
+    <div class="spec-mark">QWEN2.5-7B · REPORT30</div>
+  </header>
+
+  <div class="monolith-wrap">
+    <div class="thread"></div>
+
+    <section class="chapter">
+      <div class="chapter-tag">01 / SINGLE MODEL</div>
+      <h1 class="chapter-title">One shot,<br>can fail.</h1>
+      <div class="hero-stage-item">
+        <div class="prism-box"></div>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="chapter-tag">02 / RETRY BASELINE</div>
+      <h2 class="chapter-title">More shots,<br>no judgement.</h2>
+      <div class="hero-stage-item">
+        <div class="prism-box"></div>
+      </div>
+    </section>
+
+    <section class="chapter">
+      <div class="chapter-tag">03 / CD-AVC CAGE</div>
+      <h2 class="chapter-title">A cage that checks<br>before it accepts.</h2>
+      <div class="hero-stage-item">
+        <div class="cage-ring"></div>
+        <div class="prism-box"></div>
+      </div>
+    </section>
+
+    <section class="results-chapter">
+      <div class="table-container">
+        <div class="chapter-tag">REPORT30 RESULT</div>
+        <h2 class="results-headline">+23.3 pp measured gain.</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Condition</th>
+              <th>Pass Rate</th>
+              <th>Result</th>
+              <th>Standard</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Single-shot</td>
+              <td>53.3%</td>
+              <td>16 / 30</td>
+              <td>Unverified single attempt</td>
+            </tr>
+            <tr>
+              <td>Retry baseline</td>
+              <td>80.0%</td>
+              <td>24 / 30</td>
+              <td>Blind retry on test fail</td>
+            </tr>
+            <tr class="highlight">
+              <td>CD-AVC Cage</td>
+              <td>76.7%</td>
+              <td>23 / 30</td>
+              <td>CI [0.079, 0.387] · Sealed gates</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="footnote">Exact measured figures from REPORT30. Qwen2.5-7B Q4_K_M local execution. 0 uncontracted writes allowed.</p>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
