@@ -1,0 +1,1 @@
+PARTIAL: killed by token watchdog at 46.9K tokens this run (cap 45K; check granularity overshoot). e01-e09 recorded, e10-e13 not run. Measured, openai/gpt-oss-20b via groq, temp 0.7, seed 1, NOT comparable to REPORT30 (Qwen2.5-7B local).
