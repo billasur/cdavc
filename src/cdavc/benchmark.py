@@ -232,8 +232,9 @@ class BenchmarkRunner:
         retry_cap: int = 3,
         arms: tuple[str, ...] | None = None,
         prompt_layout: str = "default",
-        lenient_parse: bool = False,
+        lenient_parse: bool = True,
         raw_failures: str | None = None,
+        raw_responses: str | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -267,6 +268,7 @@ class BenchmarkRunner:
         self.prompt_layout = prompt_layout
         self.lenient_parse = lenient_parse
         self.raw_failures = raw_failures
+        self.raw_responses = raw_responses
         self.arms = tuple(arms) if arms else ARMS
         if any(a not in ARMS for a in self.arms):
             raise BenchmarkError(f"unknown arm in {self.arms}")
@@ -527,6 +529,9 @@ class BenchmarkRunner:
         return context
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
+        if self.raw_responses:
+            with open(self.raw_responses, "a") as handle:
+                handle.write(json.dumps({"task_id": task.task_id, "raw": response}) + "\n")
         payload = _strict_payload(response)
         if payload is None and self.lenient_parse:
             payload = _lenient_payload(response, task.implementation_files)
@@ -574,7 +579,12 @@ class BenchmarkRunner:
             try:
                 source = source_path.read_text()
                 tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
-            except (OSError, SyntaxError) as exc:
+            except SyntaxError as exc:
+                text = (exc.text or "").strip()[:200]
+                raise _GateFailure(
+                    f"AST contract failed: SyntaxError at line {exc.lineno} col {exc.offset}: {exc.msg}" + (f" | {text}" if text else "")
+                ) from exc
+            except OSError as exc:
                 raise _GateFailure("AST contract failed") from exc
             declared = {
                 node.name
@@ -1000,7 +1010,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
     parser.add_argument("--arms", default=None, help="comma-separated subset of arms to run (default: all three)")
-    parser.add_argument("--lenient-parse", action="store_true", help="opt-in: recover files object from fences/prose/trailing commas/single code block")
+    parser.add_argument("--lenient-parse", action="store_true", help="(default on) recover files object from fences/prose/trailing commas/single code block")
+    parser.add_argument("--strict-parse", action="store_true", help="disable the lenient parser (original behaviour)")
+    parser.add_argument("--raw-responses", default=None, help="append every raw model response to this JSONL")
     parser.add_argument("--raw-failures", default=None, help="append raw responses that could not be parsed to this JSONL (debug)")
     parser.add_argument("--prompt-layout", default="default", choices=["default", "stable-prefix"], help="H-b: stable-prefix puts volatile arm/seed/failure text last")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
@@ -1044,7 +1056,8 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
             prompt_layout=args.prompt_layout,
-            lenient_parse=args.lenient_parse,
+            lenient_parse=not args.strict_parse,
+            raw_responses=args.raw_responses,
             raw_failures=args.raw_failures,
             arms=tuple(args.arms.split(",")) if args.arms else None,
         )

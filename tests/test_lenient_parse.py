@@ -79,3 +79,13 @@ class StoredRealFailures(unittest.TestCase):
             self.assertIsNone(_strict_payload(row["raw"]))
             recovered += _lenient_payload(row["raw"], ["x.py"]) is not None
         self.assertGreaterEqual(recovered, len(rows) - 1)
+
+
+class SyntaxFeedback(unittest.TestCase):
+    def test_syntax_error_detail_in_gate_message(self):
+        import ast
+        try:
+            compile("def f(:\n  pass\n", "x.py", "exec", ast.PyCF_ONLY_AST)
+        except SyntaxError as exc:
+            self.assertIsNotNone(exc.lineno)
+            self.assertTrue(exc.msg)

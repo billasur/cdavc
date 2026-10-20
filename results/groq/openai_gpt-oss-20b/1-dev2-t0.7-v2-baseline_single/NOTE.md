@@ -1,0 +1,1 @@
+Only e07 and e08 are valid results. e09 and e12 show "provider unavailable": Groq returned HTTP 429 (tokens per day, 200K limit, 199,586 used). They are NOT model failures; ignore them. cdavc run (v2-cdavc) is e04, e10, e11 only; e13 not run (killed at 9.5K tokens by watchdog before it started). openai/gpt-oss-20b via groq, t=0.7, seed 1, NOT comparable to REPORT30.
