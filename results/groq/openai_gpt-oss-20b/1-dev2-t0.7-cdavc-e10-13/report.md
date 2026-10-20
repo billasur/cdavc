@@ -1,0 +1,32 @@
+# CD-AVC benchmark report
+
+All values below are measured records from this run. An em dash means the local provider did not report a value; no value is estimated.
+
+| Arm | Records | Passed | Pass rate | Mean attempts | Mean wall (s) | Mean token in | Mean token out |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `baseline_single` | 0 | 0 | — | — | — | — | — |
+| `baseline_retry` | 0 | 0 | — | — | — | — | — |
+| `baseline_fresh` | 0 | 0 | — | — | — | — | — |
+| `cdavc` | 4 | 1 | 25.0% | 2.500 | 31.829 | 1572.750 | 2605.250 |
+
+## Paired pass-rate differences
+
+| Comparison | N | Difference | 95% CI |
+|---|---:|---:|---:|
+| `baseline_retry` − `baseline_single` | 0 | — | — |
+| `cdavc` − `baseline_single` | 0 | — | — |
+
+## Measured result
+
+Measured result: no paired `cdavc`/`baseline_single` records were available.
+
+## Measured overhead vs baseline_single
+
+| Arm | Paired N | Mean time overhead (s) | Mean time overhead (%) | Mean token overhead |
+|---|---:|---:|---:|---:|
+| `baseline_retry` | 0 | — | — | — |
+| `cdavc` | 0 | — | — | — |
+
+## Measured cage-hurt cases
+
+None measured.
