@@ -335,8 +335,8 @@ class ThreadStoryStage {
   }
 
   buildTreeTopology() {
-    const l1_dist = 48.0;
-    const l2_dist = 36.0;
+    const params = new URLSearchParams(window.location.search);
+    this.maxTier = params.get('tiers') === '2' ? 2 : 3;
 
     // Node 0 is the root solid cube at (0, 0, 0)
     this.nodes = [{
@@ -347,104 +347,101 @@ class ThreadStoryStage {
       currentPos: new THREE.Vector3(0, 0, 0),
     }];
 
-    // Tier 1 (2 nodes from root solid cube, exactly matching demo frame 003)
-    this.nodes.push({
-      id: 1,
-      tier: 1,
-      parent: 0,
-      targetPos: new THREE.Vector3(l1_dist * 0.76, l1_dist * 0.60, l1_dist * 0.25),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-    this.nodes.push({
-      id: 2,
-      tier: 1,
-      parent: 0,
-      targetPos: new THREE.Vector3(-l1_dist * 0.76, -l1_dist * 0.60, -l1_dist * 0.25),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
+    // -------------------------------------------------------------
+    // Tier 1: 4 primary branches emerging from the 4 corners of the root solid cube
+    // D1: Top-Right    (+X, +Y, +Z)
+    // D2: Bottom-Left  (-X, -Y, -Z)
+    // D3: Top-Left     (-X, +Y, -Z)
+    // D4: Bottom-Right (+X, -Y, +Z)
+    // -------------------------------------------------------------
+    const t1Coords = [
+      new THREE.Vector3( 39.39,  31.52,  12.61), // 1: D1 (Top-Right)
+      new THREE.Vector3(-39.39, -31.52, -12.61), // 2: D2 (Bottom-Left)
+      new THREE.Vector3(-39.39,  31.52, -12.61), // 3: D3 (Top-Left)
+      new THREE.Vector3( 39.39, -31.52,  12.61), // 4: D4 (Bottom-Right)
+    ];
 
-    // Tier 2 (2 from each Tier 1 = 4 nodes)
-    const p1 = this.nodes[1].targetPos;
-    this.nodes.push({
-      id: 3,
-      tier: 2,
-      parent: 1,
-      targetPos: new THREE.Vector3(p1.x + l2_dist * 0.45, p1.y + l2_dist * 0.75, p1.z - l2_dist * 0.48),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-    this.nodes.push({
-      id: 4,
-      tier: 2,
-      parent: 1,
-      targetPos: new THREE.Vector3(p1.x + l2_dist * 0.75, p1.y - l2_dist * 0.40, p1.z + l2_dist * 0.52),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-
-    const p2 = this.nodes[2].targetPos;
-    this.nodes.push({
-      id: 5,
-      tier: 2,
-      parent: 2,
-      targetPos: new THREE.Vector3(p2.x - l2_dist * 0.45, p2.y - l2_dist * 0.75, p2.z + l2_dist * 0.48),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-    this.nodes.push({
-      id: 6,
-      tier: 2,
-      parent: 2,
-      targetPos: new THREE.Vector3(p2.x - l2_dist * 0.75, p2.y + l2_dist * 0.40, p2.z - l2_dist * 0.52),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-
-    // Tier 3 (2 from each Tier 2 = 8 nodes)
-    // From 3:
-    const p3 = this.nodes[3].targetPos;
-    this.nodes.push({
-      id: 7,
-      tier: 3,
-      parent: 3,
-      targetPos: new THREE.Vector3(p3.x + 10.0, p3.y + 24.0, p3.z - 14.0),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-    this.nodes.push({
-      id: 8,
-      tier: 3,
-      parent: 3,
-      targetPos: new THREE.Vector3(p3.x + 24.0, p3.y + 12.0, p3.z - 6.0),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-
-    // From 4:
-    const p4 = this.nodes[4].targetPos;
-    this.nodes.push({
-      id: 9,
-      tier: 3,
-      parent: 4,
-      targetPos: new THREE.Vector3(p4.x + 24.0, p4.y - 8.0, p4.z + 14.0),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-    this.nodes.push({
-      id: 10,
-      tier: 3,
-      parent: 4,
-      targetPos: new THREE.Vector3(p4.x + 10.0, p4.y - 24.0, p4.z + 16.0),
-      currentPos: new THREE.Vector3(0, 0, 0),
-    });
-
-    // Symmetrics for 5 and 6:
-    for (let i = 7; i <= 10; i++) {
-      const src = this.nodes[i].targetPos;
-      const parentId = i <= 8 ? 5 : 6;
+    for (let i = 0; i < 4; i++) {
       this.nodes.push({
-        id: this.nodes.length,
-        tier: 3,
-        parent: parentId,
-        targetPos: new THREE.Vector3(-src.x, -src.y, -src.z),
+        id: i + 1,
+        tier: 1,
+        parent: 0,
+        targetPos: t1Coords[i],
         currentPos: new THREE.Vector3(0, 0, 0),
       });
     }
 
-    // Create 3D visual representations for each of the 14 hollow branching nodes (1 to 14)
+    // -------------------------------------------------------------
+    // Tier 2: 8 sub-branches (2 branching from each of the 4 Tier 1 branches)
+    // -------------------------------------------------------------
+    const t2Defs = [
+      // From Node 1 (D1 Top-Right):
+      { id: 5,  parent: 1, pos: new THREE.Vector3( 60.27,  48.22,  36.71) },
+      { id: 6,  parent: 1, pos: new THREE.Vector3( 66.67,  53.34,   3.91) },
+      // From Node 2 (D2 Bottom-Left):
+      { id: 7,  parent: 2, pos: new THREE.Vector3(-66.67, -53.34,  -3.91) },
+      { id: 8,  parent: 2, pos: new THREE.Vector3(-60.27, -48.22, -36.71) },
+      // From Node 3 (D3 Top-Left):
+      { id: 9,  parent: 3, pos: new THREE.Vector3(-66.67,  53.34,  -3.91) },
+      { id: 10, parent: 3, pos: new THREE.Vector3(-60.27,  48.22, -36.71) },
+      // From Node 4 (D4 Bottom-Right):
+      { id: 11, parent: 4, pos: new THREE.Vector3( 60.27, -48.22,  36.71) },
+      { id: 12, parent: 4, pos: new THREE.Vector3( 66.67, -53.34,   3.91) },
+    ];
+
+    for (const def of t2Defs) {
+      this.nodes.push({
+        id: def.id,
+        tier: 2,
+        parent: def.parent,
+        targetPos: def.pos,
+        currentPos: new THREE.Vector3(0, 0, 0),
+      });
+    }
+
+    // -------------------------------------------------------------
+    // Tier 3: 16 outer sub-branches (2 branching from each of the 8 Tier 2 nodes)
+    // -------------------------------------------------------------
+    if (this.maxTier >= 3) {
+      const t3Defs = [
+        // From Node 5:
+        { id: 13, parent: 5,  pos: new THREE.Vector3( 67.21,  53.77,  61.15) },
+        { id: 14, parent: 5,  pos: new THREE.Vector3( 79.97,  63.98,  43.01) },
+        // From Node 6:
+        { id: 15, parent: 6,  pos: new THREE.Vector3( 86.37,  69.10,  10.22) },
+        { id: 16, parent: 6,  pos: new THREE.Vector3( 81.77,  65.41, -13.47) },
+        // From Node 7:
+        { id: 17, parent: 7,  pos: new THREE.Vector3(-81.77, -65.41,  13.47) },
+        { id: 18, parent: 7,  pos: new THREE.Vector3(-86.37, -69.10, -10.22) },
+        // From Node 8:
+        { id: 19, parent: 8,  pos: new THREE.Vector3(-79.97, -63.98, -43.01) },
+        { id: 20, parent: 8,  pos: new THREE.Vector3(-67.21, -53.77, -61.15) },
+        // From Node 9:
+        { id: 21, parent: 9,  pos: new THREE.Vector3(-81.77,  65.41,  13.47) },
+        { id: 22, parent: 9,  pos: new THREE.Vector3(-86.37,  69.10, -10.22) },
+        // From Node 10:
+        { id: 23, parent: 10, pos: new THREE.Vector3(-79.97,  63.98, -43.01) },
+        { id: 24, parent: 10, pos: new THREE.Vector3(-67.21,  53.77, -61.15) },
+        // From Node 11:
+        { id: 25, parent: 11, pos: new THREE.Vector3( 67.21, -53.77,  61.15) },
+        { id: 26, parent: 11, pos: new THREE.Vector3( 79.97, -63.98,  43.01) },
+        // From Node 12:
+        { id: 27, parent: 12, pos: new THREE.Vector3( 86.37, -69.10,  10.22) },
+        { id: 28, parent: 12, pos: new THREE.Vector3( 81.77, -65.41, -13.47) },
+      ];
+
+      for (const def of t3Defs) {
+        this.nodes.push({
+          id: def.id,
+          tier: 3,
+          parent: def.parent,
+          targetPos: def.pos,
+          currentPos: new THREE.Vector3(0, 0, 0),
+        });
+      }
+    }
+
+    // Create 3D visual representations for each hollow branching node (1 to N)
     for (let i = 1; i < this.nodes.length; i++) {
       const node = this.nodes[i];
       const size = this.tierSizes[node.tier];
@@ -452,9 +449,9 @@ class ThreadStoryStage {
       const boxGeo = new THREE.BoxGeometry(size, size, size);
       const edgeGeo = new THREE.EdgesGeometry(boxGeo);
 
-      // Hollow wireframe cube mesh (MeshBasicMaterial with wireframe: true, exactly as in demo frame 003)
+      // Hollow wireframe cube mesh (MeshBasicMaterial with wireframe: true)
       const wireMesh = new THREE.Mesh(boxGeo, this.hollowWireMat);
-      // Outer crisp edge lines
+      // Outer crisp keynote edge lines
       const edgeLines = new THREE.LineSegments(edgeGeo, this.hollowEdgeMat);
 
       const cubeGroup = new THREE.Group();
@@ -463,7 +460,7 @@ class ThreadStoryStage {
       cubeGroup.visible = false;
       this.treeGroup.add(cubeGroup);
 
-      // Connector line linking parent node to child node
+      // Connector filament linking parent node to child node
       const linePositions = new Float32Array(6);
       const lineGeo = new THREE.BufferGeometry();
       lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
@@ -565,52 +562,64 @@ class ThreadStoryStage {
     this.treeGroup.position.set(this.treeOffsetX, threadY, 0);
     this.treeGroup.rotation.set(scrubRotX, scrubRotY, this.baseRotZ);
 
-    // Responsive scaling
-    const groupScale = this.isMobile ? 0.46 : 0.62;
+    // Responsive scaling (calibrated for 4-direction radial branching)
+    const baseScale = (this.maxTier >= 3) ? 0.50 : 0.58;
+    const groupScale = this.isMobile ? (baseScale * 0.76) : baseScale;
     this.treeGroup.scale.setScalar(groupScale);
 
     // -------------------------------------------------------------
-    // PROGRESS BEAT FACTORS (Mitosis: 1 -> 2 -> 4 -> 8, Rejection, Merge, Enclosure)
+    // PROGRESS BEAT FACTORS (Mitosis: 4-Direction Branching, Rejection, Merge, Enclosure)
     // -------------------------------------------------------------
 
     // 1. Stage 0 Fail Risk (Single shot failure pulse at p in [0.12, 0.27])
     const failRisk0 = smoothstep(0.12, 0.20, progress) * (1.0 - smoothstep(0.25, 0.28, progress));
 
-    // 2. Stage 1 Mitosis Splits (1 -> 2 -> 4 -> 8) across p in [0.28, 0.68]
+    // 2. Stage 1 Mitosis Splits across p in [0.28, 0.68]
     // Overlapping cubic eased transitions with zero dead pauses
-    const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.42 - 0.28)));
-    const s2Raw = Math.max(0, Math.min(1, (progress - 0.40) / (0.55 - 0.40)));
-    const s3Raw = Math.max(0, Math.min(1, (progress - 0.53) / (0.68 - 0.53)));
-
-    const g1 = easeInOutCubic(s1Raw); // Split 1: 2 hollow cubes emerge from root (34px)
-    const g2 = easeInOutCubic(s2Raw); // Split 2: 4 smaller hollow cubes emerge from Tier 1 (25px)
-    const g3 = easeInOutCubic(s3Raw); // Split 3: 8 smaller hollow cubes emerge from Tier 2 (18px)
-
-    // 3. Stage 2 Sequential Reverse Merge (8 -> 4 -> 2 -> 1) across p in [0.74, 0.91]
-    // Collapses systematically in exact reverse order
-    const c3Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.74) / (0.82 - 0.74)));
-    const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.80) / (0.87 - 0.80)));
-    const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.85) / (0.91 - 0.85)));
-
-    const c3 = easeInOutCubic(c3Raw); // Tier 3 collapses: 8 -> 4
-    const c2 = easeInOutCubic(c2Raw); // Tier 2 collapses: 4 -> 2
-    const c1 = easeInOutCubic(c1Raw); // Tier 1 collapses: 2 -> 1
-
     let f1, f2, f3;
-    if (progress < 0.72) {
-      f1 = g1;
-      f2 = g2;
-      f3 = g3;
+
+    if (this.maxTier <= 2) {
+      // 2-tier tree (4 corner branches -> 8 sub-branches): bold, uncluttered, large cubes
+      const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.48 - 0.28)));
+      const s2Raw = Math.max(0, Math.min(1, (progress - 0.44) / (0.68 - 0.44)));
+      const g1 = easeInOutCubic(s1Raw);
+      const g2 = easeInOutCubic(s2Raw);
+
+      const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.76) / (0.85 - 0.76)));
+      const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.83) / (0.91 - 0.83)));
+      const c2 = easeInOutCubic(c2Raw);
+      const c1 = easeInOutCubic(c1Raw);
+
+      f1 = (progress < 0.72) ? g1 : c1;
+      f2 = (progress < 0.72) ? g2 : c2;
+      f3 = 0.0;
     } else {
-      f1 = c1;
-      f2 = c2;
-      f3 = c3;
+      // 3-tier tree (4 corner branches -> 8 sub-branches -> 16 outer branches)
+      const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.42 - 0.28)));
+      const s2Raw = Math.max(0, Math.min(1, (progress - 0.40) / (0.55 - 0.40)));
+      const s3Raw = Math.max(0, Math.min(1, (progress - 0.53) / (0.68 - 0.53)));
+
+      const g1 = easeInOutCubic(s1Raw);
+      const g2 = easeInOutCubic(s2Raw);
+      const g3 = easeInOutCubic(s3Raw);
+
+      const c3Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.74) / (0.82 - 0.74)));
+      const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.80) / (0.87 - 0.80)));
+      const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.85) / (0.91 - 0.85)));
+
+      const c3 = easeInOutCubic(c3Raw);
+      const c2 = easeInOutCubic(c2Raw);
+      const c1 = easeInOutCubic(c1Raw);
+
+      f1 = (progress < 0.72) ? g1 : c1;
+      f2 = (progress < 0.72) ? g2 : c2;
+      f3 = (progress < 0.72) ? g3 : c3;
     }
 
-    // 4. Rejection Moment: When all 8 are out, they all turn red together
+    // 3. Rejection Moment: When all outer branches are out, all cubes & filaments turn red
     const redIntensity = smoothstep(0.68, 0.72, progress) * (1.0 - smoothstep(0.76, 0.80, progress));
 
-    // 5. Stage 3 Verification: Turn white and pull into cage
+    // 4. Stage 3 Verification: Turn white and pull into cage
     const tAccept = smoothstep(0.85, 0.92, progress);
     const tCage = smoothstep(0.87, 0.95, progress);
 
