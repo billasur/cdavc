@@ -1285,9 +1285,14 @@ def _lenient_payload(response: str, implementation_files: Sequence[str]) -> Any:
         start = cand.find("{")
         if start == -1:
             continue
-        for suffix in ("}", "}}"):
+        body0 = cand[start:].rstrip()
+        # also seen: the object is closed with "]" instead of "}" ("...\"}]")
+        variants = [body0 + "}", body0 + "}}"]
+        if body0.endswith("]"):
+            variants.append(body0[:-1] + "}")
+        for variant in variants:
             try:
-                obj = json.loads(cand[start:].rstrip() + suffix, strict=False)
+                obj = json.loads(variant, strict=False)
             except Exception:
                 continue
             files = obj.get("files") if isinstance(obj, dict) else None

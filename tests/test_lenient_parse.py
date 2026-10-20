@@ -47,6 +47,12 @@ class LenientParse(unittest.TestCase):
         self.assertIsNone(_strict_payload(r))
         self.assertEqual(_lenient_payload(r, F)["files"][F[0]], "x = 1\n")
 
+    def test_bracket_instead_of_brace(self):
+        # shape seen in a real gpt-oss-20b failure (dev2 e13): ends with "}]"
+        r = '{"files": {"pkg/solution.py": "x = 1\\n"}]'
+        self.assertIsNone(_strict_payload(r))
+        self.assertEqual(_lenient_payload(r, F)["files"][F[0]], "x = 1\n")
+
     def test_garbage_is_none(self):
         self.assertIsNone(_lenient_payload("I cannot do that.", F))
         self.assertIsNone(_lenient_payload("", F))
@@ -57,3 +63,19 @@ class LenientParse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoredRealFailures(unittest.TestCase):
+    """Real raw failures captured on gpt-oss-20b (dev2, t=0.7). Skipped if results are absent."""
+
+    def test_real_raw_failures(self):
+        import glob
+        files = glob.glob("results/groq/openai_gpt-oss-20b/1-dev2-t0.7-*/raw_failures.jsonl")
+        rows = [json.loads(line) for f in files for line in open(f)]
+        if not rows:
+            self.skipTest("no stored raw failures")
+        recovered = 0
+        for row in rows:
+            self.assertIsNone(_strict_payload(row["raw"]))
+            recovered += _lenient_payload(row["raw"], ["x.py"]) is not None
+        self.assertGreaterEqual(recovered, len(rows) - 1)
