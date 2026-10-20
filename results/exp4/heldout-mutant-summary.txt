@@ -1,0 +1,31 @@
+task_h01_parse_config: SKIPPED (reference does not pass hidden tests)
+task_h02_eval_expression: SKIPPED (reference does not pass hidden tests)
+task_h03_parse_csv_line: SKIPPED (reference does not pass hidden tests)
+task_h04_compare_versions: SKIPPED (reference does not pass hidden tests)
+task_h05_parse_log_line: SKIPPED (reference does not pass hidden tests)
+task_h06_iso_duration: kill rate 11/12 = 0.917 (95% Wilson CI [0.646, 0.985]), survived 1, timeouts 0
+task_h07_business_days: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 0
+task_h08_add_months: kill rate 10/12 = 0.833 (95% Wilson CI [0.552, 0.953]), survived 2, timeouts 0
+task_h09_free_slots: kill rate 9/12 = 0.750 (95% Wilson CI [0.468, 0.911]), survived 3, timeouts 0
+task_h10_convert_timestamp: kill rate 10/12 = 0.833 (95% Wilson CI [0.552, 0.953]), survived 2, timeouts 0
+task_h31_modinv: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 2
+task_h32_factorize: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 3
+task_h33_crt: kill rate 9/12 = 0.750 (95% Wilson CI [0.468, 0.911]), survived 3, timeouts 0
+task_h34_isqrt: kill rate 8/12 = 0.667 (95% Wilson CI [0.391, 0.862]), survived 4, timeouts 0
+task_h35_tobase: kill rate 10/12 = 0.833 (95% Wilson CI [0.552, 0.953]), survived 2, timeouts 1
+task_h401_connected_components: SKIPPED (reference does not pass hidden tests)
+task_h402_shortest_path_length: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 0
+task_h403_topological_order: kill rate 9/12 = 0.750 (95% Wilson CI [0.468, 0.911]), survived 3, timeouts 0
+task_h404_is_bipartite: kill rate 3/12 = 0.250 (95% Wilson CI [0.089, 0.532]), survived 9, timeouts 0
+task_h405_sliding_window_max: kill rate 11/12 = 0.917 (95% Wilson CI [0.646, 0.985]), survived 1, timeouts 0
+task_h51_luhn: kill rate 10/12 = 0.833 (95% Wilson CI [0.552, 0.953]), survived 2, timeouts 0
+task_h52_ipv4: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 0
+task_h53_csvline: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 2
+task_h54_semver: kill rate 11/12 = 0.917 (95% Wilson CI [0.646, 0.985]), survived 1, timeouts 0
+task_h55_hexcolor: kill rate 12/12 = 1.000 (95% Wilson CI [0.758, 1.000]), survived 0, timeouts 0
+task_h6_01_token_bucket: kill rate 11/12 = 0.917 (95% Wilson CI [0.646, 0.985]), survived 1, timeouts 0
+task_h6_02_fsm_runner: kill rate 1/1 = 1.000 (95% Wilson CI [0.207, 1.000]), survived 0, timeouts 0
+task_h6_03_circuit_breaker: kill rate 8/12 = 0.667 (95% Wilson CI [0.391, 0.862]), survived 4, timeouts 0
+task_h6_04_reorder_buffer: kill rate 7/7 = 1.000 (95% Wilson CI [0.646, 1.000]), survived 0, timeouts 0
+task_h6_05_job_scheduler: kill rate 10/12 = 0.833 (95% Wilson CI [0.552, 0.953]), survived 2, timeouts 3
+OVERALL: 232/272 = 0.853 (95% Wilson CI [0.806, 0.890])
