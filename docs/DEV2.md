@@ -6,3 +6,6 @@ Verification (measured, offline): for all 13 tasks the reference passes public, 
 Mutation kill rate (cdavc.mutants, up to 20 mutants/task): 219/236 = 0.928 overall (see benchmarks_dev2/mutation_report.json).
 Cross-checks: min_coins vs brute force, format_bytes vs Decimal rounding. osa_distance only re-checked against the same recurrence (sanity, not independent).
 No model has been run on these tasks. Difficulty for gpt-oss-20b is a hypothesis, not a measurement.
+
+## Lenient parser (opt-in, branch night-run-lenient)
+`--lenient-parse` (env `LENIENT=1` in scripts/run_openrouter.sh) recovers a files object from prose/fences, trailing commas, bad escapes, a bare path->code object, one python block for a single-file task, and a missing final `}`. `--raw-failures PATH` saves unparseable raw responses. Default behaviour is unchanged. Unit tests (synthetic): tests/test_lenient_parse.py.

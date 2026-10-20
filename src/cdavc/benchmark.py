@@ -232,6 +232,8 @@ class BenchmarkRunner:
         retry_cap: int = 3,
         arms: tuple[str, ...] | None = None,
         prompt_layout: str = "default",
+        lenient_parse: bool = False,
+        raw_failures: str | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -263,6 +265,8 @@ class BenchmarkRunner:
         if prompt_layout not in {"default", "stable-prefix"}:
             raise BenchmarkError("prompt_layout must be default or stable-prefix")
         self.prompt_layout = prompt_layout
+        self.lenient_parse = lenient_parse
+        self.raw_failures = raw_failures
         self.arms = tuple(arms) if arms else ARMS
         if any(a not in ARMS for a in self.arms):
             raise BenchmarkError(f"unknown arm in {self.arms}")
@@ -523,16 +527,13 @@ class BenchmarkRunner:
         return context
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
-        stripped = _strip_json_fence(response)
-        try:
-            payload = json.loads(stripped, strict=False)
-        except (json.JSONDecodeError, TypeError):
-            try:
-                fixed = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', stripped)
-                payload = json.loads(fixed, strict=False)
-            except Exception:
-                raise _GateFailure("provider response is not a JSON files object")
-        if not isinstance(payload, dict) or "files" not in payload:
+        payload = _strict_payload(response)
+        if payload is None and self.lenient_parse:
+            payload = _lenient_payload(response, task.implementation_files)
+        if payload is None:
+            if self.raw_failures:
+                with open(self.raw_failures, "a") as handle:
+                    handle.write(json.dumps({"task_id": task.task_id, "raw": response}) + "\n")
             raise _GateFailure("provider response is not a JSON files object")
         files = payload["files"]
         if not isinstance(files, dict) or not files:
@@ -999,6 +1000,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
     parser.add_argument("--arms", default=None, help="comma-separated subset of arms to run (default: all three)")
+    parser.add_argument("--lenient-parse", action="store_true", help="opt-in: recover files object from fences/prose/trailing commas/single code block")
+    parser.add_argument("--raw-failures", default=None, help="append raw responses that could not be parsed to this JSONL (debug)")
     parser.add_argument("--prompt-layout", default="default", choices=["default", "stable-prefix"], help="H-b: stable-prefix puts volatile arm/seed/failure text last")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
@@ -1041,6 +1044,8 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
             prompt_layout=args.prompt_layout,
+            lenient_parse=args.lenient_parse,
+            raw_failures=args.raw_failures,
             arms=tuple(args.arms.split(",")) if args.arms else None,
         )
         records = runner.run()
@@ -1180,6 +1185,119 @@ def _restore_files(workspace: Path, original: Mapping[str, str | None]) -> None:
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
+
+
+def _strict_payload(response: str) -> Any:
+    """Original parser. Returns the payload dict with a "files" key, or None."""
+    stripped = _strip_json_fence(response)
+    try:
+        payload = json.loads(stripped, strict=False)
+    except (json.JSONDecodeError, TypeError):
+        try:
+            fixed = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', stripped)
+            payload = json.loads(fixed, strict=False)
+        except Exception:
+            return None
+    if not isinstance(payload, dict) or "files" not in payload:
+        return None
+    return payload
+
+
+def _drop_trailing_commas(text: str) -> str:
+    out: list[str] = []
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == ",":
+            rest = text[i + 1 :].lstrip()
+            if rest[:1] in ("}", "]"):
+                continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _balanced_objects(text: str) -> list[str]:
+    """Top-level {...} spans, string-aware."""
+    spans: list[str] = []
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth:
+            depth -= 1
+            if depth == 0:
+                spans.append(text[start : i + 1])
+    return spans
+
+
+def _lenient_payload(response: str, implementation_files: Sequence[str]) -> Any:
+    """Opt-in recovery. Returns {"files": {...}} or None. Never invents code:
+    it only re-reads what the model wrote (fences, prose, trailing commas, bad
+    escapes, bare path->code objects, or one code block for a single-file task)."""
+    if not isinstance(response, str):
+        return None
+    text = response.strip()
+    candidates = [m.group(1) for m in re.finditer(r"```(?:json|JSON)?\s*\n?([\s\S]*?)```", text)]
+    candidates.append(text)
+    for cand in candidates:
+        for span in _balanced_objects(cand) or []:
+            for variant in (span, _drop_trailing_commas(span)):
+                for fix in (False, True):
+                    body = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', variant) if fix else variant
+                    try:
+                        obj = json.loads(body, strict=False)
+                    except Exception:
+                        continue
+                    if isinstance(obj, dict):
+                        files = obj.get("files", obj)
+                        if isinstance(files, dict) and files and all(isinstance(k, str) and isinstance(v, str) for k, v in files.items()):
+                            if "files" in obj or any(k.endswith(".py") for k in files):
+                                return {"files": files}
+    # Observed on gpt-oss-20b (4 of 4 captured failures): a well-formed files object
+    # that is only missing its final closing brace(s). Append up to two and re-parse.
+    for cand in candidates:
+        start = cand.find("{")
+        if start == -1:
+            continue
+        for suffix in ("}", "}}"):
+            try:
+                obj = json.loads(cand[start:].rstrip() + suffix, strict=False)
+            except Exception:
+                continue
+            files = obj.get("files") if isinstance(obj, dict) else None
+            if isinstance(files, dict) and files and all(isinstance(k, str) and isinstance(v, str) for k, v in files.items()):
+                return {"files": files}
+    if len(implementation_files) == 1:
+        blocks = re.findall(r"```(?:python|py)\s*\n([\s\S]*?)```", text)
+        if len(blocks) == 1 and blocks[0].strip():
+            return {"files": {implementation_files[0]: blocks[0]}}
+    return None
 
 
 def _strip_json_fence(response: str) -> str:

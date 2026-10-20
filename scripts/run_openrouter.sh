@@ -19,7 +19,7 @@ PORT=$(( 20000 + RANDOM % 20000 ))
 PROXY=$!; trap 'kill $PROXY 2>/dev/null' EXIT; sleep 1
 [ -f "$TASKS" ] || "$PY" scripts/make_heldout_tasks.py "$(dirname "$TASKS")"
 PYTHONPATH=src "$PY" -m cdavc.benchmark . --tasks "$TASKS" --endpoint "http://127.0.0.1:$PORT/v1/chat/completions" \
-  --model "$MODEL" --seed "$SEED" --arms "$ARMS" --timeout 240 --retry-cap 3 ${PROMPT_LAYOUT:+--prompt-layout $PROMPT_LAYOUT} ${LIMIT:+--limit $LIMIT} \
+  --model "$MODEL" --seed "$SEED" --arms "$ARMS" --timeout 240 --retry-cap 3 ${PROMPT_LAYOUT:+--prompt-layout $PROMPT_LAYOUT} ${LIMIT:+--limit $LIMIT} ${LENIENT:+--lenient-parse --raw-failures $OUT/raw_failures.jsonl} \
   --records "$OUT/records.jsonl" --report "$OUT/report.md" || true
 cat > "$OUT/meta.json" <<JSON
 {"data_provenance":"measured","model":"$MODEL","seed":$SEED,"arms":"$ARMS","tasks":"$TASKS","branch":"$(git rev-parse --abbrev-ref HEAD)","commit":"$(git rev-parse --short HEAD)",
