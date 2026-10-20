@@ -506,13 +506,13 @@ class ThreadStoryStage {
     const progress = Math.max(0, Math.min(1, p));
 
     // Editorial Sentence Switching (Aligned 1:1 with Visual Chapters):
-    // 0.00 - 0.34: Stage 0 (Single model: "01 / SINGLE MODEL: One shot, can fail.")
-    // 0.34 - 0.78: Stage 1 (Retry baseline: "02 / RETRY BASELINE: More shots, no judgement.")
-    // 0.78 - 1.00: Stage 2 (CD-AVC: "03 / CD-AVC: A cage that checks before it accepts.")
+    // 0.00 - 0.28: Stage 0 (Single model: "01 / SINGLE MODEL: One shot, can fail.")
+    // 0.28 - 0.66: Stage 1 (Retry baseline: "02 / RETRY BASELINE: More shots, no judgement.")
+    // 0.66 - 1.00: Stage 2 (CD-AVC: "03 / CD-AVC: A cage that checks before it accepts.")
     let stageIndex = 0;
-    if (progress >= 0.78) {
+    if (progress >= 0.66) {
       stageIndex = 2;
-    } else if (progress >= 0.34) {
+    } else if (progress >= 0.28) {
       stageIndex = 1;
     }
 
@@ -554,31 +554,31 @@ class ThreadStoryStage {
     // -------------------------------------------------------------
 
     // 1. Stage 0 Fail Moment ("One shot, can fail.")
-    // Unhurried, generous scroll duration:
-    // - 0.00 - 0.12: pristine solid cube
-    // - 0.12 - 0.20: turns crimson red
-    // - 0.20 - 0.31: SUSTAINED RED FAIL BEAT (ample time to read and register)
-    // - 0.31 - 0.35: resets to neutral ready for retries
-    const failRisk0 = smoothstep(0.12, 0.20, progress) * (1.0 - smoothstep(0.31, 0.35, progress));
+    // Generous, unhurried scroll duration:
+    // - 0.00 - 0.08: pristine solid cube
+    // - 0.08 - 0.15: turns crimson red
+    // - 0.15 - 0.24: SUSTAINED RED FAIL BEAT (ample time to read and register)
+    // - 0.24 - 0.28: resets to neutral ready for retries
+    const failRisk0 = smoothstep(0.08, 0.15, progress) * (1.0 - smoothstep(0.24, 0.28, progress));
 
-    // 2. Stage 1 Mitosis Splits across p in [0.34, 0.68]
-    // Split 1 (p in [0.34, 0.52]): 4 hollow cubes emerge from 4 corners of root (32px)
-    // Split 2 (p in [0.50, 0.68]): 16 smaller hollow cubes emerge scattered across all open corners (20px)
-    const s1Raw = Math.max(0, Math.min(1, (progress - 0.34) / (0.52 - 0.34)));
-    const s2Raw = Math.max(0, Math.min(1, (progress - 0.50) / (0.68 - 0.50)));
+    // 2. Stage 1 Mitosis Splits across p in [0.28, 0.52]
+    // Split 1 (p in [0.28, 0.42]): 4 hollow cubes emerge from 4 corners of root (34px)
+    // Split 2 (p in [0.40, 0.52]): 16 smaller hollow cubes emerge scattered across all open corners (22px)
+    const s1Raw = Math.max(0, Math.min(1, (progress - 0.28) / (0.42 - 0.28)));
+    const s2Raw = Math.max(0, Math.min(1, (progress - 0.40) / (0.52 - 0.40)));
     const g1 = easeInOutCubic(s1Raw);
     const g2 = easeInOutCubic(s2Raw);
 
-    // 3. Stage 2 Sequential Reverse Merge across p in [0.78, 0.89]
-    // Step 1: 16 outer cubes collapse into their 4 parents (p in [0.78, 0.84])
-    // Step 2: 4 parent cubes collapse into root solid cube (p in [0.83, 0.89])
-    const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.78) / (0.84 - 0.78)));
-    const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.83) / (0.89 - 0.83)));
+    // 3. Stage 1 Reverse Merge across p in [0.54, 0.66]
+    // Step 1: 16 outer cubes collapse into their 4 parents (p in [0.54, 0.60])
+    // Step 2: 4 parent cubes collapse into root solid cube (p in [0.59, 0.65])
+    const c2Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.54) / (0.60 - 0.54)));
+    const c1Raw = 1.0 - Math.max(0, Math.min(1, (progress - 0.59) / (0.65 - 0.59)));
     const c2 = easeInOutCubic(c2Raw); // 16 cubes pull back into 4 cubes
     const c1 = easeInOutCubic(c1Raw); // 4 cubes pull back into root solid cube
 
-    const f1 = (progress < 0.78) ? g1 : c1;
-    const f2 = (progress < 0.78) ? g2 : c2;
+    const f1 = (progress < 0.54) ? g1 : c1;
+    const f2 = (progress < 0.54) ? g2 : c2;
     const f3 = 0.0;
 
     // -------------------------------------------------------------
@@ -588,22 +588,21 @@ class ThreadStoryStage {
     // until main solid one becomes red - like virus infection"
     // -------------------------------------------------------------
 
-    // Wave 1: Outermost layer (Tier 2: 16 cubes) turns RED first at p in [0.68, 0.74]
-    // Stays red through p = 0.78 while text is still 02 / RETRY BASELINE!
-    const infectT2 = smoothstep(0.68, 0.74, progress);
+    // Wave 1: Outermost layer (Tier 2: 16 cubes) turns RED first at p in [0.50, 0.55]
+    const infectT2 = smoothstep(0.50, 0.55, progress);
 
-    // Wave 2: As red outer cubes merge into Tier 1 (across [0.78, 0.84]),
-    // Tier 1 catches the infection and turns RED at p in [0.79, 0.84]
-    const infectT1 = smoothstep(0.79, 0.84, progress);
+    // Wave 2: As red outer cubes merge into Tier 1 (across [0.54, 0.60]),
+    // Tier 1 catches the infection and turns RED at p in [0.55, 0.60]
+    const infectT1 = smoothstep(0.55, 0.60, progress);
 
-    // Wave 3: As red Tier 1 cubes merge into Root Solid Cube (across [0.83, 0.89]),
-    // Root Solid Cube catches the infection and turns RED at p in [0.85, 0.89]
-    const infectT0 = smoothstep(0.85, 0.89, progress);
+    // Wave 3: As red Tier 1 cubes merge into Root Solid Cube (across [0.59, 0.65]),
+    // Root Solid Cube catches the infection and turns RED at p in [0.60, 0.65]
+    const infectT0 = smoothstep(0.60, 0.65, progress);
 
-    // Wave 4: CD-AVC Cleansing & Enclosure (p in [0.89, 0.95])
-    // The vitrine cage checks and cleanses the infection into purified luminous white
-    const tPurify = smoothstep(0.89, 0.95, progress);
-    const tCage = smoothstep(0.89, 0.96, progress);
+    // Wave 4: CD-AVC Cleansing & Enclosure (p in [0.66, 1.00])
+    // CAGE TRANSITION STARTS EXACTLY WITH THE 2 -> 3 TRANSITION AT p = 0.66!
+    const tCage = smoothstep(0.66, 0.80, progress);
+    const tPurify = smoothstep(0.80, 0.92, progress);
 
     // Accent Sub Text Styling
     if (stage0Sub) stage0Sub.style.color = failRisk0 > 0.05 ? '#ff4747' : '';
@@ -632,7 +631,7 @@ class ThreadStoryStage {
       this.rootMat.color.copy(this._color);
       this.rootMat.emissive.copy(this._redColor).multiplyScalar(failRisk0 * 0.45);
       this.rootEdgeMat.color.copy(this._edgeColor).lerp(this._redColor, failRisk0);
-    } else if (progress >= 0.89) {
+    } else if (progress >= 0.80) {
       // Wave 4: CD-AVC Cleansing from infected red to purified luminous white
       const targetColor = this.isW2 ? this._whiteColor : this._w1AccentColor;
       this._color.copy(this._redColor).lerp(targetColor, tPurify);
@@ -700,14 +699,17 @@ class ThreadStoryStage {
 
     // -------------------------------------------------------------
     // CD-AVC VERIFICATION CAGE DESCENT & ENCLOSURE
+    // Starts prominently with the 2 -> 3 transition at p = 0.66!
     // -------------------------------------------------------------
-    if (tCage > 0.001) {
+    if (progress >= 0.66) {
       this.cageGroup.visible = true;
-      // Descends from above and seals around the 44px solid cube
-      const cageDrop = (1.0 - tCage) * 35;
+      // Descends from high up on the thread line and seals around the 44px solid cube
+      const cageDrop = (1.0 - tCage) * 75;
       this.cageGroup.position.set(0, cageDrop, 0);
 
-      this.cageWireMat.opacity = tCage * (this.isW2 ? 0.90 : 0.92);
+      // Immediately crisp and visible wireframe upon entering at p = 0.66
+      const cageWireFade = smoothstep(0.655, 0.675, progress);
+      this.cageWireMat.opacity = cageWireFade * (this.isW2 ? 0.90 : 0.92);
       this.cageGlassMat.opacity = tCage * (this.isW2 ? 0.16 : 0.10);
       this.threadMat.opacity = (this.isW2 ? 0.35 : 0.30) + tCage * 0.25;
     } else {
