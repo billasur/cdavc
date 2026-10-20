@@ -1,0 +1,2 @@
+{"data_provenance":"measured","model":"allam-2-7b","seed":1,"arms":"baseline_single","tasks":"benchmarks_dev/tasks.json","branch":"night-run","commit":"4573d07",
+ "provider":"groq","extra":{"temperature":0,"max_tokens":2000,"response_format":{"type":"json_object"}},"tpm":6000,"prompt_layout":"default","label":"allam-2-7b via groq; NOT comparable to REPORT30 (Qwen2.5-7B local)"}
