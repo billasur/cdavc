@@ -23,3 +23,14 @@ ogcode.json
 .vercel
 .env*
 .cdavc/
+.ogcode/ogcode.db
+.ogcode/ogcode.db-shm
+.ogcode/ogcode.db-wal
+.ogcode/server.lock
+showcase/.ogcode/ogcode.db
+.DS_Store
+*.mov
+*.pptx
+.chart-data-*/
+.pitch-deck-build/
+submission/
