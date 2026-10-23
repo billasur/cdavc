@@ -228,11 +228,14 @@ def run_command(command: Sequence[str], root: Path, label: str, *, timeout_secon
     output = re.sub(r"(Ran \d+ tests? in )\d+(?:\.\d+)?s", r"\1<TIME>s", output)
     receipt.update(returncode=result.returncode, status="passed" if result.returncode == 0 else "failed")
     receipt["output"] = output if include_output else ""
-    if result.returncode:
-        receipt["failure"] = f"{label} failed" + (f":\n{output}" if include_output and output else "")
-    elif reject_empty_tests and _EMPTY.search(output):
+    # Emptiness outranks the exit code: newer unittest versions exit nonzero for a
+    # discovery that ran nothing, but the verdict that matters is still "verified
+    # nothing", on every interpreter version.
+    if reject_empty_tests and _EMPTY.search(output):
         flag = "--test-command" if label == "targeted test" else "--regression"
         receipt.update(status="inconclusive", failure=f"{label} ran no tests, so it verified nothing; supply {flag}")
+    elif result.returncode:
+        receipt["failure"] = f"{label} failed" + (f":\n{output}" if include_output and output else "")
     return receipt
 
 

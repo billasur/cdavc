@@ -380,8 +380,8 @@ class Supervisor:
         except subprocess.TimeoutExpired as exc:
             raise VerificationFailure(f"{label} timed out after {self.timeout_seconds}s") from exc
         output = redact_paths(result.stdout + "\n" + result.stderr, self.execution_root, self.root).strip()
-        if result.returncode:
-            raise VerificationFailure(f"{label} failed:\n{output[-2000:]}")
+        # Emptiness outranks the exit code: newer unittest exits nonzero when a
+        # discovery runs nothing, but the honest verdict is "verified nothing".
         if reject_empty_tests and _EMPTY_TEST_RUN.search(output):
             flag = "--test-command" if label == "targeted test" else "--regression"
             key = "test_command" if label == "targeted test" else "regression_command"
@@ -389,6 +389,8 @@ class Supervisor:
                 f"{label} ran no tests, so it verified nothing. Give {flag} (or {key} in a task graph) the command "
                 f"that runs this project's tests, for example 'python -m pytest -q' or 'npm test'."
             )
+        if result.returncode:
+            raise VerificationFailure(f"{label} failed:\n{output[-2000:]}")
 
     def _restore(self, original: dict[str, str | None]) -> None:
         for relative, content in original.items():

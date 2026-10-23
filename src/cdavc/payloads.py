@@ -16,6 +16,11 @@ from typing import Any, Iterator
 __all__ = ["parse_payload", "strip_json_fence"]
 
 _MAX_SCAN_STEPS = 20_000
+# A real candidate nests a handful of levels (files -> paths -> strings). Deeper
+# replies are pathological, and whether the interpreter rejects them depends on
+# its recursion limits, so a deterministic cap makes the verdict identical on
+# every Python version instead of relying on RecursionError.
+_MAX_NESTING_DEPTH = 64
 _INVALID_ESCAPE = re.compile(r'\\([^"\\/bfnrtu])')
 _INTERIOR_QUOTE_FIX = re.compile(r':\s*"""([\s\S]*?)"""')
 _PAYLOAD_START = re.compile(r'\{\s*"(?:files|edits)"\s*:')
@@ -36,7 +41,8 @@ def strip_json_fence(response: str) -> str:
 def parse_payload(response: str) -> Any:
     """Decode a provider reply, tolerating the escaping slips models make.
 
-    Raises :class:`ValueError` when no JSON value can be recovered.
+    Raises :class:`ValueError` when no JSON value can be recovered, or when the
+    recovered value nests deeper than any real candidate.
     """
 
     if not isinstance(response, str):
@@ -44,19 +50,38 @@ def parse_payload(response: str) -> Any:
     text = strip_json_fence(response)
     for candidate in (text, _repair_escapes(text)):
         try:
-            return json.loads(candidate, strict=False)
+            value = json.loads(candidate, strict=False)
         except (json.JSONDecodeError, TypeError, RecursionError):
             continue
+        if _nests_too_deeply(value):
+            raise ValueError("provider response nests deeper than any recoverable candidate")
+        return value
     if not text:
         raise ValueError("provider response is not a JSON object")
     try:
         recovered = _scan_document(text)
     except RecursionError:
-        # Nesting deeper than the parser can walk is not a recoverable payload.
+        # Nesting beyond the parser's recursion budget is not a recoverable payload.
         recovered = None
     if recovered is None:
         raise ValueError("provider response is not a JSON object")
+    if _nests_too_deeply(recovered):
+        raise ValueError("provider response nests deeper than any recoverable candidate")
     return recovered
+
+
+def _nests_too_deeply(value: Any) -> bool:
+    """Iterative depth check: never recurses, whatever the interpreter allows."""
+    stack = [(value, 1)]
+    while stack:
+        current, depth = stack.pop()
+        if depth > _MAX_NESTING_DEPTH:
+            return True
+        if isinstance(current, dict):
+            stack.extend((item, depth + 1) for item in current.values())
+        elif isinstance(current, list):
+            stack.extend((item, depth + 1) for item in current)
+    return False
 
 
 def _repair_escapes(text: str) -> str:
