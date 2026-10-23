@@ -32,17 +32,10 @@ destroyed.
 | `origin/night-run-dev2`, `-exp-3`, `-exp-4`, `-lenient` | remote branches | ancestors of `origin/night-run-v2`, which stays |
 | 9 stale worktree entries (temp benchmark dirs) | worktree metadata | `git worktree prune`; directories were already gone |
 
-## Step 1 — merge the research line into main (no decision needed)
+## Step 1 — merge the research line into main (executed 2026-10-24)
 
-`research/flint-and-harness-v2` is 0 commits behind `main`; this is a clean
-fast-forward:
-
-```bash
-git switch main
-git merge --ff-only research/flint-and-harness-v2
-git push origin main
-git branch -d research/flint-and-harness-v2   # after the push
-```
+`research/flint-and-harness-v2` was fast-forwarded into `main` and pushed
+(through `40d3f69`); the branch is deleted. `main` is the active line.
 
 All subsequent work (including the LEAN_AUDIT P0–P3 phases) then happens on
 short-lived branches off `main`.
@@ -87,15 +80,12 @@ too, first copy out `REPORT.md`, `LOG.md`, `benchmarks_heldout/` (the frozen,
 manifest-hashed pre-registration corpus), and any `results/` you cite — that
 corpus is the raw evidence behind the v2 numbers.
 
-## Step 4 — reclaim the disk (destructive, do last)
+## Step 4 — reclaim the disk (executed 2026-10-24)
 
-With the checkpoint refs gone, the 94 MB video blob and old DB blobs are
-unreachable but still on disk (`.git` ≈ 146 MB). One command collects them:
-
-```bash
-cp -R .git /tmp/git-backup-$(date +%s)   # cheap insurance
-git gc --prune=now                        # expected: ~146 MB -> ~30 MB
-```
+After backing up `.git` to `/tmp/git-backup-20261024`, reflogs were expired
+and `git gc --prune=now` run: **`.git` went from 146 MB to 11 MB.** The
+untracked `.ogcode` databases are now gitignored (commit `92a50af`), so the
+every-run churn is gone.
 
 Two tracked `.ogcode/ogcode.db` files (32 MB) remain reachable from `main`'s
 tree — only a `git filter-repo` pass removes them from history (LEAN_AUDIT
