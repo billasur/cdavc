@@ -1,0 +1,5 @@
+{
+  "files": {
+    "src/answer.py": "def answer(value):\n    if value < 0:\n        raise ValueError('negative input')\n    return value + 1\n"
+  }
+}

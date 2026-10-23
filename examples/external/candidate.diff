@@ -1,0 +1,8 @@
+--- a/src/answer.py
++++ b/src/answer.py
+@@ -1,2 +1,4 @@
+ def answer(value):
+-    return 0
++    if value < 0:
++        raise ValueError('negative input')
++    return value + 1

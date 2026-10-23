@@ -1,0 +1,13 @@
+{
+  "implementation_files": ["src/answer.py"],
+  "test_files": ["tests/test_answer.py"],
+  "symbols": ["answer"],
+  "invariants": ["Raise ValueError for negative input."],
+  "test_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "regression_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "check_repeats": 2,
+  "properties": [
+    {"name": "negative input", "file": "src/answer.py", "symbol": "answer", "args": [-1], "raises": "ValueError"},
+    {"name": "zero boundary", "file": "src/answer.py", "symbol": "answer", "args": [0], "expected": 1}
+  ]
+}

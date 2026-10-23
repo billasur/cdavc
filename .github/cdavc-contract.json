@@ -1,0 +1,33 @@
+{
+  "implementation_files": [
+    "src/cdavc/__init__.py",
+    "src/cdavc/__main__.py",
+    "src/cdavc/accounting.py",
+    "src/cdavc/adapters.py",
+    "src/cdavc/benchmark.py",
+    "src/cdavc/cli.py",
+    "src/cdavc/context.py",
+    "src/cdavc/diagnostics.py",
+    "src/cdavc/edits.py",
+    "src/cdavc/graph.py",
+    "src/cdavc/invariants.py",
+    "src/cdavc/launch.py",
+    "src/cdavc/optimization.py",
+    "src/cdavc/patches.py",
+    "src/cdavc/payloads.py",
+    "src/cdavc/properties.py",
+    "src/cdavc/providers.py",
+    "src/cdavc/redact.py",
+    "src/cdavc/runtime.py",
+    "src/cdavc/supervisor.py",
+    "src/cdavc/verification.py"
+  ],
+  "test_files": [
+    "tests/test_cli.py",
+    "tests/test_verification.py"
+  ],
+  "symbols": [],
+  "invariants": [],
+  "test_command": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "regression_command": ["python", "-m", "unittest", "discover", "-s", "tests"]
+}

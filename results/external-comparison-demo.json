@@ -1,0 +1,816 @@
+{
+  "schema": "cdavc.external-comparison.v1",
+  "experiment_fingerprint": "bee649ff91d2acc9dc11805ee69ee9c4aa83db8bb9f83fedde2fa0fa8de746c6",
+  "comparison_status": "matched_reported_budget",
+  "token_comparison_complete": true,
+  "budget": {
+    "max_calls": 2,
+    "max_tokens": 100,
+    "max_wall_seconds": 60
+  },
+  "scope": "Frozen artifacts evaluated identically under one snapshot and contract; no generation was performed.",
+  "telemetry_limitations": [
+    "Source labels and upstream usage are self-reported exports, not independent vendor attestations.",
+    "Include every upstream generation, retry, re-ask, summary, tool-model and judge call; omitted calls invalidate cost matching.",
+    "Reasoning/cache counters are details of reported totals, not extra tokens to double-count.",
+    "Verification makes zero model calls, but consumes local CPU, subprocess time and filesystem work.",
+    "This is a frozen-artifact comparison, not a model-superiority or end-to-end generation experiment.",
+    "Matching means identical declared caps, not identical actual spend; upstream compliance is reported, not enforced retroactively.",
+    "Synthetic example telemetry only: these counters are NOT measurements from Claude, Codex or a local model."
+  ],
+  "records": [
+    {
+      "schema": "cdavc.external-artifact.v1",
+      "id": "claude-export-demo",
+      "source": "claude",
+      "format": "json",
+      "experiment_fingerprint": "bee649ff91d2acc9dc11805ee69ee9c4aa83db8bb9f83fedde2fa0fa8de746c6",
+      "experiment_config": {
+        "schema": "external-artifact-comparison-v1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "budget": {
+          "max_calls": 2,
+          "max_tokens": 100,
+          "max_wall_seconds": 60
+        },
+        "engine": {
+          "__init__.py": "837f401998315e59ae83f0a4d96ac5d40e33fded16720999ffefb97f26db69b9",
+          "__main__.py": "0f7d54f3fbb1f79a85eb8110f11793db99da6f3c61ee979de5abe9a1b5f3fdb3",
+          "accounting.py": "bd707a8a78d97bd07b98cf51d38b120cd4250045c27ddd1c59693b19ee241f0f",
+          "adapters.py": "f5ab6c8ce1a593899dac3d9f138c44b66807abab6c9df7634d2d5e2bf90d0990",
+          "benchmark.py": "2f9bea68941aca2983bf2cbc77ca5ae655a20b78f0b15a5629c78dd4035d4f7b",
+          "cli.py": "44ed428ddc8e141cd7b31851dfbc74eab6fef78a2e0e0de79c731f342f6ea7fc",
+          "context.py": "c4d46a907e15491489997fe7442605ec963e3e6eae0279574a269010d6734b46",
+          "diagnostics.py": "a96feba5dfc7b94d5ca2da8d408e59eddf37a42096305a9600d98196c049c52f",
+          "edits.py": "241f8fb63badef50477b35b138dce62b6885b25c9afbe95978b9de55a27aeef7",
+          "graph.py": "4a63309d7c7d21d3b6a7c3586c6378748e59da0df77183e72b9e295528315d2b",
+          "invariants.py": "68fd7a07c32dba65b6fb925929bfb2b108181337ee2cb468d1530b6b5f152df7",
+          "launch.py": "8876949fc6f42e5f698b5a902934687935437155b20e26371ded170298091d15",
+          "optimization.py": "5059907383aa8af1048315b152f18323f19269403f20b24062a2b5fb352bf6ae",
+          "patches.py": "c7347f00e43ce3e83c05f72e8b337c6a7efffdc71d48d62ed91033e008587f56",
+          "payloads.py": "e83fc8f3f5f7ecf5f15ec04a0dfd16f81c59ece6c49032a03d7e167b51cdafbd",
+          "properties.py": "948da6e9393a18794ce89e34d0e3851eed81d94b1148cbe4ee4ecca3decafae7",
+          "providers.py": "8c1a917da4752aee8eabfa804e0693134b7acd329717239cb6d0f526563d0044",
+          "redact.py": "379a92d02811c8ddb4e8c95916608d049581b2cfaa49dd184838c8799dd0945e",
+          "runtime.py": "65d1a6feb6113c449df3bfb9454f324c771982703bbcf936c9db6ad56d324c84",
+          "supervisor.py": "902db6eb323c6d7661974d741ee17c45367c1cef15311869829b40b1eae311d6",
+          "verification.py": "6a1f655cbe39d1d8f9825113d696de07a611c1aa4d897d84f58b64c7831b35c8"
+        },
+        "python": [
+          3,
+          11,
+          2
+        ],
+        "seed": 0,
+        "timeout_seconds": 30
+      },
+      "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+      "accepted": true,
+      "verification_evidence": {
+        "schema": "1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+        "accepted": true,
+        "outcome": "accepted_under_declared_checks",
+        "failure": "",
+        "gates": [
+          "locked_test_hashes",
+          "ast_contract",
+          "targeted_test",
+          "regression",
+          "contract_properties"
+        ],
+        "checks": [
+          {
+            "gate": "targeted test",
+            "runs": [
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "regression test",
+            "runs": [
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "properties": [
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "evidence_digest": "b07228024c25a827dc05ff9df643fe7cb6415fb2e8e27854743c6c7863eb40cb"
+      },
+      "verification_model_calls": 0,
+      "budget": {
+        "max_calls": 2,
+        "max_tokens": 100,
+        "max_wall_seconds": 60
+      },
+      "calls": 1,
+      "usage_complete": true,
+      "unmetered_calls": 0,
+      "token_usage_source": "provider",
+      "token_in": 10,
+      "token_out": 5,
+      "known_token_in": 10,
+      "known_token_out": 5,
+      "total_tokens": 15,
+      "provider_calls": 1,
+      "reported_provider_calls": 1,
+      "call_log": [
+        {
+          "call": 1,
+          "purpose": "generation",
+          "status": "completed",
+          "error_type": null,
+          "finish_reason": null,
+          "request_digest": null,
+          "response_digest": null,
+          "model": "synthetic-example-not-a-vendor-run",
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "cached_input_tokens": null,
+          "cache_creation_input_tokens": null,
+          "reasoning_tokens": null,
+          "wall_time_seconds": 0.1
+        }
+      ],
+      "upstream_calls_complete": true,
+      "generation_wall_time_seconds": 0.1,
+      "budget_compliance": "within_reported_cap",
+      "telemetry_limitations": [
+        "Source labels and upstream usage are self-reported exports, not independent vendor attestations.",
+        "Include every upstream generation, retry, re-ask, summary, tool-model and judge call; omitted calls invalidate cost matching.",
+        "Reasoning/cache counters are details of reported totals, not extra tokens to double-count.",
+        "Verification makes zero model calls, but consumes local CPU, subprocess time and filesystem work.",
+        "This is a frozen-artifact comparison, not a model-superiority or end-to-end generation experiment.",
+        "Matching means identical declared caps, not identical actual spend; upstream compliance is reported, not enforced retroactively.",
+        "Synthetic example telemetry only: these counters are NOT measurements from Claude, Codex or a local model."
+      ],
+      "record_digest": "80badae9851aa26b06fe65245a988f55c53a2683dd3d9032544528e7aea77085"
+    },
+    {
+      "schema": "cdavc.external-artifact.v1",
+      "id": "codex-export-demo",
+      "source": "codex",
+      "format": "diff",
+      "experiment_fingerprint": "bee649ff91d2acc9dc11805ee69ee9c4aa83db8bb9f83fedde2fa0fa8de746c6",
+      "experiment_config": {
+        "schema": "external-artifact-comparison-v1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "budget": {
+          "max_calls": 2,
+          "max_tokens": 100,
+          "max_wall_seconds": 60
+        },
+        "engine": {
+          "__init__.py": "837f401998315e59ae83f0a4d96ac5d40e33fded16720999ffefb97f26db69b9",
+          "__main__.py": "0f7d54f3fbb1f79a85eb8110f11793db99da6f3c61ee979de5abe9a1b5f3fdb3",
+          "accounting.py": "bd707a8a78d97bd07b98cf51d38b120cd4250045c27ddd1c59693b19ee241f0f",
+          "adapters.py": "f5ab6c8ce1a593899dac3d9f138c44b66807abab6c9df7634d2d5e2bf90d0990",
+          "benchmark.py": "2f9bea68941aca2983bf2cbc77ca5ae655a20b78f0b15a5629c78dd4035d4f7b",
+          "cli.py": "44ed428ddc8e141cd7b31851dfbc74eab6fef78a2e0e0de79c731f342f6ea7fc",
+          "context.py": "c4d46a907e15491489997fe7442605ec963e3e6eae0279574a269010d6734b46",
+          "diagnostics.py": "a96feba5dfc7b94d5ca2da8d408e59eddf37a42096305a9600d98196c049c52f",
+          "edits.py": "241f8fb63badef50477b35b138dce62b6885b25c9afbe95978b9de55a27aeef7",
+          "graph.py": "4a63309d7c7d21d3b6a7c3586c6378748e59da0df77183e72b9e295528315d2b",
+          "invariants.py": "68fd7a07c32dba65b6fb925929bfb2b108181337ee2cb468d1530b6b5f152df7",
+          "launch.py": "8876949fc6f42e5f698b5a902934687935437155b20e26371ded170298091d15",
+          "optimization.py": "5059907383aa8af1048315b152f18323f19269403f20b24062a2b5fb352bf6ae",
+          "patches.py": "c7347f00e43ce3e83c05f72e8b337c6a7efffdc71d48d62ed91033e008587f56",
+          "payloads.py": "e83fc8f3f5f7ecf5f15ec04a0dfd16f81c59ece6c49032a03d7e167b51cdafbd",
+          "properties.py": "948da6e9393a18794ce89e34d0e3851eed81d94b1148cbe4ee4ecca3decafae7",
+          "providers.py": "8c1a917da4752aee8eabfa804e0693134b7acd329717239cb6d0f526563d0044",
+          "redact.py": "379a92d02811c8ddb4e8c95916608d049581b2cfaa49dd184838c8799dd0945e",
+          "runtime.py": "65d1a6feb6113c449df3bfb9454f324c771982703bbcf936c9db6ad56d324c84",
+          "supervisor.py": "902db6eb323c6d7661974d741ee17c45367c1cef15311869829b40b1eae311d6",
+          "verification.py": "6a1f655cbe39d1d8f9825113d696de07a611c1aa4d897d84f58b64c7831b35c8"
+        },
+        "python": [
+          3,
+          11,
+          2
+        ],
+        "seed": 0,
+        "timeout_seconds": 30
+      },
+      "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+      "accepted": true,
+      "verification_evidence": {
+        "schema": "1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+        "accepted": true,
+        "outcome": "accepted_under_declared_checks",
+        "failure": "",
+        "gates": [
+          "locked_test_hashes",
+          "ast_contract",
+          "targeted_test",
+          "regression",
+          "contract_properties"
+        ],
+        "checks": [
+          {
+            "gate": "targeted test",
+            "runs": [
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "regression test",
+            "runs": [
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "properties": [
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "evidence_digest": "b07228024c25a827dc05ff9df643fe7cb6415fb2e8e27854743c6c7863eb40cb"
+      },
+      "verification_model_calls": 0,
+      "budget": {
+        "max_calls": 2,
+        "max_tokens": 100,
+        "max_wall_seconds": 60
+      },
+      "calls": 1,
+      "usage_complete": true,
+      "unmetered_calls": 0,
+      "token_usage_source": "provider",
+      "token_in": 10,
+      "token_out": 5,
+      "known_token_in": 10,
+      "known_token_out": 5,
+      "total_tokens": 15,
+      "provider_calls": 1,
+      "reported_provider_calls": 1,
+      "call_log": [
+        {
+          "call": 1,
+          "purpose": "generation",
+          "status": "completed",
+          "error_type": null,
+          "finish_reason": null,
+          "request_digest": null,
+          "response_digest": null,
+          "model": "synthetic-example-not-a-vendor-run",
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "cached_input_tokens": null,
+          "cache_creation_input_tokens": null,
+          "reasoning_tokens": null,
+          "wall_time_seconds": 0.1
+        }
+      ],
+      "upstream_calls_complete": true,
+      "generation_wall_time_seconds": 0.1,
+      "budget_compliance": "within_reported_cap",
+      "telemetry_limitations": [
+        "Source labels and upstream usage are self-reported exports, not independent vendor attestations.",
+        "Include every upstream generation, retry, re-ask, summary, tool-model and judge call; omitted calls invalidate cost matching.",
+        "Reasoning/cache counters are details of reported totals, not extra tokens to double-count.",
+        "Verification makes zero model calls, but consumes local CPU, subprocess time and filesystem work.",
+        "This is a frozen-artifact comparison, not a model-superiority or end-to-end generation experiment.",
+        "Matching means identical declared caps, not identical actual spend; upstream compliance is reported, not enforced retroactively.",
+        "Synthetic example telemetry only: these counters are NOT measurements from Claude, Codex or a local model."
+      ],
+      "record_digest": "27f8cb355f9cd90259f6e07c0e86db7a71362443fa8f808346d36791954a43f4"
+    },
+    {
+      "schema": "cdavc.external-artifact.v1",
+      "id": "local-export-demo",
+      "source": "local",
+      "format": "json",
+      "experiment_fingerprint": "bee649ff91d2acc9dc11805ee69ee9c4aa83db8bb9f83fedde2fa0fa8de746c6",
+      "experiment_config": {
+        "schema": "external-artifact-comparison-v1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "budget": {
+          "max_calls": 2,
+          "max_tokens": 100,
+          "max_wall_seconds": 60
+        },
+        "engine": {
+          "__init__.py": "837f401998315e59ae83f0a4d96ac5d40e33fded16720999ffefb97f26db69b9",
+          "__main__.py": "0f7d54f3fbb1f79a85eb8110f11793db99da6f3c61ee979de5abe9a1b5f3fdb3",
+          "accounting.py": "bd707a8a78d97bd07b98cf51d38b120cd4250045c27ddd1c59693b19ee241f0f",
+          "adapters.py": "f5ab6c8ce1a593899dac3d9f138c44b66807abab6c9df7634d2d5e2bf90d0990",
+          "benchmark.py": "2f9bea68941aca2983bf2cbc77ca5ae655a20b78f0b15a5629c78dd4035d4f7b",
+          "cli.py": "44ed428ddc8e141cd7b31851dfbc74eab6fef78a2e0e0de79c731f342f6ea7fc",
+          "context.py": "c4d46a907e15491489997fe7442605ec963e3e6eae0279574a269010d6734b46",
+          "diagnostics.py": "a96feba5dfc7b94d5ca2da8d408e59eddf37a42096305a9600d98196c049c52f",
+          "edits.py": "241f8fb63badef50477b35b138dce62b6885b25c9afbe95978b9de55a27aeef7",
+          "graph.py": "4a63309d7c7d21d3b6a7c3586c6378748e59da0df77183e72b9e295528315d2b",
+          "invariants.py": "68fd7a07c32dba65b6fb925929bfb2b108181337ee2cb468d1530b6b5f152df7",
+          "launch.py": "8876949fc6f42e5f698b5a902934687935437155b20e26371ded170298091d15",
+          "optimization.py": "5059907383aa8af1048315b152f18323f19269403f20b24062a2b5fb352bf6ae",
+          "patches.py": "c7347f00e43ce3e83c05f72e8b337c6a7efffdc71d48d62ed91033e008587f56",
+          "payloads.py": "e83fc8f3f5f7ecf5f15ec04a0dfd16f81c59ece6c49032a03d7e167b51cdafbd",
+          "properties.py": "948da6e9393a18794ce89e34d0e3851eed81d94b1148cbe4ee4ecca3decafae7",
+          "providers.py": "8c1a917da4752aee8eabfa804e0693134b7acd329717239cb6d0f526563d0044",
+          "redact.py": "379a92d02811c8ddb4e8c95916608d049581b2cfaa49dd184838c8799dd0945e",
+          "runtime.py": "65d1a6feb6113c449df3bfb9454f324c771982703bbcf936c9db6ad56d324c84",
+          "supervisor.py": "902db6eb323c6d7661974d741ee17c45367c1cef15311869829b40b1eae311d6",
+          "verification.py": "6a1f655cbe39d1d8f9825113d696de07a611c1aa4d897d84f58b64c7831b35c8"
+        },
+        "python": [
+          3,
+          11,
+          2
+        ],
+        "seed": 0,
+        "timeout_seconds": 30
+      },
+      "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+      "accepted": true,
+      "verification_evidence": {
+        "schema": "1",
+        "snapshot_digest": "9a0ddeb1a0925bc42c739755beabe8dc6e519c95c780856ab5944748bce88440",
+        "contract_digest": "521a67815fafa21edc7e674157538c58acf1375e4c7f85d6a4165f3f85817dbb",
+        "artifact_digest": "a9144b9b454f023c2964d08fa40984a2fda7d9e61cdce8d3a95b17c6c8c48efc",
+        "accepted": true,
+        "outcome": "accepted_under_declared_checks",
+        "failure": "",
+        "gates": [
+          "locked_test_hashes",
+          "ast_contract",
+          "targeted_test",
+          "regression",
+          "contract_properties"
+        ],
+        "checks": [
+          {
+            "gate": "targeted test",
+            "runs": [
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "targeted test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "regression test",
+            "runs": [
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              },
+              {
+                "gate": "regression test",
+                "command": [
+                  "python",
+                  "-m",
+                  "unittest",
+                  "discover",
+                  "-s",
+                  "tests"
+                ],
+                "status": "passed",
+                "returncode": 0,
+                "output": ".\n----------------------------------------------------------------------\nRan 1 test in <TIME>s\n\nOK",
+                "failure": ""
+              }
+            ]
+          },
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "properties": [
+          {
+            "gate": "property:negative input",
+            "runs": [
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              },
+              {
+                "name": "negative input",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "103020b0995cef1848facb23200bbcad53e30aefb79fee0c0af3830d57e82222"
+              }
+            ]
+          },
+          {
+            "gate": "property:zero boundary",
+            "runs": [
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              },
+              {
+                "name": "zero boundary",
+                "passed": true,
+                "status": "passed",
+                "failure": null,
+                "digest": "de3dd54ccdf9352e8188610b7df316bbcf0b23b5676ef4f268a407dc3702f7df"
+              }
+            ]
+          }
+        ],
+        "evidence_digest": "b07228024c25a827dc05ff9df643fe7cb6415fb2e8e27854743c6c7863eb40cb"
+      },
+      "verification_model_calls": 0,
+      "budget": {
+        "max_calls": 2,
+        "max_tokens": 100,
+        "max_wall_seconds": 60
+      },
+      "calls": 1,
+      "usage_complete": true,
+      "unmetered_calls": 0,
+      "token_usage_source": "provider",
+      "token_in": 10,
+      "token_out": 5,
+      "known_token_in": 10,
+      "known_token_out": 5,
+      "total_tokens": 15,
+      "provider_calls": 1,
+      "reported_provider_calls": 1,
+      "call_log": [
+        {
+          "call": 1,
+          "purpose": "generation",
+          "status": "completed",
+          "error_type": null,
+          "finish_reason": null,
+          "request_digest": null,
+          "response_digest": null,
+          "model": "synthetic-example-not-a-vendor-run",
+          "prompt_tokens": 10,
+          "completion_tokens": 5,
+          "cached_input_tokens": null,
+          "cache_creation_input_tokens": null,
+          "reasoning_tokens": null,
+          "wall_time_seconds": 0.1
+        }
+      ],
+      "upstream_calls_complete": true,
+      "generation_wall_time_seconds": 0.1,
+      "budget_compliance": "within_reported_cap",
+      "telemetry_limitations": [
+        "Source labels and upstream usage are self-reported exports, not independent vendor attestations.",
+        "Include every upstream generation, retry, re-ask, summary, tool-model and judge call; omitted calls invalidate cost matching.",
+        "Reasoning/cache counters are details of reported totals, not extra tokens to double-count.",
+        "Verification makes zero model calls, but consumes local CPU, subprocess time and filesystem work.",
+        "This is a frozen-artifact comparison, not a model-superiority or end-to-end generation experiment.",
+        "Matching means identical declared caps, not identical actual spend; upstream compliance is reported, not enforced retroactively.",
+        "Synthetic example telemetry only: these counters are NOT measurements from Claude, Codex or a local model."
+      ],
+      "record_digest": "c5aa94e3c543b88e7a45c664f76a9fdbf7200acbd62e2426e6ce069f06709eea"
+    }
+  ],
+  "report_digest": "56704e00ab7873f0e03398d251b773315f01a72f66158dc9e19a9082016ec1c8"
+}

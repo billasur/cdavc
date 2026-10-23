@@ -7,6 +7,7 @@ from cdavc.providers import (
     MockProvider,
     OpenAICompatibleProvider,
     ProviderUnavailableError,
+    SamplingParams,
 )
 
 
@@ -165,6 +166,76 @@ class ProviderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ProviderUnavailableError, "timed out"):
             provider.complete([])
+
+    def test_sampling_parameters_are_sent_and_validated(self):
+        captured = {}
+
+        def opener(request: Request):
+            captured["request"] = request
+
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    return json.dumps(
+                        {"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]}
+                    ).encode()
+
+            return Response()
+
+        provider = OpenAICompatibleProvider(
+            "https://example.test",
+            opener=opener,
+            sampling=SamplingParams(temperature=1.0, top_p=0.95, top_k=20, max_tokens=32768),
+        )
+        completion = provider.complete_with_metadata([])
+
+        self.assertEqual(
+            json.loads(captured["request"].data),
+            {
+                "model": "gpt-4o-mini",
+                "messages": [],
+                "temperature": 1.0,
+                "top_p": 0.95,
+                "top_k": 20,
+                "max_tokens": 32768,
+            },
+        )
+        self.assertEqual(completion.metadata["finish_reason"], "stop")
+
+        with self.assertRaises(ValueError):
+            SamplingParams(temperature=4.0)
+        with self.assertRaises(ValueError):
+            SamplingParams(top_p=1.5)
+        with self.assertRaises(ValueError):
+            SamplingParams(top_k=0)
+        with self.assertRaises(ValueError):
+            SamplingParams(max_tokens=0)
+        # None everywhere is the default and serializes to no request fields.
+        self.assertEqual(SamplingParams().request_fields(), {})
+
+    def test_truncated_completion_reports_length_finish_reason(self):
+        def opener(request: Request):
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def read(self):
+                    body = {"choices": [{"message": {"content": '{"files": {"a": '}, "finish_reason": "length"}]}
+                    return json.dumps(body).encode()
+
+            return Response()
+
+        provider = OpenAICompatibleProvider("https://example.test", opener=opener)
+        completion = provider.complete_with_metadata([])
+        self.assertEqual(completion.metadata["finish_reason"], "length")
 
 
 if __name__ == "__main__":

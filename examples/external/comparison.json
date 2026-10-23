@@ -1,0 +1,10 @@
+{
+  "directory": ".",
+  "contract": "contract.json",
+  "budget": {"max_calls": 2, "max_tokens": 100, "max_wall_seconds": 60},
+  "candidates": [
+    {"id": "claude-export-demo", "source": "claude", "candidate": "candidate.json", "format": "json", "telemetry": "usage-synthetic.json"},
+    {"id": "codex-export-demo", "source": "codex", "candidate": "candidate.diff", "format": "diff", "telemetry": "usage-synthetic.json"},
+    {"id": "local-export-demo", "source": "local", "candidate": "candidate.json", "format": "json", "telemetry": "usage-synthetic.json"}
+  ]
+}

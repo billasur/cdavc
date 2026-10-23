@@ -125,6 +125,37 @@ class TaskGraphTests(unittest.TestCase):
         self.assertEqual([task.id for task in graph.runnable_tasks({"A", "B"})], ["C"])
         self.assertEqual(graph.task("B").dependencies, ("A",))
 
+    def test_project_wide_regression_command_applies_to_each_task(self):
+        graph = TaskGraph.from_dict(
+            {
+                "project_id": "demo",
+                "regression_command": ["python", "-m", "pytest", "-q"],
+                "tasks": [{"id": "A", "title": "only", "implementation_files": ["src/a.py"]}],
+            }
+        )
+
+        self.assertEqual(graph.task("A").regression_command, ("python", "-m", "pytest", "-q"))
+
+    def test_task_can_disable_the_targeted_gate_and_override_the_regression_command(self):
+        graph = TaskGraph.from_dict(
+            {
+                "project_id": "demo",
+                "regression_command": ["python", "-m", "pytest", "-q"],
+                "tasks": [
+                    {
+                        "id": "A",
+                        "title": "only",
+                        "implementation_files": ["web/app.js"],
+                        "test_command": None,
+                        "regression_command": ["npm", "test"],
+                    }
+                ],
+            }
+        )
+
+        self.assertIsNone(graph.task("A").test_command)
+        self.assertEqual(graph.task("A").regression_command, ("npm", "test"))
+
 
 if __name__ == "__main__":
     unittest.main()

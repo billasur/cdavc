@@ -15,6 +15,9 @@ coverage: check-python
 	$(PYTHON) -m coverage report -m
 
 run-demo:
+	PYTHONPATH=src $(PYTHON) tools/showcase_cli.py
+
+run-demo-raw:
 	PYTHONPATH=src $(PYTHON) -m cdavc.cli examples/demo/task_graph.json \
 		--provider mock \
 		--mock-response examples/demo/responses/bad.json \
@@ -23,11 +26,12 @@ run-demo:
 benchmark-mock: check-python
 	PYTHONPATH=src $(PYTHON) -m cdavc.benchmark . \
 		--tasks benchmarks/tasks.json \
+		--records results/benchmark-v5-mock.jsonl --report results/REPORT-v5-mock.md \
 		--mock \
 		--seed 0 \
 		--model mock-local \
 		--quantisation mock \
-		--version benchmark-v1 \
+		--version benchmark-v5 \
 		--hardware "$(shell uname -srm)"
 
 package-test: check-python

@@ -1,9 +1,9 @@
 {
-  "benchmark_id": "cdavc-python-original-v1",
+  "benchmark_id": "cdavc-python-original-v2",
   "source": {
     "kind": "original",
     "name": "CD-AVC benchmark corpus",
-    "version": "1",
+    "version": "2",
     "style_reference": "HumanEval/MBPP-style function-completion tasks",
     "license": "MIT"
   },
@@ -25,7 +25,9 @@
         "count_vowels"
       ],
       "invariants": [
-        "Do not count y or punctuation."
+        "Count only the ASCII vowels a, e, i, o, u, case-insensitively.",
+        "Never count y.",
+        "Return 0 when the text is empty or holds no vowels."
       ],
       "test_command": [
         "python",
@@ -42,7 +44,8 @@
         "benchmarks/regression_tests.py",
         "task_001"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_002",
@@ -61,7 +64,9 @@
         "is_palindrome"
       ],
       "invariants": [
-        "An empty normalized string is a palindrome."
+        "Ignore case and every non-alphanumeric character before comparing.",
+        "An empty normalized string is a palindrome.",
+        "Return False for a non-palindrome."
       ],
       "test_command": [
         "python",
@@ -78,7 +83,8 @@
         "benchmarks/regression_tests.py",
         "task_002"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_003",
@@ -97,7 +103,8 @@
         "reverse_words"
       ],
       "invariants": [
-        "Leading, trailing and repeated whitespace is discarded."
+        "Split on runs of whitespace and join the words with single spaces.",
+        "Return an empty string for empty or whitespace-only input."
       ],
       "test_command": [
         "python",
@@ -114,7 +121,8 @@
         "benchmarks/regression_tests.py",
         "task_003"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_004",
@@ -133,7 +141,8 @@
         "run_length_encode"
       ],
       "invariants": [
-        "Return an empty string for empty input and do not escape digits."
+        "Emit every character followed by its decimal run length.",
+        "Return an empty string for empty input."
       ],
       "test_command": [
         "python",
@@ -150,7 +159,8 @@
         "benchmarks/regression_tests.py",
         "task_004"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_005",
@@ -169,7 +179,8 @@
         "chunk"
       ],
       "invariants": [
-        "Raise ValueError when size is not positive."
+        "Return [] for an empty sequence.",
+        "raise ValueError when size is smaller than 1."
       ],
       "test_command": [
         "python",
@@ -186,7 +197,8 @@
         "benchmarks/regression_tests.py",
         "task_005"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_006",
@@ -205,7 +217,9 @@
         "merge_sorted"
       ],
       "invariants": [
-        "Inputs are already sorted and may contain equal or negative values."
+        "Both inputs are sorted ascending.",
+        "Values may be equal, zero or negative; preserve duplicates.",
+        "Return a new list and never mutate the inputs."
       ],
       "test_command": [
         "python",
@@ -222,7 +236,8 @@
         "benchmarks/regression_tests.py",
         "task_006"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_007",
@@ -241,7 +256,9 @@
         "rotate"
       ],
       "invariants": [
-        "Empty input returns an empty list and negative steps are valid modulo rotation."
+        "Positive n rotates right and negative n rotates left.",
+        "Normalise n modulo the length.",
+        "Return [] for empty input."
       ],
       "test_command": [
         "python",
@@ -258,7 +275,8 @@
         "benchmarks/regression_tests.py",
         "task_007"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_008",
@@ -277,7 +295,9 @@
         "unique_preserve"
       ],
       "invariants": [
-        "Do not sort the result or mutate the input list."
+        "Keep the order of first occurrence.",
+        "Values may be strings or numbers.",
+        "Return [] for empty input."
       ],
       "test_command": [
         "python",
@@ -294,7 +314,8 @@
         "benchmarks/regression_tests.py",
         "task_008"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_009",
@@ -313,7 +334,8 @@
         "flatten_once"
       ],
       "invariants": [
-        "Strings are iterables at this level and should be flattened character by character."
+        "Flatten exactly one level; a string contributes its characters.",
+        "Return [] for empty input."
       ],
       "test_command": [
         "python",
@@ -330,7 +352,8 @@
         "benchmarks/regression_tests.py",
         "task_009"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_010",
@@ -349,7 +372,9 @@
         "group_anagrams"
       ],
       "invariants": [
-        "Return a dictionary keyed by signature and keep insertion order of keys."
+        "Group keys are the sorted lowercase letters of each word.",
+        "Preserve input order inside each group.",
+        "Return {} for empty input."
       ],
       "test_command": [
         "python",
@@ -366,7 +391,8 @@
         "benchmarks/regression_tests.py",
         "task_010"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_011",
@@ -385,7 +411,9 @@
         "top_k_frequent"
       ],
       "invariants": [
-        "Return an empty list when k is not positive."
+        "Break count ties by first appearance in the input.",
+        "Return [] when k <= 0.",
+        "Return at most one entry per distinct value."
       ],
       "test_command": [
         "python",
@@ -402,7 +430,8 @@
         "benchmarks/regression_tests.py",
         "task_011"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_012",
@@ -421,7 +450,9 @@
         "balanced_brackets"
       ],
       "invariants": [
-        "A closing bracket must match the most recent unmatched opening bracket."
+        "Only (), [] and {} are tracked.",
+        "Return True for empty text.",
+        "Return False when a closer has no opener or an opener is left unclosed."
       ],
       "test_command": [
         "python",
@@ -438,7 +469,8 @@
         "benchmarks/regression_tests.py",
         "task_012"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_013",
@@ -457,7 +489,9 @@
         "camel_to_snake"
       ],
       "invariants": [
-        "Existing underscores are preserved as separators without duplicate underscores."
+        "Acronym runs stay together, so HTTPRequest becomes http_request.",
+        "Existing underscores are preserved without duplicates.",
+        "Leading and trailing underscores are removed and the result is lowercase."
       ],
       "test_command": [
         "python",
@@ -474,7 +508,8 @@
         "benchmarks/regression_tests.py",
         "task_013"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_014",
@@ -493,7 +528,9 @@
         "parse_query"
       ],
       "invariants": [
-        "Percent escapes are decoded and a key without a value maps to an empty string."
+        "Repeated keys append their values in order.",
+        "Percent-decode keys and values, treating '+' as a space.",
+        "Return {} for an empty query string."
       ],
       "test_command": [
         "python",
@@ -510,7 +547,8 @@
         "benchmarks/regression_tests.py",
         "task_014"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_015",
@@ -529,7 +567,8 @@
         "roman_to_int"
       ],
       "invariants": [
-        "Raise ValueError for empty, non-canonical or out-of-range numerals."
+        "Validate strictly and raise ValueError for malformed or non-canonical numerals such as IIII.",
+        "Support the subtractive pairs IV, IX, XL, XC, CD and CM."
       ],
       "test_command": [
         "python",
@@ -546,7 +585,8 @@
         "benchmarks/regression_tests.py",
         "task_015"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_016",
@@ -565,7 +605,8 @@
         "int_to_roman"
       ],
       "invariants": [
-        "Raise ValueError outside the inclusive range 1..3999."
+        "Support 1 to 3999 inclusive; raise ValueError outside that range.",
+        "Produce canonical numerals, using the largest symbol first."
       ],
       "test_command": [
         "python",
@@ -582,7 +623,8 @@
         "benchmarks/regression_tests.py",
         "task_016"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_017",
@@ -601,7 +643,9 @@
         "gcd_many"
       ],
       "invariants": [
-        "Zeros and negative inputs are accepted; raise ValueError for an empty list."
+        "Use the absolute value of every input.",
+        "gcd_many([]) raises ValueError.",
+        "gcd_many([0, n]) returns abs(n)."
       ],
       "test_command": [
         "python",
@@ -618,7 +662,8 @@
         "benchmarks/regression_tests.py",
         "task_017"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_018",
@@ -637,7 +682,9 @@
         "lcm_many"
       ],
       "invariants": [
-        "A zero input makes the result zero; use absolute values and raise ValueError for empty input."
+        "Return 0 when any input is 0.",
+        "Use absolute values, so lcm_many([-4, 6]) is 12.",
+        "lcm_many([]) raises ValueError."
       ],
       "test_command": [
         "python",
@@ -654,7 +701,8 @@
         "benchmarks/regression_tests.py",
         "task_018"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_019",
@@ -673,7 +721,9 @@
         "is_prime"
       ],
       "invariants": [
-        "Values below 2 are not prime and the function must return a bool."
+        "Return False for n < 2.",
+        "Return True only for numbers with no divisor other than 1 and themselves.",
+        "is_prime(2) is True."
       ],
       "test_command": [
         "python",
@@ -690,7 +740,8 @@
         "benchmarks/regression_tests.py",
         "task_019"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_020",
@@ -709,7 +760,8 @@
         "fibonacci"
       ],
       "invariants": [
-        "Fibonacci(0)=0 and Fibonacci(1)=1; raise ValueError for negative indices."
+        "Use 0-based indexing, with fibonacci(0) == 0 and fibonacci(1) == 1.",
+        "raise ValueError for negative n."
       ],
       "test_command": [
         "python",
@@ -726,7 +778,8 @@
         "benchmarks/regression_tests.py",
         "task_020"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_021",
@@ -745,7 +798,9 @@
         "binary_search"
       ],
       "invariants": [
-        "Duplicate targets require the lowest matching index."
+        "The input list is sorted ascending and may contain duplicates.",
+        "Return the index of the first occurrence of target, or -1.",
+        "Return -1 for an empty list."
       ],
       "test_command": [
         "python",
@@ -762,7 +817,8 @@
         "benchmarks/regression_tests.py",
         "task_021"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_022",
@@ -781,7 +837,8 @@
         "longest_common_prefix"
       ],
       "invariants": [
-        "Return an empty string for an empty input or no shared characters."
+        "Return '' for an empty list or when any string is empty.",
+        "Comparison is case-sensitive."
       ],
       "test_command": [
         "python",
@@ -798,7 +855,8 @@
         "benchmarks/regression_tests.py",
         "task_022"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_023",
@@ -817,7 +875,8 @@
         "levenshtein_distance"
       ],
       "invariants": [
-        "The distance is zero only for equal strings and must be an integer."
+        "Unit insertion, deletion and substitution each cost 1.",
+        "Return the length of the other string when one input is empty."
       ],
       "test_command": [
         "python",
@@ -834,7 +893,8 @@
         "benchmarks/regression_tests.py",
         "task_023"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_024",
@@ -853,7 +913,9 @@
         "transpose"
       ],
       "invariants": [
-        "Return [] for an empty matrix and raise ValueError for a ragged matrix."
+        "Swap rows and columns.",
+        "Return [] for an empty matrix.",
+        "raise ValueError for a ragged matrix."
       ],
       "test_command": [
         "python",
@@ -870,7 +932,8 @@
         "benchmarks/regression_tests.py",
         "task_024"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_025",
@@ -889,7 +952,9 @@
         "spiral_order"
       ],
       "invariants": [
-        "Handle empty, one-row and one-column matrices without duplicating values."
+        "Walk clockwise from the top-left corner inwards.",
+        "Support non-square, single-row and single-column matrices.",
+        "Return [] for an empty matrix."
       ],
       "test_command": [
         "python",
@@ -906,7 +971,8 @@
         "benchmarks/regression_tests.py",
         "task_025"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_026",
@@ -925,7 +991,8 @@
         "matrix_multiply"
       ],
       "invariants": [
-        "Raise ValueError for incompatible or ragged matrices and return a new matrix."
+        "raise ValueError when the inner dimensions do not match.",
+        "Support non-square, single-row and single-column matrices."
       ],
       "test_command": [
         "python",
@@ -942,7 +1009,8 @@
         "benchmarks/regression_tests.py",
         "task_026"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_027",
@@ -961,7 +1029,9 @@
         "merge_intervals"
       ],
       "invariants": [
-        "Do not mutate the input and preserve singleton intervals."
+        "Intervals are closed; touching intervals merge.",
+        "Return [] for empty input.",
+        "Sort the result by start."
       ],
       "test_command": [
         "python",
@@ -978,7 +1048,8 @@
         "benchmarks/regression_tests.py",
         "task_027"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_028",
@@ -997,7 +1068,9 @@
         "evaluate_rpn"
       ],
       "invariants": [
-        "Division truncates toward zero; raise ValueError for malformed expressions."
+        "Tokens are strings and operands are integers.",
+        "Division truncates toward zero.",
+        "raise ValueError for malformed or under-supplied expressions."
       ],
       "test_command": [
         "python",
@@ -1014,7 +1087,8 @@
         "benchmarks/regression_tests.py",
         "task_028"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_029",
@@ -1033,7 +1107,9 @@
         "format_duration"
       ],
       "invariants": [
-        "Use 0s for zero and raise ValueError for negative input."
+        "Omit zero components, and format 0 as '0s'.",
+        "Emit d, h, m and s in that order, space separated.",
+        "raise ValueError for negative input."
       ],
       "test_command": [
         "python",
@@ -1050,7 +1126,8 @@
         "benchmarks/regression_tests.py",
         "task_029"
       ],
-      "max_retries": 2
+      "max_retries": 2,
+      "boundary_probe": true
     },
     {
       "task_id": "task_030",
@@ -1069,7 +1146,8 @@
         "stable_sort_records"
       ],
       "invariants": [
-        "Equal keys retain input order and the input list is not mutated."
+        "Preserve the input order of records with equal keys.",
+        "Return [] for empty input."
       ],
       "test_command": [
         "python",
@@ -1086,6 +1164,812 @@
         "benchmarks/regression_tests.py",
         "task_030"
       ],
+      "max_retries": 2,
+      "boundary_probe": true
+    },
+    {
+      "task_id": "task_031",
+      "title": "Parse ini text",
+      "description": "Implement parse_ini(text). Parse a minimal INI document into a mapping of section name to key/value strings.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_031/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_ini"
+      ],
+      "invariants": [
+        "Blank lines, '#' comments and ';' comments are ignored.",
+        "Keys and values are stripped of surrounding whitespace, and the key ends at the first '=' so a value may contain '='.",
+        "A repeated section header merges into the same section, with later keys overriding earlier ones.",
+        "raise ValueError when a key appears before any section header, when a line has no '=', or when a key is empty."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_031"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_031"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_031"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_032",
+      "title": "Slugify a title",
+      "description": "Implement slugify(title). Build a lowercase URL slug from an arbitrary title.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_032/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "slugify"
+      ],
+      "invariants": [
+        "Lowercase the title and drop every non-ASCII character.",
+        "Each run of characters that are not ASCII letters or digits becomes a single '-'.",
+        "Strip leading and trailing '-'.",
+        "Return '' when no ASCII letter or digit survives."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_032"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_032"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_032"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_033",
+      "title": "Parse a human readable size",
+      "description": "Implement parse_size(text). Convert a size such as '10 KB' or '1.5MB' into bytes.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_033/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_size"
+      ],
+      "invariants": [
+        "Accept an optional space between the number and the unit.",
+        "Units are case-insensitive and limited to B, KB, MB and GB, where each step is 1024.",
+        "The number may be an integer or a decimal, and the result is rounded to the nearest byte.",
+        "raise ValueError for empty text, a number without a unit, an unparsable number or an unknown unit."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_033"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_033"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_033"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_034",
+      "title": "Greedy word wrap",
+      "description": "Implement wrap_text(text, width). Wrap text into lines of at most width characters without splitting words.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_034/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "wrap_text"
+      ],
+      "invariants": [
+        "Collapse runs of whitespace and split on whitespace.",
+        "Fill each line greedily, separating words with a single space.",
+        "A word longer than width occupies a line on its own.",
+        "Return [] for empty or whitespace-only text.",
+        "raise ValueError when width is smaller than 1."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_034"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_034"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_034"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_035",
+      "title": "Parse one csv line",
+      "description": "Implement parse_csv_line(line). Split a single comma separated record, honouring double quoted fields.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_035/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_csv_line"
+      ],
+      "invariants": [
+        "Split on commas that are outside double quotes.",
+        "A quoted field may contain commas and a doubled quote stands for one literal quote.",
+        "Strip surrounding whitespace from unquoted fields and keep quoted field content verbatim.",
+        "Return [''] for an empty line.",
+        "raise ValueError when a quoted field is never closed."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_035"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_035"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_035"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_036",
+      "title": "Deep merge and list merge",
+      "description": "Implement deep_merge in solution.py and merge_lists in merge_utils.py. deep_merge combines nested dictionaries while merge_lists concatenates two lists without duplicates.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_036/solution.py",
+        "benchmarks/tasks/task_036/merge_utils.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "deep_merge",
+        "merge_lists"
+      ],
+      "invariants": [
+        "deep_merge merges nested dictionaries recursively and replaces lists and scalars with the override value.",
+        "Keys that only exist in the base mapping survive.",
+        "deep_merge never mutates either input.",
+        "merge_lists keeps the order of left followed by the values of right that are not already present."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_036"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_036"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_036"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_037",
+      "title": "Normalise a slash path",
+      "description": "Implement normalize_path(path). Normalise a POSIX style path without touching the filesystem.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_037/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "normalize_path"
+      ],
+      "invariants": [
+        "Collapse repeated '/' and drop '.' segments.",
+        "Resolve '..' against the previous segment, keeping leading '..' segments of a relative path.",
+        "Keep the leading '/' of an absolute path and never emit a trailing '/' except for the root '/'.",
+        "Return '.' for empty input."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_037"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_037"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_037"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_038",
+      "title": "Intersect closed intervals",
+      "description": "Implement intersect_intervals(first, second). Intersect two sorted lists of closed integer intervals.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_038/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "intersect_intervals"
+      ],
+      "invariants": [
+        "Both inputs are sorted by start and each interval is a two element [start, end] list with start <= end.",
+        "Return only non-empty intersections, sorted by start.",
+        "A shared single point is a valid intersection, so [1, 2] and [2, 3] intersect at [2, 2].",
+        "Return [] when either input is empty or nothing overlaps."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_038"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_038"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_038"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_039",
+      "title": "Parse a compact duration",
+      "description": "Implement parse_duration(text). Convert a compact duration such as '1h30m' or '2d 3h' into whole seconds.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_039/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "parse_duration"
+      ],
+      "invariants": [
+        "Units are d, h, m and s, case-insensitive, where a day is 86400 seconds.",
+        "Components may be separated by whitespace, appear in any order and each unit may appear at most once.",
+        "raise ValueError for empty text, an unknown unit, an unparsable character or a repeated unit."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_039"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_039"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_039"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_040",
+      "title": "Most frequent words",
+      "description": "Implement top_words(text, k). Rank the words of a text by frequency.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_040/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "top_words"
+      ],
+      "invariants": [
+        "A word is a run of ASCII letters or digits, compared case-insensitively.",
+        "Sort by count descending and break ties by the word ascending.",
+        "Return [] when k <= 0, and fewer than k entries when the text has fewer distinct words."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_040"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_040"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_040"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_041",
+      "title": "Compare dotted versions",
+      "description": "Implement compare_versions(left, right). Compare two dotted numeric version strings.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_041/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "compare_versions"
+      ],
+      "invariants": [
+        "Compare component by component as integers.",
+        "Missing trailing components count as 0, so '1.0' equals '1'.",
+        "Return -1, 0 or 1 for less than, equal to, or greater than.",
+        "raise ValueError for an empty component or a non-numeric component."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_041"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_041"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_041"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_042",
+      "title": "Safe division and percentage",
+      "description": "Implement safe_divide and percentage in one module, both tolerant of a zero denominator.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_042/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "safe_divide",
+        "percentage"
+      ],
+      "invariants": [
+        "safe_divide returns default when the denominator is 0, and default is 0.0 unless the caller overrides it.",
+        "percentage returns part divided by whole times 100, rounded to one decimal place.",
+        "percentage returns 0.0 when whole is 0."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_042"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_042"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_042"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_043",
+      "title": "Decode run length encoding",
+      "description": "Implement decode_rle(text). Expand a run length encoded string such as 'a3b2c1'.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_043/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "decode_rle"
+      ],
+      "invariants": [
+        "Each character is followed by one or more decimal digits giving its repeat count.",
+        "Return '' for empty input.",
+        "raise ValueError when a character has no count or a count is smaller than 1."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_043"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_043"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_043"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_044",
+      "title": "Convert between bases",
+      "description": "Implement to_base and from_base in one module for bases 2 to 36.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_044/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "to_base",
+        "from_base"
+      ],
+      "invariants": [
+        "Digits above 9 are the lowercase letters a to z.",
+        "to_base(0, base) is '0' and negative values keep a leading '-' in both directions.",
+        "raise ValueError when the base is outside 2 to 36, when from_base gets an invalid digit, an empty text or a digit that is too large for the base."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_044"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_044"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_044"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_045",
+      "title": "Text utilities and summarise",
+      "description": "Implement summarize in solution.py, and normalize_whitespace plus word_count in text_utils.py. summarize truncates a text to a word budget and imports the helpers from text_utils.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_045/solution.py",
+        "benchmarks/tasks/task_045/text_utils.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "summarize",
+        "normalize_whitespace",
+        "word_count"
+      ],
+      "invariants": [
+        "normalize_whitespace collapses every run of whitespace to one space and strips both ends.",
+        "word_count counts the words of the normalized text and returns 0 for blank text.",
+        "summarize returns the normalized text when it has at most limit words, otherwise the first limit words followed by ' ...'.",
+        "raise ValueError when limit is smaller than 1."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_045"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_045"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_045"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_046",
+      "title": "Moving average",
+      "description": "Implement moving_average(values, window). Compute the trailing average of a numeric sequence.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_046/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "moving_average"
+      ],
+      "invariants": [
+        "Return one average per full window, so the result has len(values) - window + 1 entries.",
+        "Round every average to three decimal places.",
+        "Return [] when the sequence is shorter than the window.",
+        "raise ValueError when window is smaller than 1."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_046"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_046"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_046"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_047",
+      "title": "Group records by a key",
+      "description": "Implement group_by(records, key). Group a list of dictionaries by the value of one key.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_047/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "group_by"
+      ],
+      "invariants": [
+        "Preserve the input order inside every group.",
+        "Return {} for an empty list.",
+        "raise KeyError when a record is missing the key."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_047"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_047"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_047"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_048",
+      "title": "Bigrams and jaccard similarity",
+      "description": "Implement bigrams in tokens.py and jaccard in solution.py. jaccard compares the word bigram sets of two texts and imports bigrams from tokens.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_048/solution.py",
+        "benchmarks/tasks/task_048/tokens.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "bigrams",
+        "jaccard"
+      ],
+      "invariants": [
+        "bigrams lowercases the text, splits on whitespace and joins each adjacent word pair with one space.",
+        "bigrams returns [] when there are fewer than two words.",
+        "jaccard returns the size of the intersection divided by the size of the union, rounded to three decimal places.",
+        "jaccard returns 1.0 when both texts have no bigrams and 0.0 when only one of them does."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_048"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_048"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_048"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_049",
+      "title": "Rectangle areas",
+      "description": "Implement total_area and overlap_area in one module. Rectangles are dictionaries with x, y, w and h.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_049/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "total_area",
+        "overlap_area"
+      ],
+      "invariants": [
+        "total_area sums w * h over the rectangles and returns 0 for an empty list.",
+        "overlap_area returns the area of the axis-aligned intersection of two rectangles.",
+        "overlap_area returns 0 when the rectangles only touch or are disjoint."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_049"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_049"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_049"
+      ],
+      "boundary_probe": true,
+      "max_retries": 2
+    },
+    {
+      "task_id": "task_050",
+      "title": "Compress number ranges",
+      "description": "Implement compress_ranges(numbers). Render sorted unique integers as comma separated ranges.",
+      "source": "CD-AVC-original-v1",
+      "implementation_files": [
+        "benchmarks/tasks/task_050/solution.py"
+      ],
+      "test_files": [
+        "benchmarks/public_tests.py",
+        "benchmarks/hidden_tests.py",
+        "benchmarks/regression_tests.py"
+      ],
+      "symbols": [
+        "compress_ranges"
+      ],
+      "invariants": [
+        "Sort the input and remove duplicates.",
+        "Collapse a run of three or more consecutive numbers into 'start-end'.",
+        "Leave runs of one or two numbers as individual values.",
+        "Return '' for empty input."
+      ],
+      "test_command": [
+        "python",
+        "benchmarks/public_tests.py",
+        "task_050"
+      ],
+      "hidden_test_command": [
+        "python",
+        "benchmarks/hidden_tests.py",
+        "task_050"
+      ],
+      "regression_command": [
+        "python",
+        "benchmarks/regression_tests.py",
+        "task_050"
+      ],
+      "boundary_probe": true,
       "max_retries": 2
     }
   ]

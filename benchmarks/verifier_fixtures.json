@@ -1,0 +1,72 @@
+[
+  {
+    "id": "good-validation", "label": "Correct negative-input validation", "ground_truth_correct": true,
+    "files": {"candidate.py": "def solve(x):\n    if x < 0: raise ValueError('negative')\n    return x * 2\n"},
+    "public_check": "from candidate import solve\nassert solve(2) == 4\n",
+    "symbols": ["solve"], "invariants": ["Raise ValueError for negative input"],
+    "properties": [{"name": "negative", "file": "candidate.py", "symbol": "solve", "args": [-1], "raises": "ValueError"}, {"name": "zero", "file": "candidate.py", "symbol": "solve", "args": [0], "expected": 0}]
+  },
+  {
+    "id": "good-duplicates", "label": "Correct duplicate preservation and non-mutation", "ground_truth_correct": true,
+    "files": {"candidate.py": "def solve(values):\n    return sorted(values)\n"},
+    "public_check": "from candidate import solve\nassert solve([2, 1]) == [1, 2]\n",
+    "symbols": ["solve"], "invariants": [],
+    "properties": [{"name": "duplicates", "file": "candidate.py", "symbol": "solve", "args": [[2, 1, 2]], "expected": [1, 2, 2], "unchanged_args": true}, {"name": "empty", "file": "candidate.py", "symbol": "solve", "args": [[]], "expected": [], "unchanged_args": true}]
+  },
+  {
+    "id": "good-boundary", "label": "Correct zero and singleton boundaries", "ground_truth_correct": true,
+    "files": {"candidate.py": "def solve(n):\n    return list(range(n))\n"},
+    "public_check": "from candidate import solve\nassert solve(3) == [0, 1, 2]\n",
+    "symbols": ["solve"], "invariants": [],
+    "properties": [{"name": "zero", "file": "candidate.py", "symbol": "solve", "args": [0], "expected": []}, {"name": "singleton", "file": "candidate.py", "symbol": "solve", "args": [1], "expected": [0]}]
+  },
+  {
+    "id": "good-modules", "label": "Correct implementation across multiple modules", "ground_truth_correct": true,
+    "files": {"candidate.py": "from helper import twice\ndef solve(x):\n    return twice(x)\n", "helper.py": "def twice(x):\n    if x < 0: raise ValueError('negative')\n    return 2 * x\n"},
+    "public_check": "from candidate import solve\nassert solve(2) == 4\n",
+    "symbols": ["solve"], "invariants": ["Raise ValueError for negative input"],
+    "properties": [{"name": "negative", "file": "candidate.py", "symbol": "solve", "args": [-1], "raises": "ValueError"}]
+  },
+  {
+    "id": "unreachable-raise", "label": "Incorrect unreachable validation raise", "ground_truth_correct": false,
+    "files": {"candidate.py": "def solve(x):\n    return x * 2\n    raise ValueError('unreachable')\n"},
+    "public_check": "from candidate import solve\nassert solve(2) == 4\n",
+    "symbols": ["solve"], "invariants": ["Raise ValueError for negative input"],
+    "properties": [{"name": "negative", "file": "candidate.py", "symbol": "solve", "args": [-1], "raises": "ValueError"}]
+  },
+  {
+    "id": "unrelated-raise", "label": "Incorrect unrelated helper raise", "ground_truth_correct": false,
+    "files": {"candidate.py": "def other():\n    raise ValueError('unrelated')\ndef solve(x):\n    return x * 2\n"},
+    "public_check": "from candidate import solve\nassert solve(2) == 4\n",
+    "symbols": ["solve"], "invariants": ["Raise ValueError for negative input"],
+    "properties": [{"name": "negative", "file": "candidate.py", "symbol": "solve", "args": [-1], "raises": "ValueError"}]
+  },
+  {
+    "id": "wrong-exception", "label": "Incorrect exception type on negative input", "ground_truth_correct": false,
+    "files": {"candidate.py": "def solve(x):\n    if x < 0: raise TypeError('wrong')\n    return x * 2\n"},
+    "public_check": "from candidate import solve\nassert solve(2) == 4\n",
+    "symbols": ["solve"], "invariants": ["Raise ValueError for negative input"],
+    "properties": [{"name": "negative", "file": "candidate.py", "symbol": "solve", "args": [-1], "raises": "ValueError"}]
+  },
+  {
+    "id": "drops-duplicates", "label": "Incorrect set-based duplicate loss", "ground_truth_correct": false,
+    "files": {"candidate.py": "def solve(values):\n    return sorted(set(values))\n"},
+    "public_check": "from candidate import solve\nassert solve([2, 1]) == [1, 2]\n",
+    "symbols": ["solve"], "invariants": [],
+    "properties": [{"name": "duplicates", "file": "candidate.py", "symbol": "solve", "args": [[2, 1, 2]], "expected": [1, 2, 2], "unchanged_args": true}]
+  },
+  {
+    "id": "mutates-input", "label": "Incorrect in-place sort mutates input", "ground_truth_correct": false,
+    "files": {"candidate.py": "def solve(values):\n    values.sort()\n    return values\n"},
+    "public_check": "from candidate import solve\nassert solve([2, 1]) == [1, 2]\n",
+    "symbols": ["solve"], "invariants": [],
+    "properties": [{"name": "non-mutation", "file": "candidate.py", "symbol": "solve", "args": [[2, 1, 2]], "expected": [1, 2, 2], "unchanged_args": true}]
+  },
+  {
+    "id": "bad-zero-boundary", "label": "Incorrect special case at zero boundary", "ground_truth_correct": false,
+    "files": {"candidate.py": "def solve(n):\n    return list(range(n)) if n else [0]\n"},
+    "public_check": "from candidate import solve\nassert solve(3) == [0, 1, 2]\n",
+    "symbols": ["solve"], "invariants": [],
+    "properties": [{"name": "zero", "file": "candidate.py", "symbol": "solve", "args": [0], "expected": []}]
+  }
+]

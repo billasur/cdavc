@@ -1,0 +1,81 @@
+# CD-AVC pre-merge verification gate for AI-generated (and human) pull requests.
+#
+# The gate checks out the PR's BASE commit, installs the verifier from that
+# reviewed base (a PR cannot weaken the verifier that judges it), replays the
+# PR's implementation-file diff through cdavc's deterministic checks, and runs
+# the repository's own locked test suite against the patched tree. Test files
+# are never taken from the PR: their hashes are locked in the snapshot, so a
+# patch that also edits tests is still judged by the tests as they existed on
+# the base branch. See docs/PRE_MERGE_GATE.md.
+name: cdavc gate
+on:
+  pull_request:
+    paths:
+      - "src/cdavc/**"
+      - "tests/**"
+      - ".github/workflows/cdavc-gate.yml"
+      - ".github/cdavc-contract.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the base commit the PR is judged against
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the verifier from the reviewed base
+        run: |
+          python -m pip install --quiet --no-deps .
+
+      - name: Extract the PR's implementation diff
+        env:
+          PR_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git fetch --quiet origin "$PR_SHA"
+          git diff --unified=3 "$PR_SHA" -- src/cdavc > pr.diff || true
+          echo "PR diff: $(grep -c '^diff --git' pr.diff || true) file section(s), $(wc -l < pr.diff) line(s)"
+          # Surface test-file edits explicitly: they are never replayed by the
+          # gate, so reviewers must read them the usual way.
+          changed_tests=$(git diff --name-only "$PR_SHA" -- tests/ || true)
+          if [ -n "$changed_tests" ]; then
+            {
+              echo '### CD-AVC gate note'
+              echo 'This PR also changes locked test files. The gate judges the patch with the base tests only:'
+              echo "$changed_tests" | sed 's/^/- `/; s/$/`/'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Verify the patch under the deterministic contract
+        run: |
+          if [ -s pr.diff ]; then
+            cdavc verify \
+              --directory . \
+              --contract .github/cdavc-contract.json \
+              --candidate pr.diff \
+              --format diff \
+              --source github-pr \
+              --test-timeout 300 \
+              --output results/verification.json
+          else
+            echo 'No implementation-file changes in this PR; nothing to verify.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish the evidence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdavc-verification
+          path: results/verification.json
+          if-no-files-found: ignore

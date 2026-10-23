@@ -1,0 +1,8 @@
+{
+  "complete": true,
+  "calls": [
+    {"purpose": "generation", "model": "synthetic-example-not-a-vendor-run", "prompt_tokens": 10, "completion_tokens": 5, "wall_time_seconds": 0.1}
+  ],
+  "wall_time_seconds": 0.1,
+  "limitations": ["Synthetic example telemetry only: these counters are NOT measurements from Claude, Codex or a local model."]
+}

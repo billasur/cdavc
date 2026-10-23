@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import inspect
+import math
 import socket
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -13,6 +14,46 @@ from urllib.request import Request, urlopen
 
 
 Message = Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class SamplingParams:
+    """Explicit sampling controls sent to local OpenAI-compatible servers.
+
+    Local model cards pin these for a reason: server defaults differ and
+    silently change candidate quality (for example a coding model documented
+    at temperature 1.0 with top-p 0.95 and top-k 20). ``top_k`` is not part
+    of the OpenAI protocol but llama.cpp, LM Studio, vLLM and Ollama accept
+    it in the request body; only local endpoints are supported anyway.
+    """
+
+    temperature: float | None = None
+    top_p: float | None = None
+    top_k: int | None = None
+    max_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("temperature", "top_p"):
+            value = getattr(self, name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                      or not math.isfinite(value) or not 0 <= value <= 1
+                                      or (name == "temperature" and value > 2)):
+                raise ValueError(f"{name} must be a finite number in [0, 1] (temperature allows up to 2)")
+        for name in ("top_k", "max_tokens"):
+            value = getattr(self, name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+                raise ValueError(f"{name} must be a positive integer")
+
+    def request_fields(self) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        for name in ("temperature", "top_p", "top_k", "max_tokens"):
+            value = getattr(self, name)
+            if value is not None:
+                fields[name] = value
+        return fields
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self.request_fields())
 
 
 @dataclass(frozen=True)
@@ -129,6 +170,7 @@ class OpenAICompatibleProvider:
         api_key: str | None = None,
         opener: Callable[[Request], Any] = urlopen,
         timeout: float = 30.0,
+        sampling: SamplingParams | None = None,
     ) -> None:
         if timeout <= 0:
             raise ValueError("provider timeout must be greater than zero")
@@ -137,6 +179,7 @@ class OpenAICompatibleProvider:
         self.api_key = api_key
         self._opener = opener
         self.timeout = timeout
+        self.sampling = sampling
 
     @property
     def available(self) -> bool:
@@ -157,6 +200,8 @@ class OpenAICompatibleProvider:
         request_payload: dict[str, Any] = {"model": self.model, "messages": list(messages)}
         if seed is not None:
             request_payload["seed"] = seed
+        if self.sampling is not None:
+            request_payload.update(self.sampling.request_fields())
         payload = json.dumps(request_payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -183,7 +228,8 @@ class OpenAICompatibleProvider:
 
         try:
             body = json.loads(raw.decode("utf-8"))
-            content = body["choices"][0]["message"]["content"]
+            choice = body["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError, ValueError, UnicodeDecodeError) as exc:
             raise ValueError("invalid OpenAI-compatible response") from exc
         if not isinstance(content, str):
@@ -191,12 +237,18 @@ class OpenAICompatibleProvider:
         usage = body.get("usage")
         if not isinstance(usage, Mapping):
             usage = {}
+        finish_reason = choice.get("finish_reason") if isinstance(choice, Mapping) else None
+        if not isinstance(finish_reason, str):
+            finish_reason = None
+        metadata: dict[str, Any] = {"usage": dict(usage)} if usage else {}
+        if finish_reason is not None:
+            metadata["finish_reason"] = finish_reason
         return ProviderCompletion(
             content,
             prompt_tokens=_usage_int(usage, "prompt_tokens", "input_tokens"),
             completion_tokens=_usage_int(usage, "completion_tokens", "output_tokens"),
             model=body.get("model") if isinstance(body.get("model"), str) else self.model,
-            metadata={"usage": dict(usage)} if usage else {},
+            metadata=metadata,
         )
 
     def complete_with_usage(

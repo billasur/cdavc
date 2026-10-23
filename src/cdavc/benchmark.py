@@ -26,51 +26,94 @@ import sys
 import tempfile
 import threading
 import time
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
 from .invariants import has_raise_statement, required_exception
+from .payloads import parse_payload
 from .providers import (
     MockProvider,
     OpenAICompatibleProvider,
     ProviderCompletion,
     ProviderUnavailableError,
+    SamplingParams,
 )
+from .redact import redact_paths
+from .accounting import Budget, BudgetExceeded, UsageLedger, complete_recorded, digest as fingerprint_digest
+from .edits import apply_candidate
+from .properties import PropertyCase
+from .verification import ArtifactStore, VerificationContract, WorkspaceSnapshot, candidate_payload, run_command, verify_workspace
+from .context import ContextSession, is_context_request
 
 
-ARMS = ("baseline_single", "baseline_retry", "cdavc")
+ARMS = ("baseline_single", "baseline_retry", "cdavc", "cdavc_sampled", "cdavc_sampled_repair")
 """The stable order and names used in benchmark records."""
 
+CAGE_ARMS = ("cdavc", "cdavc_sampled", "cdavc_sampled_repair")
+"""Arms whose candidate must pass every verification gate before it is accepted."""
+
 DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
-BENCHMARK_VERSION = "1"
+BENCHMARK_VERSION = "5"
+EVALUATION_PROTOCOL = "public-selection-heldout-once-v1"
+DEFAULT_SAMPLES = 4
+"""Independent draws a sampled arm may spend on one task."""
+
+MAX_CANDIDATE_CHARS = 4000
+"""Per-file cap when a repair prompt quotes the candidate it is repairing."""
 
 HIDDEN_GATE_LABEL = "hidden test"
 """Gate label whose diagnostics must never reach a repair prompt."""
 
+STDLIB_CONSTRAINT = (
+    "The evaluation environment has no third-party packages: use the Python standard library only."
+)
+"""Environment fact every arm is told, so the arms differ only in verification."""
+
+JSON_REASK_SUFFIX = (
+    "\nYour previous reply could not be parsed as the required JSON object. "
+    'Return only one valid JSON object of the form {"files": {"<path>": "<complete file contents>"}} '
+    "with no prose, no markdown fence and no unescaped control characters.\n"
+)
+
+JSON_FAILURE_MARKERS = ("JSON", "files object", "file paths and contents")
+
 BOUNDARY_PROBE = """\
 import importlib.util
 import json
+import os
 import sys
 
 spec = json.loads(sys.argv[1])
 for path in spec["files"]:
+    directory = os.path.dirname(path)
+    if directory not in sys.path:
+        sys.path.insert(0, directory)
     loader = importlib.util.spec_from_file_location("cdavc_boundary_probe", path)
     module = importlib.util.module_from_spec(loader)
-    loader.loader.exec_module(module)
+    try:
+        loader.loader.exec_module(module)
+    except Exception as exc:
+        # An unimportable module is the targeted test's problem, not this gate's.
+        print(f"could not load {path}: {type(exc).__name__}: {exc}", file=sys.stderr)
+        raise SystemExit(1)
     for symbol in spec["symbols"]:
         function = getattr(module, symbol, None)
         if not callable(function):
             continue
-        for argument in ("", [], 0):
+        for arguments in ((), ("",), ([],), (0,)):
             try:
-                function(argument)
+                function(*arguments)
             except (IndexError, ZeroDivisionError) as exc:
-                print(f"{symbol}({argument!r}) raised {type(exc).__name__}: {exc}", file=sys.stderr)
+                print(f"{symbol}{arguments!r} raised {type(exc).__name__}: {exc}", file=sys.stderr)
                 raise SystemExit(1)
+            except Exception:
+                # Wrong-arity or wrong-type calls are not this gate's business.
+                continue
 """
 """Opt-in gate that fuzzes each symbol with empty and zero inputs."""
 
@@ -108,6 +151,9 @@ class BenchmarkTask:
     boundary_probe: bool = False
     max_retries: int = 2
     locked_test_hashes: Mapping[str, str] | None = None
+    properties: tuple[PropertyCase, ...] = ()
+    check_repeats: int = 1
+    context_files: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.task_id, str) or not self.task_id:
@@ -126,6 +172,7 @@ class BenchmarkTask:
             raise BenchmarkError("at least one test file is required")
         object.__setattr__(self, "symbols", _strings(self.symbols, "symbols"))
         object.__setattr__(self, "invariants", _strings(self.invariants, "invariants"))
+        object.__setattr__(self, "context_files", _paths(self.context_files, "context_files"))
         object.__setattr__(self, "test_command", _command(self.test_command, "test_command"))
         object.__setattr__(self, "hidden_test_command", _optional_command(self.hidden_test_command, "hidden_test_command"))
         object.__setattr__(self, "regression_command", _optional_command(self.regression_command, "regression_command"))
@@ -142,6 +189,8 @@ class BenchmarkTask:
                 raise BenchmarkError("locked_test_hashes must map paths to strings")
             _paths(tuple(hashes), "locked_test_hashes")
             object.__setattr__(self, "locked_test_hashes", hashes)
+        contract = VerificationContract.from_task(self)
+        object.__setattr__(self, "properties", contract.properties)
 
     @property
     def id(self) -> str:
@@ -174,6 +223,9 @@ class BenchmarkTask:
             boundary_probe=payload.get("boundary_probe", False),
             max_retries=payload.get("max_retries", 2),
             locked_test_hashes=payload.get("locked_test_hashes"),
+            properties=payload.get("properties", ()),
+            check_repeats=payload.get("check_repeats", 1),
+            context_files=payload.get("context_files", ()),
         )
 
     @classmethod
@@ -200,6 +252,9 @@ class BenchmarkTask:
             "boundary_probe": getattr(task, "boundary_probe", False),
             "max_retries": getattr(task, "max_retries", 2),
             "locked_test_hashes": getattr(task, "locked_test_hashes", None),
+            "properties": getattr(task, "properties", ()),
+            "check_repeats": getattr(task, "check_repeats", 1),
+            "context_files": getattr(task, "context_files", ()),
         }
         return cls(**values)
 
@@ -210,10 +265,13 @@ class _Attempt:
     prompt_tokens: int | None
     completion_tokens: int | None
     failure: str = ""
+    draw: int = 1
+    seed: int | None = None
+    json_reasks: int = 0
 
 
 class BenchmarkRunner:
-    """Run the three benchmark arms and append resumable JSONL records."""
+    """Run the benchmark arms and append resumable JSONL records."""
 
     def __init__(
         self,
@@ -223,6 +281,7 @@ class BenchmarkRunner:
         provider_factory: Callable[[str, BenchmarkTask], Any] | None = None,
         tasks: Iterable[BenchmarkTask | Mapping[str, Any] | Any] = (),
         records_path: Path | str | None = None,
+        report_path: Path | str | None = None,
         seed: int = 0,
         model: str | None = None,
         quantisation: str | None = None,
@@ -230,6 +289,10 @@ class BenchmarkRunner:
         hardware: str | None = None,
         timeout_seconds: float = 30.0,
         retry_cap: int = 3,
+        samples: int = DEFAULT_SAMPLES,
+        budget: Budget | None = None,
+        context_budget_chars: int = 12000,
+        max_context_requests: int = 2,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -251,6 +314,8 @@ class BenchmarkRunner:
             raise BenchmarkError("timeout_seconds must be greater than zero")
         if isinstance(retry_cap, bool) or not isinstance(retry_cap, int) or retry_cap < 0:
             raise BenchmarkError("retry_cap must be a non-negative integer")
+        if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+            raise BenchmarkError("samples must be a positive integer")
         self.seed = seed
         self.model = model
         self.quantisation = quantisation
@@ -258,6 +323,13 @@ class BenchmarkRunner:
         self.hardware = hardware
         self.timeout_seconds = timeout_seconds
         self.retry_cap = retry_cap
+        self.samples = samples
+        self.budget = budget or Budget()
+        if isinstance(context_budget_chars, bool) or not isinstance(context_budget_chars, int) or context_budget_chars < 512:
+            raise BenchmarkError("context_budget_chars must be at least 512")
+        if isinstance(max_context_requests, bool) or not isinstance(max_context_requests, int) or max_context_requests < 0:
+            raise BenchmarkError("max_context_requests must be nonnegative")
+        self.context_budget_chars, self.max_context_requests = context_budget_chars, max_context_requests
         if records_path is None:
             output_path = self.root / "results" / "benchmark.jsonl"
         else:
@@ -265,10 +337,55 @@ class BenchmarkRunner:
             if not output_path.is_absolute():
                 output_path = self.root / output_path
         self.records_path = output_path.resolve()
+        report = Path(report_path) if report_path is not None else self.records_path.parent / "REPORT.md"
+        self.report_path = (report if report.is_absolute() else self.root / report).resolve()
+        if self.report_path == self.records_path:
+            raise BenchmarkError("report and records paths must be different")
         self.records_path.parent.mkdir(parents=True, exist_ok=True)
+        self.report_path.parent.mkdir(parents=True, exist_ok=True)
+        excluded = tuple(path.relative_to(self.root).as_posix() for path in (self.records_path, self.report_path)
+                         if path.is_relative_to(self.root))
+        self.snapshot = WorkspaceSnapshot.capture(self.root, exclude_paths=excluded)
+        self.artifacts = ArtifactStore(self.root / ".cdavc" / "artifacts")
+        self._last_evidence: dict[str, Any] | None = None
         self._records = _read_records(self.records_path)
         self._keys = {(record.get("task_id"), record.get("arm")) for record in self._records}
+        self.experiment_config = self._experiment_config()
+        self.experiment_fingerprint = fingerprint_digest(self.experiment_config)
         self._validate_resume_metadata()
+
+    def _experiment_config(self) -> dict[str, Any]:
+        paths: set[str] = set()
+        for task in self.tasks:
+            paths.update(task.implementation_files)
+            paths.update(task.test_files)
+            paths.update(task.locked_test_hashes or {})
+            for command in (task.test_command, task.hidden_test_command, task.regression_command, task.negative_test_command):
+                for word in command or ():
+                    path = self.root / word
+                    if not Path(word).is_absolute() and path.is_file() and path.resolve().is_relative_to(self.root):
+                        paths.add(word)
+        return {
+            "protocol": EVALUATION_PROTOCOL, "runner_version": BENCHMARK_VERSION,
+            "snapshot_digest": self.snapshot.digest,
+            "tasks": [asdict(task) for task in self.tasks],
+            "source_hashes": {path: _sha256(self.root / path) if (self.root / path).is_file() else None
+                              for path in sorted(paths)},
+            "engine_hashes": {path.name: _sha256(path) for path in sorted(Path(__file__).parent.glob("*.py"))},
+            "python": list(sys.version_info[:3]), "seed": self.seed, "model": self.model,
+            "quantisation": self.quantisation, "version": self.version, "hardware": self.hardware,
+            "timeout_seconds": self.timeout_seconds, "retry_cap": self.retry_cap, "samples": self.samples,
+            "budget": self.budget.to_dict(),
+            "context_budget_chars": self.context_budget_chars, "max_context_requests": self.max_context_requests,
+            "provider": {name: getattr(self.provider, name, None) for name in ("model", "timeout")},
+            "sampling": self._sampling_config(),
+            "endpoint_digest": fingerprint_digest(getattr(self.provider, "endpoint", None)),
+        }
+
+    def _sampling_config(self) -> dict[str, Any] | None:
+        """Sampling controls belong in the fingerprint: they change candidate quality."""
+        sampling = getattr(self.provider, "sampling", None)
+        return sampling.to_dict() if sampling is not None else None
 
     def _validate_resume_metadata(self) -> None:
         """Prevent a resumed JSONL from silently mixing experiment configs."""
@@ -287,6 +404,10 @@ class BenchmarkRunner:
                         f"resume metadata mismatch for {field_name}: "
                         f"record has {record.get(field_name)!r}, requested {configured!r}"
                     )
+            if record.get("experiment_fingerprint") != self.experiment_fingerprint:
+                raise BenchmarkError("resume fingerprint mismatch: use a new records file for incompatible or legacy runs")
+        if len(self._keys) != len(self._records):
+            raise BenchmarkError("duplicate task/arm records cannot resume")
 
     def run(self) -> list[dict[str, Any]]:
         """Run missing task/arm pairs and return all records, oldest first."""
@@ -318,47 +439,114 @@ class BenchmarkRunner:
         meter = _MemoryMeter()
         attempts: list[_Attempt] = []
         failure = ""
+        previous_candidate = ""
         gates: list[str] = []
+        accepted = False
+        heldout_pass: bool | None = None
+        evaluation_failure = ""
         reported_model: str | None = None
+        ledger = UsageLedger(self.budget)
+        outcome = ""
+        selected: dict[str, Any] | None = None
+        evidence_log: list[dict[str, Any]] = []
+        verification_evidence: dict[str, Any] | None = None
         provider = self._provider_for(arm, task)
         self._ensure_local_provider(provider)
-        max_attempts = 1 if arm == "baseline_single" else min(task.max_retries, self.retry_cap) + 1
-        execution_mode = "git-worktree" if arm == "cdavc" else "temporary-copy"
+        cage_arm = arm in CAGE_ARMS
+        # ``cdavc_sampled`` draws independent candidates; ``cdavc_sampled_repair``
+        # spends the same draw budget but carries the previous public-gate failure
+        # into the next draw, which separates the budget from the feedback effect.
+        sampled = arm == "cdavc_sampled"
+        if arm == "baseline_single":
+            draw_budget = 1
+        elif arm in ("cdavc_sampled", "cdavc_sampled_repair"):
+            draw_budget = self.samples
+        else:
+            draw_budget = min(task.max_retries, self.retry_cap) + 1
+        execution_mode = "fresh-snapshot-copy"
         try:
-            with self._execution_directory(arm) as workspace:
-                original = {path: _read_optional(workspace / path) for path in task.implementation_files}
-                for attempt_number in range(1, max_attempts + 1):
-                    prompt = self._prompt(task, arm, failure)
-                    completion: ProviderCompletion | None = None
+            for draw in range(1, draw_budget + 1):
+                try:
+                    ledger.check(before_call=True)
+                except BudgetExceeded as exc:
+                    outcome, failure = exc.outcome, str(exc)
+                    break
+                with self._execution_directory(arm) as workspace:
+                    original = {path: _read_optional(workspace / path) for path in task.implementation_files}
+                    # Test hashes include private evaluator inputs. Only implementation
+                    # source and explicitly published context enter generation prompts.
+                    paths = tuple(dict.fromkeys((*task.implementation_files, *task.context_files)))
+                    paths = tuple(path for path in paths if (workspace / path).is_file())
+                    session = ContextSession(workspace, paths, query=" ".join((task.title, task.description, *task.symbols)),
+                                             max_chars=self.context_budget_chars)
+                    context = session.initial()
+                    # ``cdavc_sampled`` draws each candidate independently: no repair
+                    # feedback is carried over, so repeated draws are real samples.
+                    prompt = self._prompt(
+                        task,
+                        arm,
+                        "" if sampled else failure,
+                        draw=draw,
+                        candidate="" if sampled else previous_candidate,
+                        context=context,
+                    )
+                    usage: list[ProviderCompletion] = []
+                    seed = self._draw_seed(task.task_id, draw)
+                    self._last_evidence = None
+                    call_start = len(ledger.entries)
                     try:
-                        completion = self._complete(provider, prompt, task, arm, attempt_number)
+                        completion = self._generate(provider, prompt, task, arm, draw, workspace, usage, ledger, session, context)
                         if completion.model:
                             reported_model = completion.model
-                        self._apply_response(task, completion.text, workspace)
-                        if arm == "cdavc":
+                        if cage_arm:
                             gates = self._run_cage_gates(task, workspace, hashes)
                         else:
                             self._run_baseline_test(task, workspace)
-                        attempts.append(
-                            _Attempt(
-                                True,
-                                completion.prompt_tokens,
-                                completion.completion_tokens,
-                            )
-                        )
+                        ledger.check()
+                        selected = candidate_payload(workspace, VerificationContract.from_task(task))
+                        verification_evidence = self._last_evidence
+                        if verification_evidence:
+                            evidence_log.append(verification_evidence)
+                        reasks = sum(call["purpose"] == "json_reask" for call in ledger.entries[call_start:])
+                        attempts.append(_attempt_record(True, usage, draw, seed, json_reasks=reasks))
                         failure = ""
                         break
                     except Exception as exc:  # bounded candidate failures become data, not runner crashes
                         failure = _safe_failure(exc)
-                        attempts.append(
-                            _Attempt(
-                                False,
-                                completion.prompt_tokens if completion is not None else None,
-                                completion.completion_tokens if completion is not None else None,
-                                failure,
-                            )
-                        )
-                        _restore_files(workspace, original)
+                        # Capture what the model wrote before the workspace is restored:
+                        # the next draw repairs that candidate instead of re-deriving it.
+                        previous_candidate = self._candidate_context(task, workspace, original)
+                        reasks = sum(call["purpose"] == "json_reask" for call in ledger.entries[call_start:])
+                        attempts.append(_attempt_record(False, usage, draw, seed, failure, json_reasks=reasks))
+                        if self._last_evidence:
+                            evidence_log.append(self._last_evidence)
+                            verification_evidence = self._last_evidence
+                            if self._last_evidence["outcome"] in {"environment_failure", "inconclusive"}:
+                                outcome = self._last_evidence["outcome"]
+                                break
+                        if isinstance(exc, BudgetExceeded):
+                            outcome = exc.outcome
+                            break
+                        if isinstance(exc, ProviderUnavailableError):
+                            outcome = "environment_failure"
+                            break
+            accepted = selected is not None
+            # Held-out scoring executes once, in a new copy of the original
+            # snapshot with the selected immutable artifact. Never re-enter draws.
+            if accepted:
+                with self._execution_directory(arm) as workspace:
+                    try:
+                        ledger.check()
+                        apply_candidate(workspace, task.implementation_files, selected)
+                        self._run_final_evaluation(task, workspace)
+                        heldout_pass = True
+                        ledger.check()
+                    except BudgetExceeded as exc:
+                        outcome = exc.outcome
+                        evaluation_failure = str(exc)
+                    except Exception as exc:
+                        heldout_pass = False
+                        evaluation_failure = _safe_failure(exc)
         except BenchmarkError:
             raise
         except Exception as exc:
@@ -366,13 +554,24 @@ class BenchmarkRunner:
             attempts.append(_Attempt(False, None, None, failure))
 
         elapsed = time.perf_counter() - started
-        passed = bool(attempts and attempts[-1].passed)
-        token_in = _sum_usage(attempts, "prompt_tokens")
-        token_out = _sum_usage(attempts, "completion_tokens")
+        passed = accepted and heldout_pass is True and outcome not in {"budget_exhausted", "inconclusive", "environment_failure"}
+        accounting = ledger.summary()
+        token_in, token_out = accounting["token_in"], accounting["token_out"]
+        hidden_rejections = int(accepted and _is_hidden_failure(_failure_category(evaluation_failure)))
+        accepted_on = next((index for index, item in enumerate(attempts, 1) if item.passed), None)
         record = {
             "task_id": task.task_id,
             "arm": arm,
             "task_source": task.source,
+            "evaluation_protocol": EVALUATION_PROTOCOL,
+            "experiment_fingerprint": self.experiment_fingerprint,
+            "experiment_config": self.experiment_config,
+            "budget": self.budget.to_dict(),
+            "outcome": outcome or ("accepted_under_declared_checks" if accepted else "rejected_with_counterexample"),
+            "accepted": accepted,
+            "heldout_pass": heldout_pass,
+            "selection_failure": failure,
+            "evaluation_failure": evaluation_failure,
             "pass": passed,
             "passed": passed,
             "status": "PASS" if passed else "FAIL",
@@ -383,29 +582,52 @@ class BenchmarkRunner:
             "token_out": token_out,
             "tokens_in": token_in,
             "tokens_out": token_out,
-            "token_usage_source": _usage_source(attempts, token_in, token_out),
+            "token_usage_source": accounting["token_usage_source"],
+            "usage_complete": accounting["usage_complete"],
+            "provider_calls": accounting["calls"],
+            "unmetered_calls": accounting["unmetered_calls"],
+            "known_token_in": accounting["known_token_in"],
+            "known_token_out": accounting["known_token_out"],
+            "call_log": ledger.entries,
+            "verification_evidence": verification_evidence,
+            "attempt_evidence": evidence_log,
+            "artifact_digest": self.artifacts.put(selected) if selected is not None else None,
             "peak_memory_bytes": meter.finish(),
             "peak_memory_source": meter.source,
             "peak_memory_scope": "benchmark harness process",
             "model": self._metadata_value("model", provider, reported_model),
+            "sampling": self._sampling_config(),
             "quantisation": self._metadata_value("quantisation", provider),
             "quantization": self._metadata_value("quantisation", provider),
             "version": self._metadata_value("version", provider),
             "runner_version": BENCHMARK_VERSION,
             "hardware": self.hardware or platform.platform(),
             "seed": self.seed,
+            "samples_budget": draw_budget,
+            "samples_drawn": len(attempts),
+            "samples_to_accept": accepted_on,
+            "json_reasks": sum(item.json_reasks for item in attempts),
+            "verifier_gap": bool(cage_arm and hidden_rejections),
+            "verifier_gap_attempts": hidden_rejections if cage_arm else 0,
             "attempt_log": [
-                {"attempt": index, "status": "ACCEPTED" if item.passed else "REJECTED", **({"failure": item.failure} if item.failure else {})}
+                {
+                    "attempt": index,
+                    "draw": item.draw,
+                    "seed": item.seed,
+                    "status": "ACCEPTED" if item.passed else "REJECTED",
+                    **({"failure": item.failure} if item.failure else {}),
+                    **({"json_reasks": item.json_reasks} if item.json_reasks else {}),
+                }
                 for index, item in enumerate(attempts, 1)
             ],
-            "failure": "" if passed else failure,
+            "failure": "" if passed else evaluation_failure or failure,
             "execution_mode": execution_mode,
-            "cage_gates_run": arm == "cdavc",
+            "cage_gates_run": cage_arm,
             "gate_results": gates,
             "locked_test_hashes": dict(hashes),
             "ast_contract": {"files": list(task.implementation_files), "symbols": list(task.symbols)},
             "cage_rejected_bad_patch_arm_a_would_have_shipped": (
-                arm == "cdavc" and not passed and self._baseline_single_passed(task.task_id)
+                cage_arm and not passed and self._baseline_single_passed(task.task_id)
             ),
         }
         record["cage_rejected_bad_patch"] = record["cage_rejected_bad_patch_arm_a_would_have_shipped"]
@@ -441,39 +663,132 @@ class BenchmarkRunner:
             return self.provider(arm, task)
         return self.provider(arm)
 
-    def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, attempt: int) -> ProviderCompletion:
-        del task, arm, attempt
-        messages = [{"role": "user", "content": prompt}]
-        method = getattr(provider, "complete_with_metadata", None)
-        if method is None:
-            method = getattr(provider, "complete_with_usage", None)
-        if method is not None:
-            result = _call_with_optional_seed(method, messages, self.seed)
-        else:
-            result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
-        return _normalise_completion(result)
+    def _draw_seed(self, task_id: str, draw: int) -> int:
+        """Derive an independent sampling seed for one draw of one task.
 
-    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
+        Passing the run seed unchanged on every attempt restarted the same
+        sampler stream, so retries were near-duplicates.  Drawing 1 is derived
+        identically for every arm, which keeps the arms paired.
+        """
+
+        material = f"{self.seed}:{task_id}:{draw}".encode("utf-8")
+        digest = hashlib.blake2s(material, digest_size=8).digest()
+        return int.from_bytes(digest, "big") % (2**31 - 1)
+
+    def _complete(self, provider: Any, prompt: str, task: BenchmarkTask, arm: str, draw: int,
+                  ledger: UsageLedger, *, purpose: str = "generation") -> ProviderCompletion:
+        del arm
+        seed = self._draw_seed(task.task_id, draw)
+        messages = [{"role": "user", "content": prompt}]
+        return complete_recorded(provider, messages, ledger, purpose=purpose, seed=seed)
+
+    def _generate(
+        self,
+        provider: Any,
+        prompt: str,
+        task: BenchmarkTask,
+        arm: str,
+        draw: int,
+        workspace: Path,
+        usage: list[ProviderCompletion],
+        ledger: UsageLedger,
+        session: ContextSession,
+        context: str,
+    ) -> ProviderCompletion:
+        """Draw one candidate, asking once more if the reply is not JSON.
+
+        A formatting slip is not a failed attempt: re-asking costs tokens but
+        does not consume the arm's draw budget, and the extra call is counted
+        in ``json_reasks``.
+        """
+
+        purpose, next_prompt, requested, reasked = "generation", prompt, 0, False
+        while True:
+            completion = self._complete(provider, next_prompt, task, arm, draw, ledger, purpose=purpose)
+            usage.append(completion)
+            try:
+                try:
+                    payload = parse_payload(completion.text)
+                except ValueError:
+                    payload = None
+                if is_context_request(payload):
+                    if requested >= self.max_context_requests:
+                        raise BudgetExceeded("context request budget exhausted")
+                    retrieved = session.respond(payload)
+                    next_prompt, purpose = prompt.replace(context, retrieved, 1), "context_retrieval"
+                    requested += 1
+                    continue
+                self._apply_response(task, completion.text, workspace)
+                return completion
+            except _GateFailure as exc:
+                if reasked or not _is_json_failure(exc):
+                    raise
+                next_prompt += JSON_REASK_SUFFIX
+                purpose, reasked = "json_reask", True
+
+    def _prompt(
+        self,
+        task: BenchmarkTask,
+        arm: str,
+        previous_failure: str,
+        *,
+        draw: int = 1,
+        candidate: str = "",
+        context: str = "",
+    ) -> str:
         specification = f"\nTask specification: {task.description}\n" if task.description else ""
+        previous = ""
+        if candidate:
+            previous = (
+                "\nPrevious candidate, which failed the gates below; repair it instead of starting over:\n"
+                f"{candidate}\n"
+            )
         repair = ""
         if previous_failure:
             if arm == "baseline_retry":
                 repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
-            elif arm == "cdavc":
+            elif arm in CAGE_ARMS:
                 repair = self._cage_repair(task, previous_failure)
-        target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
+        examples = ", ".join(f'"{path}": "complete file contents"' for path in task.implementation_files)
+        if not examples:
+            examples = '"src/example.py": "complete file contents"'
         return (
             f"Implement task {task.task_id}: {task.title}.\n"
-            f"Benchmark arm: {arm}.\n"
-            f"Deterministic seed: {self.seed}.\n"
+            f"Deterministic seed: {self._draw_seed(task.task_id, draw)}.\n"
             + specification
             + f"Allowed implementation files: {', '.join(task.implementation_files)}\n"
             f"Required symbols: {', '.join(task.symbols) or '(none)'}\n"
             f"Public invariants: {', '.join(task.invariants) or '(see tests)'}\n"
-            f'Return only JSON in the form {{"files": {{"{target_example}": "complete file contents"}}}}. '
+            f"{STDLIB_CONSTRAINT}\n"
+            f'Return only JSON in the form {{"files": {{{examples}}}}}. '
             "Use repository-relative paths, modify only allowed implementation files, and never modify tests.\n"
+            + context
+            + previous
             + repair
         )
+
+    def _candidate_context(
+        self,
+        task: BenchmarkTask,
+        workspace: Path,
+        original: Mapping[str, str | None],
+    ) -> str:
+        """Quote the files a rejected draw changed, so the next draw can repair them."""
+
+        sections: list[str] = []
+        for relative in task.implementation_files:
+            try:
+                content = (workspace / relative).read_bytes().decode("utf-8")
+            except OSError:
+                continue
+            if content == original.get(relative):
+                continue
+            if len(content) > MAX_CANDIDATE_CHARS:
+                content = content[:MAX_CANDIDATE_CHARS] + (
+                    f"\n... truncated after {MAX_CANDIDATE_CHARS} characters ...\n"
+                )
+            sections.append(f"--- {relative} ---\n{content}")
+        return "\n".join(sections)
 
     def _cage_repair(self, task: BenchmarkTask, failure: str) -> str:
         """Build cage repair context that never carries hidden assertions.
@@ -494,19 +809,14 @@ class BenchmarkRunner:
         return context
 
     def _apply_response(self, task: BenchmarkTask, response: str, workspace: Path) -> None:
-        stripped = _strip_json_fence(response)
         try:
-            payload = json.loads(stripped, strict=False)
-        except (json.JSONDecodeError, TypeError):
-            try:
-                fixed = re.sub(r'\\([^"\\/bfnrtu])', r'\\\\\1', stripped)
-                payload = json.loads(fixed, strict=False)
-            except Exception:
-                raise _GateFailure("provider response is not a JSON files object")
-        if not isinstance(payload, dict) or "files" not in payload:
+            payload = parse_payload(response)
+        except ValueError:
             raise _GateFailure("provider response is not a JSON files object")
-        files = payload["files"]
-        if not isinstance(files, dict) or not files:
+        if not isinstance(payload, dict) or not ({"files", "edits"} & payload.keys()):
+            raise _GateFailure("provider response is not a JSON files object")
+        files = payload.get("files", {})
+        if not isinstance(files, dict):
             raise _GateFailure("provider files object is empty")
         allowed = set(task.implementation_files)
         normalized_files: dict[str, Any] = {}
@@ -520,64 +830,46 @@ class BenchmarkRunner:
                 normalized_files[path_key] = content
         if not set(normalized_files).issubset(allowed):
             raise _GateFailure("provider changed a file outside the implementation contract")
-        workspace_root = workspace.resolve()
-        for relative, content in normalized_files.items():
-            if not isinstance(relative, str) or not isinstance(content, str):
-                raise _GateFailure("provider file paths and contents must be strings")
-            target = (workspace_root / relative).resolve()
-            if workspace_root not in target.parents:
-                raise _GateFailure("provider attempted a path outside the workspace")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
+        try:
+            apply_candidate(workspace, task.implementation_files, {**payload, "files": normalized_files})
+        except ValueError as exc:
+            raise _GateFailure(str(exc)) from exc
 
     def _run_baseline_test(self, task: BenchmarkTask, workspace: Path) -> None:
-        command = task.hidden_test_command or task.test_command
-        label = "baseline hidden test" if task.hidden_test_command else "baseline evaluation test"
-        self._run_command(command, workspace, label, include_output=True)
+        contract = replace(VerificationContract.from_task(task), symbols=(), invariants=(), properties=(),
+                           regression_command=None, negative_test_command=None, boundary_probe=False)
+        self._verify_public(workspace, contract)
+
+    def _run_final_evaluation(self, task: BenchmarkTask, workspace: Path) -> None:
+        """Use one common final evaluator, never as a generation feedback oracle."""
+        contract = replace(VerificationContract.from_task(task), symbols=(), invariants=(), properties=(),
+                           negative_test_command=None, boundary_probe=False)
+        # Preserve selection evidence; scoring evidence must not replace it.
+        selection = self._last_evidence
+        try:
+            self._verify_public(workspace, contract)
+        finally:
+            self._last_evidence = selection
+        if task.hidden_test_command:
+            locked = {name: values["sha256"] for name, values in WorkspaceSnapshot.capture(workspace).manifest()["files"].items()}
+            try:
+                self._run_command(task.hidden_test_command, workspace, HIDDEN_GATE_LABEL)
+            finally:
+                _assert_test_hashes(workspace, locked)
 
     def _run_cage_gates(self, task: BenchmarkTask, workspace: Path, hashes: Mapping[str, str]) -> list[str]:
-        results: list[str] = []
         _assert_test_hashes(workspace, hashes)
-        results.append("locked_test_hashes")
-        for relative in task.implementation_files:
-            source_path = workspace / relative
-            try:
-                source = source_path.read_text()
-                tree = compile(source, relative, "exec", ast.PyCF_ONLY_AST)
-            except (OSError, SyntaxError) as exc:
-                raise _GateFailure("AST contract failed") from exc
-            declared = {
-                node.name
-                for node in ast.walk(tree)
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-            }
-            missing = set(task.symbols) - declared
-            if missing:
-                raise _GateFailure("AST contract is missing a required symbol")
-            required = required_exception(task.invariants)
-            if required and not has_raise_statement(tree):
-                raise _GateFailure(
-                    f"AST Contract Failed: Task invariant requires input validation raising {required}, "
-                    "but no Raise statements were found in implementation."
-                )
-        results.append("ast_contract")
-        if task.boundary_probe:
-            self._run_boundary_probe(task, workspace)
-            results.append("boundary_probe")
-        self._run_command(task.test_command, workspace, "targeted test", include_output=True)
-        results.append("targeted_test")
-        if task.hidden_test_command:
-            # Hidden assertions stay private; only this gate is categorical.
-            self._run_command(task.hidden_test_command, workspace, HIDDEN_GATE_LABEL)
-            results.append("hidden_test")
-        if task.negative_test_command:
-            self._run_command(task.negative_test_command, workspace, "negative test", include_output=True)
-            results.append("negative_test")
-        if task.regression_command:
-            self._run_command(task.regression_command, workspace, "regression test", include_output=True)
-            results.append("regression")
-        _assert_test_hashes(workspace, hashes)
-        return results
+        return self._verify_public(workspace, VerificationContract.from_task(task))
+
+    def _verify_public(self, workspace: Path, contract: VerificationContract) -> list[str]:
+        evidence = verify_workspace(workspace, contract, snapshot=self.snapshot, store=self.artifacts,
+                                    seed=self.seed, timeout_seconds=self.timeout_seconds, command_runner=self._run_command)
+        self._last_evidence = evidence
+        if not evidence["accepted"]:
+            failure = _GateFailure(evidence["failure"])
+            failure.evidence = evidence
+            raise failure
+        return evidence["gates"]
 
     def _run_boundary_probe(self, task: BenchmarkTask, workspace: Path) -> None:
         """Fuzz every declared symbol with empty and zero inputs."""
@@ -597,40 +889,17 @@ class BenchmarkRunner:
         label: str,
         *,
         include_output: bool = False,
-    ) -> None:
-        argv = tuple(command)
-        if argv[0] in {"python", "python3"}:
-            argv = (sys.executable, *argv[1:])
-        env = dict(os.environ)
-        env["PYTHONPATH"] = str(workspace / "src") + os.pathsep + env.get("PYTHONPATH", "")
-        env["PYTHONHASHSEED"] = str(self.seed)
-        env["CDAVC_SEED"] = str(self.seed)
-        try:
-            result = subprocess.run(
-                argv,
-                cwd=workspace,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise _GateFailure(f"{label} timed out") from exc
-        except OSError as exc:
-            raise _GateFailure(f"{label} could not start") from exc
-        if result.returncode:
-            if not include_output:
-                # Hidden gates stay categorical: their source and assertions
-                # must never enter a repair prompt.
-                raise _GateFailure(f"{label} failed")
-            output = (result.stdout + "\n" + result.stderr).replace(str(workspace), "$WORKSPACE")
-            output = output.replace(str(self.root), "$PROJECT_ROOT").strip()
-            raise _GateFailure(f"{label} failed:\n{output[-4000:]}")
+    ) -> dict[str, Any]:
+        receipt = run_command(command, workspace, label, timeout_seconds=self.timeout_seconds,
+                              seed=self.seed, include_output=include_output)
+        if receipt["status"] != "passed":
+            failure = _GateFailure(receipt["failure"])
+            failure.receipt = receipt
+            raise failure
+        return receipt
 
     def _execution_directory(self, arm: str) -> contextlib.AbstractContextManager[Path]:
-        if arm == "cdavc":
-            return _GitWorktree(self.root)
-        return _CopiedWorkspace(self.root)
+        return self.snapshot.materialize()
 
     def _lock_test_hashes(self, task: BenchmarkTask) -> dict[str, str]:
         actual: dict[str, str] = {}
@@ -870,63 +1139,163 @@ def paired_pass_rate_difference(
     }
 
 
+def wilson_interval(passed: int, total: int, z: float = 1.96) -> tuple[float, float] | None:
+    """Wilson score interval for a pass rate; ``None`` when no records exist."""
+
+    if total <= 0:
+        return None
+    proportion = passed / total
+    denominator = 1 + z * z / total
+    centre = (proportion + z * z / (2 * total)) / denominator
+    margin = (z / denominator) * ((proportion * (1 - proportion) / total + z * z / (4 * total * total)) ** 0.5)
+    return (max(0.0, centre - margin), min(1.0, centre + margin))
+
+
 def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
     """Render benchmark records with arm summaries and paired comparisons."""
 
     rows = _read_records(Path(records)) if isinstance(records, (Path, str)) else list(records)
     summaries = {arm: _arm_summary(rows, arm) for arm in ARMS}
     cage_difference = paired_pass_rate_difference(rows, "cdavc", "baseline_single")
+    sampled_difference = paired_pass_rate_difference(rows, "cdavc_sampled", "baseline_single")
+    repair_difference = paired_pass_rate_difference(rows, "cdavc_sampled_repair", "baseline_single")
     lines = [
         "# CD-AVC benchmark report",
         "",
         "All values below are measured records from this run. An em dash means the local provider did not report a value; no value is estimated.",
+        "Budget disclosure: differing draw limits and incomplete telemetry are not matched-token evidence. "
+        "These summaries do not establish model superiority or token savings. Use the explicit-cap external comparison workflow for qualified frozen-artifact comparisons.",
         "",
-        "| Arm | Records | Passed | Pass rate | Mean attempts | Mean wall (s) | Mean token in | Mean token out |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        ("Fairness disclosure: public checks alone select candidates. Held-out scoring runs once after selection, "
+         "never triggers another generation, and never feeds a repair prompt. Acceptance and held-out success are recorded separately. "
+         "All arms use the same initial prompt and common final evaluator; retries and independent samples have different draw budgets."
+         if rows and all(row.get("evaluation_protocol") == EVALUATION_PROTOCOL for row in rows)
+         else "Fairness disclosure: historical or unrecorded evaluation protocols are present. Legacy runs may use hidden "
+         "feedback or hidden-oracle selection and must not be treated as deployable public-selection comparisons."),
+        "",
+        "| Arm | Records | Passed | Pass rate | 95% CI (Wilson) | Mean attempts | Mean wall (s) | Mean token in | Mean token out |",
+        "|---|---:|---:|---:|---|---:|---:|---:|---:|",
     ]
     for arm in ARMS:
         summary = summaries[arm]
         lines.append(
             f"| `{arm}` | {summary['records']} | {summary['passed']} | {_percent(summary['pass_rate'])} | "
+            f"{_wilson_text(summary['passed'], summary['records'])} | "
             f"{_number(summary['mean_attempts'])} | {_number(summary['mean_wall_time'])} | "
             f"{_number(summary['mean_token_in'])} | {_number(summary['mean_token_out'])} |"
         )
 
+    provenance: dict[str, int] = {}
+    for record in rows:
+        label = str(record.get("runner_version") or "unrecorded")
+        provenance[label] = provenance.get(label, 0) + 1
+    if len(provenance) > 1:
+        lines.extend(
+            [
+                "",
+                "## Record provenance",
+                "",
+                "Task/arm pairs measured under more than one runner version are present; each pair is scored entirely by the version that measured it.",
+                "",
+                "| Runner version | Records |",
+                "|---|---:|",
+            ]
+        )
+        for label in sorted(provenance):
+            lines.append(f"| `{label}` | {provenance[label]} |")
+
     lines.extend(["", "## Paired pass-rate differences", "", "| Comparison | N | Difference | 95% CI |", "|---|---:|---:|---:|"])
-    for arm in ("baseline_retry", "cdavc"):
-        difference = paired_pass_rate_difference(rows, arm, "baseline_single")
+    for arm, baseline in (
+        ("baseline_retry", "baseline_single"),
+        ("cdavc", "baseline_single"),
+        ("cdavc_sampled", "baseline_single"),
+        ("cdavc_sampled", "baseline_retry"),
+        ("cdavc_sampled", "cdavc"),
+        ("cdavc_sampled_repair", "baseline_single"),
+        ("cdavc_sampled_repair", "baseline_retry"),
+        ("cdavc_sampled_repair", "cdavc"),
+        ("cdavc_sampled_repair", "cdavc_sampled"),
+    ):
+        difference = paired_pass_rate_difference(rows, arm, baseline)
         lines.append(
-            f"| `{arm}` − `baseline_single` | {difference['n']} | {_number(difference['difference'])} | "
+            f"| `{arm}` − `{baseline}` | {difference['n']} | {_number(difference['difference'])} | "
             f"{_ci_text(difference)} |"
         )
 
-    lines.extend(["", "## Measured result", ""])
-    if cage_difference["difference"] is None:
-        lines.append("Measured result: no paired `cdavc`/`baseline_single` records were available.")
-    else:
-        difference = float(cage_difference["difference"])
-        low = float(cage_difference["ci95_low"])
-        high = float(cage_difference["ci95_high"])
-        if difference > 0 and low > 0:
-            conclusion = "a measured pass-rate gain"
-        elif difference > 0:
-            conclusion = "a measured positive difference, but not a conclusive gain because the 95% CI includes zero"
-        elif difference < 0:
-            conclusion = "a measured negative pass-rate difference"
-        else:
-            conclusion = "no measured pass-rate gain"
+    lines.extend(
+        [
+            "",
+            "## Measured result",
+            "",
+            _result_sentence("cdavc_sampled", sampled_difference),
+            _result_sentence("cdavc_sampled_repair", repair_difference),
+            _result_sentence("cdavc", cage_difference),
+            _result_sentence(
+                "cdavc_sampled", paired_pass_rate_difference(rows, "cdavc_sampled", "baseline_retry"), "baseline_retry"
+            ),
+            _result_sentence(
+                "cdavc_sampled_repair",
+                paired_pass_rate_difference(rows, "cdavc_sampled_repair", "cdavc_sampled"),
+                "cdavc_sampled",
+            ),
+        ]
+    )
+
+    lines.extend(
+        [
+            "",
+            "## Sampling budget",
+            "",
+            "| Arm | Draw budget | Mean draws used | Mean draws to accept | JSON re-asks |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    for arm in ARMS:
+        summary = summaries[arm]
         lines.append(
-            f"Measured result: CD-AVC shows {conclusion} of {difference:.3f} "
-            f"({difference * 100:.1f} percentage points; 95% CI {_ci_text(cage_difference)}). "
-            "This statement uses only completed paired records; it is not a projection."
+            f"| `{arm}` | {_number(summary['mean_budget'])} | {_number(summary['mean_drawn'])} | "
+            f"{_number(summary['mean_to_accept'])} | {summary['json_reasks']} |"
         )
 
-    lines.extend(["", "## Measured overhead vs baseline_single", "", "| Arm | Paired N | Mean time overhead (s) | Mean time overhead (%) | Mean token overhead |", "|---|---:|---:|---:|---:|"])
-    for arm in ("baseline_retry", "cdavc"):
+    lines.extend(
+        [
+            "",
+            "## Measured overhead vs baseline_single",
+            "",
+            "| Arm | Paired N | Mean time overhead (s) | Mean time overhead (%) | Mean token overhead |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    for arm in ("baseline_retry", "cdavc", "cdavc_sampled", "cdavc_sampled_repair"):
         overhead = _overhead(rows, arm, "baseline_single")
         lines.append(
             f"| `{arm}` | {overhead['n']} | {_number(overhead['time_seconds'])} | {_percent(overhead['time_ratio'])} | {_number(overhead['tokens'])} |"
         )
+
+    lines.extend(["", "## Measured verifier gap", ""])
+    gaps = [
+        (arm, sum(1 for record in rows if record.get("arm") == arm and record.get("verifier_gap")))
+        for arm in CAGE_ARMS
+    ]
+    if any(count for _, count in gaps):
+        for arm, count in gaps:
+            lines.append(
+                f"- `{arm}`: {count} task(s) where at least one candidate passed the public targeted test "
+                "and was rejected by the hidden gate."
+            )
+    else:
+        lines.append("None measured: no cage candidate passed the public gates and then failed the hidden gate.")
+
+    lines.extend(["", "## Measured failure categories", ""])
+    categories = failure_categories(rows)
+    if categories:
+        lines.append("| Category | " + " | ".join(f"`{arm}`" for arm in ARMS) + " |")
+        lines.append("|---|" + "---:|" * len(ARMS))
+        for category in categories:
+            cells = [str(categories[category].get(arm, 0)) for arm in ARMS]
+            lines.append(f"| {category} | " + " | ".join(cells) + " |")
+    else:
+        lines.append("None measured: every recorded arm passed its task.")
 
     lines.extend(["", "## Measured cage-hurt cases", ""])
     hurt = cage_hurt_cases(rows)
@@ -939,6 +1308,50 @@ def render_report(records: Sequence[Mapping[str, Any]] | Path | str) -> str:
         lines.append("None measured.")
     lines.append("")
     return "\n".join(lines)
+
+
+def _result_sentence(arm: str, difference: Mapping[str, Any], baseline: str = "baseline_single") -> str:
+    if difference.get("difference") is None:
+        return f"Measured result: no paired `{arm}`/`{baseline}` records were available."
+    value = float(difference["difference"])
+    low = float(difference["ci95_low"])
+    if value > 0 and low > 0:
+        conclusion = "a measured pass-rate gain"
+    elif value > 0:
+        conclusion = "a measured positive difference, but not a conclusive gain because the 95% CI includes zero"
+    elif value < 0:
+        conclusion = "a measured negative pass-rate difference"
+    else:
+        conclusion = "no measured pass-rate gain"
+    return (
+        f"Measured result: `{arm}` shows {conclusion} of {value:.3f} "
+        f"({value * 100:.1f} percentage points vs `{baseline}`; 95% CI {_ci_text(difference)}). "
+        "This statement uses only completed paired records; it is not a projection."
+    )
+
+
+def failure_categories(records: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, int]]:
+    """Count final failure categories per arm, ordered by total occurrences.
+
+    The same gate can word its first line differently between code paths ("AST contract
+    failed" for a parse error, "AST Contract Failed" for a missing raise), so categories
+    are grouped case-insensitively and shown with the first spelling a record used.
+    """
+
+    counts: Counter[tuple[str, str]] = Counter()
+    spellings: dict[str, str] = {}
+    for record in records:
+        if record.get("arm") not in ARMS or _record_passed(record):
+            continue
+        category = _failure_category(str(record.get("failure") or "")) or "unclassified"
+        key = category.casefold()
+        spellings.setdefault(key, category)
+        counts[(key, str(record["arm"]))] += 1
+    keys = sorted({key for key, _ in counts}, key=lambda item: (-sum(counts[(item, arm)] for arm in ARMS), item))
+    return {
+        spellings[key]: {arm: counts[(key, arm)] for arm in ARMS if counts[(key, arm)]}
+        for key in keys
+    }
 
 
 def cage_hurt_cases(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -969,6 +1382,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--retry-cap", type=int, default=3)
+    parser.add_argument("--samples", type=int, default=DEFAULT_SAMPLES, help="draw budget for the cdavc_sampled and cdavc_sampled_repair arms")
+    parser.add_argument("--max-calls", type=int, help="provider call cap per task/arm, including re-asks and retrieval")
+    parser.add_argument("--max-tokens", type=int, help="reported input+output cap; unmetered calls make the run inconclusive")
+    parser.add_argument("--max-wall-seconds", type=float, help="wall-clock cap per task/arm")
+    parser.add_argument("--context-budget", dest="context_budget_chars", type=int, default=12000)
+    parser.add_argument("--max-context-requests", type=int, default=2)
+    parser.add_argument("--temperature", type=float, default=None, help="sampling temperature sent to the model server")
+    parser.add_argument("--top-p", type=float, default=None, help="nucleus sampling bound sent to the model server")
+    parser.add_argument("--top-k", type=int, default=None, help="top-k bound; accepted by llama.cpp, LM Studio, vLLM and Ollama")
+    parser.add_argument("--max-output-tokens", type=int, default=None, help="completion length cap; truncated replies are rejected, not parsed")
     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
@@ -992,16 +1415,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.endpoint:
                 raise BenchmarkError("--endpoint is required unless --mock is selected")
+            sampling = SamplingParams(temperature=args.temperature, top_p=args.top_p,
+                                      top_k=args.top_k, max_tokens=args.max_output_tokens)
             provider = OpenAICompatibleProvider(
                 args.endpoint,
                 model=args.model or "local-model",
                 timeout=args.timeout,
+                sampling=None if sampling == SamplingParams() else sampling,
             )
         runner = BenchmarkRunner(
             args.root,
             provider,
             tasks=tasks,
             records_path=args.records,
+            report_path=args.report,
             seed=args.seed,
             model=args.model,
             quantisation=args.quantisation,
@@ -1009,16 +1436,14 @@ def main(argv: list[str] | None = None) -> int:
             hardware=args.hardware,
             timeout_seconds=args.timeout,
             retry_cap=args.retry_cap,
+            samples=args.samples,
+            budget=Budget(args.max_calls, args.max_tokens, args.max_wall_seconds),
+            context_budget_chars=args.context_budget_chars,
+            max_context_requests=args.max_context_requests,
         )
         records = runner.run()
         output = render_report(records)
-        if args.report is None:
-            report_path = runner.records_path.parent / "REPORT.md"
-        else:
-            report_path = args.report if args.report.is_absolute() else args.root / args.report
-            report_path = report_path.resolve()
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(output)
+        runner.report_path.write_text(output)
         print(output, end="")
         selected_ids = {task.task_id for task in tasks}
         return 0 if all(_record_passed(record) for record in records if record.get("task_id") in selected_ids) else 1
@@ -1045,9 +1470,13 @@ def _snapshot_mock_provider(root: Path, task: BenchmarkTask) -> MockProvider:
 
     files = {}
     for relative in task.implementation_files:
-        mock_path = root / "benchmarks" / "mock_solutions" / task.task_id / "solution.py"
-        path = mock_path if mock_path.is_file() else root / relative
-        if not path.is_file():
+        candidates = (
+            root / "benchmarks" / "mock_solutions" / task.task_id / Path(relative).name,
+            root / "benchmarks" / "mock_solutions" / task.task_id / "solution.py",
+            root / relative,
+        )
+        path = next((candidate for candidate in candidates if candidate.is_file()), None)
+        if path is None:
             raise BenchmarkError(f"mock snapshot file does not exist for {task.task_id}: {relative}")
         files[relative] = path.read_text()
     response = json.dumps({"files": files})
@@ -1136,7 +1565,7 @@ def _assert_test_hashes(workspace: Path, hashes: Mapping[str, str]) -> None:
 
 
 def _read_optional(path: Path) -> str | None:
-    return path.read_text() if path.exists() else None
+    return path.read_bytes().decode("utf-8") if path.exists() else None
 
 
 def _restore_files(workspace: Path, original: Mapping[str, str | None]) -> None:
@@ -1147,19 +1576,6 @@ def _restore_files(workspace: Path, original: Mapping[str, str | None]) -> None:
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content)
-
-
-def _strip_json_fence(response: str) -> str:
-    text = response.strip()
-    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-    candidate = fence_match.group(1).strip() if fence_match else text
-    if not candidate.startswith("{"):
-        start = candidate.find("{")
-        end = candidate.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            candidate = candidate[start : end + 1]
-    candidate = re.sub(r':\s*"""([\s\S]*?)"""', lambda m: ": " + json.dumps(m.group(1)), candidate)
-    return candidate
 
 
 def _call_with_optional_seed(method: Callable[..., Any], messages: list[Mapping[str, str]], seed: int) -> Any:
@@ -1224,11 +1640,37 @@ def _optional_int_attr(value: Any, *names: str) -> int | None:
     return None
 
 
-def _sum_usage(attempts: Sequence[_Attempt], field_name: str) -> int | None:
+def _sum_usage(attempts: Sequence[_Attempt] | Sequence[ProviderCompletion], field_name: str) -> int | None:
     if not attempts:
         return None
     known = [getattr(item, field_name) for item in attempts if getattr(item, field_name) is not None]
-    return sum(int(value) for value in known) if known else None
+    return sum(int(value) for value in known) if len(known) == len(attempts) else None
+
+
+def _attempt_record(
+    passed: bool,
+    usage: Sequence[ProviderCompletion],
+    draw: int,
+    seed: int,
+    failure: str = "",
+    *, json_reasks: int | None = None,
+) -> _Attempt:
+    """Collapse the completions of one draw into a single attempt record."""
+
+    return _Attempt(
+        passed=passed,
+        prompt_tokens=_sum_usage(usage, "prompt_tokens"),
+        completion_tokens=_sum_usage(usage, "completion_tokens"),
+        failure=failure,
+        draw=draw,
+        seed=seed,
+        json_reasks=max(0, len(usage) - 1) if json_reasks is None else json_reasks,
+    )
+
+
+def _is_json_failure(exc: _GateFailure) -> bool:
+    message = str(exc)
+    return any(marker in message for marker in JSON_FAILURE_MARKERS)
 
 
 def _usage_source(attempts: Sequence[_Attempt], token_in: int | None, token_out: int | None) -> str:
@@ -1240,6 +1682,8 @@ def _usage_source(attempts: Sequence[_Attempt], token_in: int | None, token_out:
 
 
 def _safe_failure(exc: Exception) -> str:
+    if isinstance(exc, BudgetExceeded):
+        return str(exc)
     if isinstance(exc, _GateFailure):
         return str(exc)
     if isinstance(exc, ProviderUnavailableError):
@@ -1252,7 +1696,9 @@ def _safe_failure(exc: Exception) -> str:
 def _failure_category(failure: str) -> str:
     """Keep cage repair context categorical and out of hidden-test output."""
 
-    first_line = failure.splitlines()[0].strip()
+    first_line = failure.splitlines()[0].strip() if failure.strip() else ""
+    if not first_line:
+        return ""
     if ":" in first_line:
         first_line = first_line.split(":", 1)[0]
     return first_line[:200]
@@ -1288,6 +1734,10 @@ def _arm_summary(records: Sequence[Mapping[str, Any]], arm: str) -> dict[str, fl
         "mean_wall_time": _mean([record.get("wall_time_seconds") for record in selected]),
         "mean_token_in": _mean([record.get("token_in", record.get("tokens_in")) for record in selected]),
         "mean_token_out": _mean([record.get("token_out", record.get("tokens_out")) for record in selected]),
+        "mean_budget": _mean([record.get("samples_budget") for record in selected]),
+        "mean_drawn": _mean([record.get("samples_drawn", record.get("attempts")) for record in selected]),
+        "mean_to_accept": _mean([record.get("samples_to_accept") for record in selected]),
+        "json_reasks": sum(int(record.get("json_reasks") or 0) for record in selected),
     }
 
 
@@ -1360,8 +1810,20 @@ def _ci_text(value: Mapping[str, Any]) -> str:
     return f"[{float(value['ci95_low']):.3f}, {float(value['ci95_high']):.3f}]"
 
 
+def _wilson_text(passed: Any, total: Any) -> str:
+    if not isinstance(passed, int) or not isinstance(total, int) or total <= 0:
+        return "—"
+    interval = wilson_interval(passed, total)
+    if interval is None:
+        return "—"
+    return f"[{interval[0]:.3f}, {interval[1]:.3f}]"
+
+
 __all__ = [
     "ARMS",
+    "BENCHMARK_VERSION",
+    "CAGE_ARMS",
+    "DEFAULT_SAMPLES",
     "BenchmarkError",
     "BenchmarkRunner",
     "BenchmarkTask",
@@ -1370,6 +1832,7 @@ __all__ = [
     "read_records",
     "render_report",
     "run_benchmark",
+    "wilson_interval",
 ]
 
 
