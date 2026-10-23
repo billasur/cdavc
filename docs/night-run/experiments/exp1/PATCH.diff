@@ -1,0 +1,284 @@
+diff --git a/src/cdavc/benchmark.py b/src/cdavc/benchmark.py
+index ea64923..c84f21f 100644
+--- a/src/cdavc/benchmark.py
++++ b/src/cdavc/benchmark.py
+@@ -45,6 +45,9 @@ from .providers import (
+ ARMS = ("baseline_single", "baseline_retry", "cdavc")
+ """The stable order and names used in benchmark records."""
+ 
++FEEDBACK_MODES = ("latest", "cumulative")
++"""Retry-feedback modes: only the latest failure trace, or every prior trace."""
++
+ DEFAULT_COMMAND = ("python", "-m", "unittest", "discover", "-s", "tests")
+ BENCHMARK_VERSION = "1"
+ 
+@@ -230,6 +233,7 @@ class BenchmarkRunner:
+         hardware: str | None = None,
+         timeout_seconds: float = 30.0,
+         retry_cap: int = 3,
++        feedback_mode: str = "latest",
+     ) -> None:
+         self.root = Path(root).resolve()
+         if not self.root.is_dir():
+@@ -251,6 +255,9 @@ class BenchmarkRunner:
+             raise BenchmarkError("timeout_seconds must be greater than zero")
+         if isinstance(retry_cap, bool) or not isinstance(retry_cap, int) or retry_cap < 0:
+             raise BenchmarkError("retry_cap must be a non-negative integer")
++        if feedback_mode not in FEEDBACK_MODES:
++            raise BenchmarkError(f"feedback_mode must be one of: {', '.join(FEEDBACK_MODES)}")
++        self.feedback_mode = feedback_mode
+         self.seed = seed
+         self.model = model
+         self.quantisation = quantisation
+@@ -279,6 +286,7 @@ class BenchmarkRunner:
+             "quantisation": self.quantisation,
+             "version": self.version,
+             "hardware": self.hardware,
++            "feedback_mode": self.feedback_mode,
+         }
+         for record in self._records:
+             for field_name, configured in expected.items():
+@@ -318,6 +326,7 @@ class BenchmarkRunner:
+         meter = _MemoryMeter()
+         attempts: list[_Attempt] = []
+         failure = ""
++        failures: list[str] = []
+         gates: list[str] = []
+         reported_model: str | None = None
+         provider = self._provider_for(arm, task)
+@@ -328,7 +337,7 @@ class BenchmarkRunner:
+             with self._execution_directory(arm) as workspace:
+                 original = {path: _read_optional(workspace / path) for path in task.implementation_files}
+                 for attempt_number in range(1, max_attempts + 1):
+-                    prompt = self._prompt(task, arm, failure)
++                    prompt = self._prompt(task, arm, failures)
+                     completion: ProviderCompletion | None = None
+                     try:
+                         completion = self._complete(provider, prompt, task, arm, attempt_number)
+@@ -350,6 +359,7 @@ class BenchmarkRunner:
+                         break
+                     except Exception as exc:  # bounded candidate failures become data, not runner crashes
+                         failure = _safe_failure(exc)
++                        failures.append(failure)
+                         attempts.append(
+                             _Attempt(
+                                 False,
+@@ -392,6 +402,7 @@ class BenchmarkRunner:
+             "quantization": self._metadata_value("quantisation", provider),
+             "version": self._metadata_value("version", provider),
+             "runner_version": BENCHMARK_VERSION,
++            "feedback_mode": self.feedback_mode,
+             "hardware": self.hardware or platform.platform(),
+             "seed": self.seed,
+             "attempt_log": [
+@@ -453,14 +464,17 @@ class BenchmarkRunner:
+             result = _call_with_optional_seed(getattr(provider, "complete"), messages, self.seed)
+         return _normalise_completion(result)
+ 
+-    def _prompt(self, task: BenchmarkTask, arm: str, previous_failure: str) -> str:
++    def _prompt(self, task: BenchmarkTask, arm: str, failures: list[str]) -> str:
+         specification = f"\nTask specification: {task.description}\n" if task.description else ""
+         repair = ""
+-        if previous_failure:
++        if failures:
+             if arm == "baseline_retry":
+-                repair = f"\nPrevious failing output; repair the candidate using only this output:\n{previous_failure}\n"
++                feedback = failures[-1]
++                if self.feedback_mode == "cumulative":
++                    feedback = _format_cumulative_feedback(failures)
++                repair = f"\nPrevious failing output; repair the candidate using only this output:\n{feedback}\n"
+             elif arm == "cdavc":
+-                repair = self._cage_repair(task, previous_failure)
++                repair = self._cage_repair(task, failures[-1])
+         target_example = task.implementation_files[0] if task.implementation_files else "src/example.py"
+         return (
+             f"Implement task {task.task_id}: {task.title}.\n"
+@@ -969,6 +983,12 @@ def build_parser() -> argparse.ArgumentParser:
+     parser.add_argument("--seed", type=int, default=0)
+     parser.add_argument("--timeout", type=float, default=30.0)
+     parser.add_argument("--retry-cap", type=int, default=3)
++    parser.add_argument(
++        "--feedback-mode",
++        choices=FEEDBACK_MODES,
++        default="latest",
++        help="retry prompt feedback: only the latest failure trace, or every prior trace (baseline_retry arm)",
++    )
+     parser.add_argument("--limit", type=int, default=None, help="limit the number of tasks to run")
+     parser.add_argument("--mock", action="store_true", help="use deterministic scripted responses instead of an endpoint")
+     parser.add_argument("--mock-response", action="append", default=[], type=Path, help="JSON response file; may be repeated")
+@@ -1009,6 +1029,7 @@ def main(argv: list[str] | None = None) -> int:
+             hardware=args.hardware,
+             timeout_seconds=args.timeout,
+             retry_cap=args.retry_cap,
++            feedback_mode=args.feedback_mode,
+         )
+         records = runner.run()
+         output = render_report(records)
+@@ -1239,6 +1260,12 @@ def _usage_source(attempts: Sequence[_Attempt], token_in: int | None, token_out:
+     return "provider_partial"
+ 
+ 
++def _format_cumulative_feedback(failures: Sequence[str]) -> str:
++    """Render every prior failure trace, oldest first, for cumulative retry feedback."""
++
++    return "\n".join(f"Attempt {index} failure:\n{failure}" for index, failure in enumerate(failures, 1))
++
++
+ def _safe_failure(exc: Exception) -> str:
+     if isinstance(exc, _GateFailure):
+         return str(exc)
+@@ -1362,6 +1389,7 @@ def _ci_text(value: Mapping[str, Any]) -> str:
+ 
+ __all__ = [
+     "ARMS",
++    "FEEDBACK_MODES",
+     "BenchmarkError",
+     "BenchmarkRunner",
+     "BenchmarkTask",
+diff --git a/tests/test_benchmark.py b/tests/test_benchmark.py
+index 547e444..e2f1447 100644
+--- a/tests/test_benchmark.py
++++ b/tests/test_benchmark.py
+@@ -540,6 +540,142 @@ class BenchmarkTests(unittest.TestCase):
+             self.assertIn("IndexError", cage["failure"])
+             self.assertNotIn("targeted test", cage["failure"])
+ 
++    def test_invalid_feedback_mode_is_rejected(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            task = self._task(max_retries=0)
++            with self.assertRaisesRegex(BenchmarkError, "feedback_mode"):
++                BenchmarkRunner(
++                    root,
++                    lambda _arm, _task: MockProvider([]),
++                    tasks=[task],
++                    records_path=root / "records.jsonl",
++                    feedback_mode="everything",
++                )
++
++    def _retry_sequence_run(self, root, *, feedback_mode):
++        task = self._task(max_retries=2)
++        wrong_zero = self._response("def answer() -> int:\n    return 0\n")
++        wrong_one = self._response("def answer() -> int:\n    return 100\n")
++        good = self._response("def answer() -> int:\n    return 42\n")
++        prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
++
++        class SequenceProvider:
++            available = True
++
++            def __init__(self, responses, arm):
++                self.responses = iter(responses)
++                self.arm = arm
++
++            def complete_with_metadata(self, messages, *, seed=None):
++                prompts[self.arm].append(messages[0]["content"])
++                return next(self.responses)
++
++        def provider_factory(arm, _task):
++            if arm == "baseline_retry":
++                return SequenceProvider([wrong_zero, wrong_one, good], arm)
++            return SequenceProvider([good], arm)
++
++        records = BenchmarkRunner(
++            root,
++            provider_factory,
++            tasks=[task],
++            records_path=root / f"records-{feedback_mode}.jsonl",
++            feedback_mode=feedback_mode,
++        ).run()
++        retry = next(record for record in records if record["arm"] == "baseline_retry")
++        return retry, prompts
++
++    def test_latest_feedback_is_default_and_feeds_only_the_latest_trace(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            retry, prompts = self._retry_sequence_run(root, feedback_mode="latest")
++            self.assertTrue(retry["pass"])
++            self.assertEqual(retry["attempts"], 3)
++            self.assertEqual(retry["feedback_mode"], "latest")
++            first, second, third = prompts["baseline_retry"]
++            self.assertNotIn("!=", first)
++            self.assertIn("AssertionError: 0 != 42", second)
++            self.assertNotIn("AssertionError: 100 != 42", second)
++            self.assertIn("AssertionError: 100 != 42", third)
++            self.assertNotIn("AssertionError: 0 != 42", third)
++            self.assertNotIn("Attempt 1 failure", third)
++
++    def test_cumulative_feedback_feeds_every_prior_trace(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            retry, prompts = self._retry_sequence_run(root, feedback_mode="cumulative")
++            self.assertTrue(retry["pass"])
++            self.assertEqual(retry["attempts"], 3)
++            self.assertEqual(retry["feedback_mode"], "cumulative")
++            first, second, third = prompts["baseline_retry"]
++            self.assertNotIn("!=", first)
++            self.assertIn("AssertionError: 0 != 42", second)
++            self.assertIn("Attempt 1 failure", third)
++            self.assertIn("Attempt 2 failure", third)
++            self.assertIn("AssertionError: 0 != 42", third)
++            self.assertIn("AssertionError: 100 != 42", third)
++            # The cage arm always repairs from the latest sanitised failure only.
++            cage_third_prompt_present = len(prompts["cdavc"]) == 1
++            self.assertTrue(cage_third_prompt_present)
++
++    def test_cage_prompt_stays_latest_only_under_cumulative_mode(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            task = self._task(max_retries=2)
++            wrong_zero = self._response("def answer() -> int:\n    return 0\n")
++            wrong_one = self._response("def answer() -> int:\n    return 100\n")
++            good = self._response("def answer() -> int:\n    return 42\n")
++            prompts = {"baseline_single": [], "baseline_retry": [], "cdavc": []}
++
++            class SequenceProvider:
++                available = True
++
++                def __init__(self, responses, arm):
++                    self.responses = iter(responses)
++                    self.arm = arm
++
++                def complete_with_metadata(self, messages, *, seed=None):
++                    prompts[self.arm].append(messages[0]["content"])
++                    return next(self.responses)
++
++            records = BenchmarkRunner(
++                root,
++                lambda arm, _task: SequenceProvider([wrong_zero, wrong_one, good], arm),
++                tasks=[task],
++                records_path=root / "records.jsonl",
++                feedback_mode="cumulative",
++            ).run()
++            cage = next(record for record in records if record["arm"] == "cdavc")
++            self.assertTrue(cage["pass"])
++            self.assertEqual(cage["attempts"], 3)
++            third = prompts["cdavc"][2]
++            self.assertIn("AssertionError: 100 != 42", third)
++            self.assertNotIn("AssertionError: 0 != 42", third)
++            self.assertNotIn("Attempt 1 failure", third)
++
++    def test_feedback_mode_mismatch_rejects_resume(self):
++        with tempfile.TemporaryDirectory() as directory:
++            root = self._git_project(Path(directory))
++            task = self._task(max_retries=0)
++            good = self._response("def answer() -> int:\n    return 42\n")
++            records_path = root / "records.jsonl"
++            BenchmarkRunner(
++                root,
++                lambda _arm, _task: MockProvider([good]),
++                tasks=[task],
++                records_path=records_path,
++            ).run()
++            with self.assertRaisesRegex(BenchmarkError, "resume metadata mismatch"):
++                BenchmarkRunner(
++                    root,
++                    lambda _arm, _task: MockProvider([good]),
++                    tasks=[task],
++                    records_path=records_path,
++                    feedback_mode="cumulative",
++                )
++
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
