@@ -9,12 +9,22 @@ it cannot write to.
 - `pi_extension/cdavc/index.ts` - the extension:
   - `cdavc_verify` tool: runs the public gates for a dev2 task, returns
     structured feedback. Hidden tests are never exposed through it.
-  - write/edit guard: blocks changes to `benchmarks_heldout/`,
+  - write/edit/bash guards: block changes to `benchmarks_heldout/`,
     `self_improve/protected/`, any `hidden_tests.py`, and the improvement log.
+    Guard rail only (string matching, inside pi); the controller's SHA-256
+    manifest is the backstop, and even that is not a security boundary -
+    see docs/SELF_IMPROVE.md.
   - `/cdavc-improve [N]` command: runs N iterations of the self-improvement
     loop in SIMULATED mode (offline, mechanics only, no measurement).
 - `self_improve/` (repo root) - the loop itself: bounded config surface,
   proposers, evaluators, controller, offline tests.
+
+## Status
+
+Load-tested in real pi 1.4.0 (24 Oct): the tool registers in a live session;
+tool, guards and `/cdavc-improve` were exercised through pi's jiti loader
+(PASS/FAIL/refusal cases, write/edit/bash blocks, simulated loop run).
+No model-driven pi session yet (no model key in the test environment).
 
 ## Install
 

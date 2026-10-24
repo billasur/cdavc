@@ -87,22 +87,42 @@ const verifyTool = defineTool({
 export default function (pi: ExtensionAPI) {
   pi.registerTool(verifyTool);
 
-  // Block writes/edits to the fixed evaluation authority.
+  // Block writes/edits to the fixed evaluation authority, and obvious bash
+  // commands that reference it. NOTE: this is a guard rail for a cooperating
+  // agent, not a security boundary - shell indirection can evade string
+  // matching. The real backstop is the controller's SHA-256 manifest check,
+  // which catches content changes regardless of how they were made.
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "write" && event.toolName !== "edit") {
+    if (event.toolName === "write" || event.toolName === "edit") {
+      const path = String((event.input as { path?: unknown }).path ?? "");
+      if (isProtected(path)) {
+        if (ctx.hasUI) {
+          ctx.ui.notify(`Blocked write to protected evaluator path: ${path}`, "warning");
+        }
+        return {
+          block: true,
+          reason:
+            `"${path}" is part of the fixed CD-AVC evaluation authority. ` +
+            "The improving agent may edit self_improve/harness_config.json only.",
+        };
+      }
       return undefined;
     }
-    const path = String((event.input as { path?: unknown }).path ?? "");
-    if (isProtected(path)) {
-      if (ctx.hasUI) {
-        ctx.ui.notify(`Blocked write to protected evaluator path: ${path}`, "warning");
+    if (event.toolName === "bash") {
+      const command = String((event.input as { command?: unknown }).command ?? "");
+      const hit = PROTECTED.find((p) => command.includes(p));
+      if (hit) {
+        if (ctx.hasUI) {
+          ctx.ui.notify(`Blocked bash command touching protected evaluator path: ${hit}`, "warning");
+        }
+        return {
+          block: true,
+          reason:
+            `Command references "${hit}", part of the fixed CD-AVC evaluation ` +
+            "authority. Read-only inspection is fine via cdavc_verify; the " +
+            "manifest check will reject any actual change.",
+        };
       }
-      return {
-        block: true,
-        reason:
-          `"${path}" is part of the fixed CD-AVC evaluation authority. ` +
-          "The improving agent may edit self_improve/harness_config.json only.",
-      };
     }
     return undefined;
   });

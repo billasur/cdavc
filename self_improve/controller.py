@@ -22,17 +22,22 @@ from pathlib import Path
 
 from .config import HarnessConfig
 from .evaluator import Evaluator, EvalResult
+from .manifest import verify_manifest, ManifestMismatchError
 from .proposer import Proposer
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-PROTECTED_PATHS = ("self_improve/protected", "benchmarks_dev2", "benchmarks_heldout")
 CONFIG_PATH = "self_improve/harness_config.json"
 LOG_PATH = "self_improve/IMPROVE_LOG.md"
 
+# A single-seed keep is a MECHANICAL keep, not a validated gain: run-to-run
+# noise at t=0.7 was previously measured to be as large as arm differences.
+# A gain is only "validated" after confirmation on VALIDATION_SEEDS.
+VALIDATION_SEEDS = (2, 3)
+
 
 class EvaluatorTamperedError(RuntimeError):
-    """Protected evaluation files differ from git HEAD."""
+    """Protected evaluation files differ from the pinned manifest."""
 
 
 @dataclass
@@ -41,34 +46,40 @@ class LoopState:
     best_result: EvalResult | None = None
     tried: list[HarnessConfig] = field(default_factory=list)
     history: list[dict] = field(default_factory=list)
+    validated: bool = False
 
 
 def check_evaluator_clean(repo_root: Path) -> None:
-    dirty = subprocess.run(
-        ["git", "status", "--porcelain", "--", *PROTECTED_PATHS],
-        cwd=repo_root, capture_output=True, text=True, check=True,
-    ).stdout.strip()
-    if dirty:
-        raise EvaluatorTamperedError(
-            "protected evaluation files differ from git HEAD; refusing to run:\n" + dirty
-        )
+    try:
+        verify_manifest(repo_root)
+    except ManifestMismatchError as exc:
+        raise EvaluatorTamperedError(str(exc)) from exc
 
 
 def is_better(candidate: EvalResult, best: EvalResult | None) -> bool:
+    """Equal-cost comparison: a config that retries more is not 'better' for
+    passing more if it also spent more total compute to get there."""
     if best is None:
         return True
-    if candidate.passed != best.passed:
-        return candidate.passed > best.passed
     if candidate.tokens is not None and best.tokens is not None:
-        return candidate.tokens < best.tokens
-    return False
+        if candidate.passed > best.passed and candidate.tokens <= best.tokens:
+            return True
+        if candidate.passed == best.passed and candidate.tokens < best.tokens:
+            return True
+        return False
+    # Token counts unknown: only a strict pass improvement can be compared.
+    return candidate.passed > best.passed
 
 
 class Controller:
-    def __init__(self, repo_root: Path, proposer: Proposer, evaluator: Evaluator) -> None:
+    def __init__(self, repo_root: Path, proposer: Proposer, evaluator: Evaluator,
+                 evaluator_for_seed: "callable[[int], Evaluator] | None" = None) -> None:
         self.repo_root = Path(repo_root)
         self.proposer = proposer
         self.evaluator = evaluator
+        # When provided, a measured keep is immediately re-checked on
+        # VALIDATION_SEEDS; only then is it logged as a validated gain.
+        self.evaluator_for_seed = evaluator_for_seed
         self.config_file = self.repo_root / CONFIG_PATH
         self.log_file = self.repo_root / LOG_PATH
 
@@ -90,6 +101,27 @@ class Controller:
         with self.log_file.open("a") as fh:
             fh.write(line + "\n")
 
+    def _validate_gain(self, candidate: HarnessConfig, result: EvalResult,
+                       state: LoopState, label: str) -> bool:
+        """Re-run candidate and incumbent on the validation seeds. The keep
+        stands only if the candidate wins the equal-cost comparison on every
+        validation seed too. Otherwise it was single-seed noise: roll back."""
+        assert self.evaluator_for_seed is not None
+        incumbent = state.best_config
+        for seed in VALIDATION_SEEDS:
+            evaluator = self.evaluator_for_seed(seed)
+            cand = evaluator.evaluate(candidate)
+            base = evaluator.evaluate(incumbent)
+            check_evaluator_clean(self.repo_root)
+            self._append_log(
+                f"- {datetime.now(IST).strftime('%H:%M')} - validation seed {seed}: "
+                f"candidate {cand.passed}/{cand.total} ({cand.tokens} tok) vs "
+                f"incumbent {base.passed}/{base.total} ({base.tokens} tok)"
+            )
+            if not is_better(cand, base):
+                return False
+        return True
+
     def run(self, iterations: int) -> LoopState:
         check_evaluator_clean(self.repo_root)
         current = HarnessConfig.load(self.config_file)
@@ -101,8 +133,14 @@ class Controller:
             check_evaluator_clean(self.repo_root)
             self._write_config(candidate)
             result = self.evaluator.evaluate(candidate)
-            label = "simulated (mechanics only)" if result.simulated else "measured"
+            check_evaluator_clean(self.repo_root)  # catch mid-run edits
+            label = "simulated (mechanics only)" if result.simulated else "measured (single-seed, provisional)"
             keep = (not result.simulated) and is_better(result, state.best_result)
+            if keep and result.tokens is not None and self.evaluator_for_seed is not None:
+                keep = self._validate_gain(candidate, result, state, label)
+                if keep:
+                    label = "measured (validated, seeds 1," + ",".join(str(s) for s in VALIDATION_SEEDS) + ")"
+                    state.validated = True
             state.tried.append(candidate)
             state.history.append({"config": candidate.to_runner_kwargs(),
                                   "passed": result.passed, "total": result.total,
