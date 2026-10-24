@@ -1,0 +1,20 @@
+{
+  "comment": "FIXED evaluation authority. The improving agent must never edit this file, benchmarks_dev2 tests, or benchmarks_heldout. Changes here are only allowed by a human decision recorded in docs/DECISIONS.md.",
+  "benchmark_root": "benchmarks_dev2/agent10",
+  "arm": "cdavc",
+  "task_ids": [
+    "task_e01_roman_strict",
+    "task_e02_cron_field",
+    "task_e03_wrap_text",
+    "task_e04_osa_distance",
+    "task_e05_brace_expand",
+    "task_e06_interval_set",
+    "task_e07_format_bytes",
+    "task_e08_case_convert",
+    "task_e09_json_pointer",
+    "task_e10_check_brackets",
+    "task_e11_min_coins",
+    "task_e12_merge_sorted_lazy",
+    "task_e13_parse_query"
+  ]
+}

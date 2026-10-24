@@ -1,0 +1,5 @@
+{
+  "lenient_parse": true,
+  "prompt_layout": "default",
+  "retry_cap": 3
+}
