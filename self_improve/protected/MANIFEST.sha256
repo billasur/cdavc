@@ -275,7 +275,7 @@
  "benchmarks_heldout/agent6/task_h6_05_job_scheduler/solution_stub.py": "396b0a35f4fda1792221952b9b96335457f9e181253ec673a17a7f5fc826d5f8",
  "benchmarks_heldout/agent6/task_h6_05_job_scheduler/spec.json": "43f77a9e19dd814e6bf4762511b1b033cb34c68ea897a3e8b9665abfeab30254",
  "self_improve/__init__.py": "4a851febe8c9f33a2844fbaa24dcde2265fa84055e185b3455a0894cb81c321d",
- "self_improve/budget.py": "71a7016c6f54704a1c5ac4fbf093e2670ef606fea37d78434e78a0c3b9670c43",
+ "self_improve/budget.py": "ed9dfd56749de43420f385cdf349d4113958159ed4ac23e8023a1563f543c4be",
  "self_improve/config.py": "c4f90ea55ed99a28a30e6e4860dc2c0763dcaf56f921de97223a663878f0a4cb",
  "self_improve/controller.py": "cccd34a8608c62947cf7296be73b28dc40eb8cdd5833104a42f5cefb79e30407",
  "self_improve/evaluator.py": "d313535642cfa2cb653f09732ef6ad47f467edc10720143e11baf8804920ec99",

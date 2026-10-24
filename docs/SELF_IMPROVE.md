@@ -44,17 +44,23 @@ scope.
   EVERYTHING: model-proposer calls, seed-1 evaluations and validation
   re-runs. Two guards: (1) no new evaluation/proposal starts past 80% of the
   cap; (2) BudgetedProvider wraps every request, sends max_tokens
-  (--max-output-tokens, default 4096), and REFUSES a request whose estimated
+  (--max-output-tokens, default 4096), and REFUSES a request whose counted
   prompt tokens + max_tokens would cross the cap. Calls are sequential, so at
-  most one request is in flight. Hard-cap honesty: the prompt estimate
-  assumes >= 3 chars per BPE token (English/code averages ~4, so this
-  overestimates); the cap is hard only while that bound holds - a pathological
-  tokenizer ratio could overshoot by the prompt-side difference on one
-  in-flight request. This is a bounded budget with a stated assumption, not
-  an absolute guarantee. Providers reporting no usage are charged the worst
+  most one request is in flight. Prompt accounting (gpt-oss family): exact
+  o200k content tokens via tiktoken, plus 16 tokens/message harmony framing
+  (<|start|> role <|message|> content <|end|>) and a 1024-token per-request
+  allowance for provider-side template content we cannot see. Output AND
+  reasoning tokens are bounded by max_tokens (reasoning bills as completion
+  tokens). Residual risk: provider-side template content beyond the 1024
+  allowance on the single in-flight request. If tiktoken is unavailable the
+  code falls back to a chars/3 heuristic and the budget is BEST-EFFORT ONLY -
+  do not run under a promised hard cap in that mode, and verify the served
+  model actually uses the o200k tokenizer before relying on exactness for a
+  non-gpt-oss model. Providers reporting no usage are charged the worst
   case. BudgetExhausted aborts the benchmark run (it subclasses
   BenchmarkError; benchmark.py now re-raises those instead of recording them
-  as candidate failures).
+  as candidate failures). tiktoken is an optional dependency of the live
+  path only (not needed for simulated runs or tests that skip it).
 - `pi_extension/cdavc/index.ts` - the pi extension: `cdavc_verify` tool
   (public gates only; hidden tests never run through it), a write/edit/bash
   guard over protected paths, and `/cdavc-improve` (simulated mode only;

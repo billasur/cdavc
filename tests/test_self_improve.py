@@ -406,7 +406,7 @@ def test_budgeted_provider_refuses_request_that_cannot_fit():
 
 
 def test_budgeted_provider_charges_actual_usage():
-    budget = Budget(1000)
+    budget = Budget(100_000)  # headroom for the provider framing allowance
     provider = MockProvider([{"text": "ok", "usage": {"prompt_tokens": 10, "completion_tokens": 5}}])
     wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
     wrapped.complete_with_metadata([{"role": "user", "content": "hi"}])
@@ -414,11 +414,31 @@ def test_budgeted_provider_charges_actual_usage():
 
 
 def test_budgeted_provider_charges_worst_case_when_usage_missing():
-    budget = Budget(1000)
+    from self_improve.budget import count_prompt_tokens
+    budget = Budget(100_000)
     provider = MockProvider(["plain text, no usage"])
     wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
-    wrapped.complete_with_metadata([{"role": "user", "content": "a" * 30}])
-    assert budget.spent == 10 + 50  # estimated prompt + max output
+    msgs = [{"role": "user", "content": "a" * 30}]
+    wrapped.complete_with_metadata(msgs)
+    exact = count_prompt_tokens(msgs)
+    expected_prompt = exact if exact is not None else 10  # chars/3 fallback
+    assert budget.spent == expected_prompt + 50  # estimated prompt + max output
+
+
+def test_count_prompt_tokens_exact_when_tiktoken_present():
+    tiktoken = pytest.importorskip("tiktoken")
+    from self_improve.budget import (PER_MESSAGE_FRAMING,
+                                     PROVIDER_FRAMING_ALLOWANCE,
+                                     count_prompt_tokens)
+    msgs = [{"role": "user", "content": "hello world"}]
+    content = len(tiktoken.get_encoding("o200k_base").encode("hello world"))
+    assert count_prompt_tokens(msgs) == content + PER_MESSAGE_FRAMING + PROVIDER_FRAMING_ALLOWANCE
+
+
+def test_count_prompt_tokens_falls_back_without_tiktoken(monkeypatch):
+    import self_improve.budget as budget_mod
+    monkeypatch.setattr(budget_mod, "_o200k_encoding", lambda: None)
+    assert budget_mod.count_prompt_tokens([{"role": "user", "content": "x"}]) is None
 
 
 def test_budgeted_provider_requires_capped_output():

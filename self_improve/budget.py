@@ -10,12 +10,16 @@ Two guards:
    max_tokens, and before launching, the wrapper refuses the request if
    estimated_prompt_tokens + max_tokens would cross the cap.
 
-Honesty about the hard cap: the prompt estimate assumes >= 3 characters per
-BPE token (English/code averages ~4, so this overestimates). The cap is hard
-only while that bound holds; an unusual tokenizer ratio on one in-flight
-request could overshoot by (actual - estimate) on the prompt side. Sequential
-calls mean at most one request is in flight. This is a bounded budget with a
-stated assumption, not an absolute guarantee.
+Prompt bounding: when tiktoken is available, prompt tokens are counted
+EXACTLY for message contents with the model family's encoding (o200k for
+gpt-oss), plus a per-message harmony framing allowance (16 tokens) and a
+per-request provider-template allowance (1024 tokens) for framing the
+provider adds server-side. Output and reasoning tokens are bounded by the
+request's max_tokens (reasoning is billed as completion tokens by OpenAI-
+compatible serving). Residual risk: provider-side template content beyond
+the allowance on the single in-flight request (calls are sequential). When
+tiktoken is unavailable, the chars/3 heuristic is used instead and the budget
+is BEST-EFFORT - do not run under a promised hard cap in that mode.
 """
 
 from __future__ import annotations
@@ -35,12 +39,43 @@ class BudgetExhausted(_Base):
     benchmark run aborts instead of recording the refusal as task failures."""
 
 
-# Conservative prompt-token estimate: at least 3 chars per token.
+# Fallback prompt-token estimate when tiktoken is unavailable: at least 3
+# chars per token. Heuristic only - results are then labelled BEST-EFFORT.
 CHARS_PER_TOKEN_ASSUMPTION = 3
+
+# Per-message harmony framing allowance: <|start|> + role + <|message|> +
+# content + <|end|> is about 4-6 tokens; 16 is conservative.
+PER_MESSAGE_FRAMING = 16
+# Per-request allowance for provider-side template content we cannot see
+# (harmony system/developer preamble, tool preludes, assistant priming).
+# Documented residual risk: if a provider injects more than this, a single
+# in-flight request can overshoot the cap by the difference.
+PROVIDER_FRAMING_ALLOWANCE = 1024
 
 
 def estimate_prompt_tokens(text: str) -> int:
     return -(-len(text) // CHARS_PER_TOKEN_ASSUMPTION)  # ceil
+
+
+def _o200k_encoding():
+    try:
+        import tiktoken
+        return tiktoken.get_encoding("o200k_base")
+    except Exception:
+        return None
+
+
+def count_prompt_tokens(messages, *, framing_allowance: int = PROVIDER_FRAMING_ALLOWANCE):
+    """Exact o200k content tokens + documented framing allowances, or None
+    when tiktoken is unavailable (caller falls back to the heuristic and must
+    label the budget best-effort). Correct only for o200k-tokenizer models
+    (the gpt-oss family); other models need their own encoding."""
+    enc = _o200k_encoding()
+    if enc is None:
+        return None
+    content = sum(len(enc.encode(str(m.get("content", "")))) for m in messages)
+    framing = PER_MESSAGE_FRAMING * len(messages) + framing_allowance
+    return content + framing
 
 
 class Budget:
@@ -97,8 +132,12 @@ class BudgetedProvider:
         self.available = getattr(provider, "available", True)
 
     def complete_with_metadata(self, messages, *, seed=None):
-        prompt_text = "\n".join(str(m.get("content", "")) for m in messages)
-        estimated = estimate_prompt_tokens(prompt_text)
+        exact = count_prompt_tokens(messages)
+        if exact is not None:
+            estimated = exact
+        else:
+            prompt_text = "\n".join(str(m.get("content", "")) for m in messages)
+            estimated = estimate_prompt_tokens(prompt_text)
         self.budget.check_request_fits(estimated, self.max_output_tokens, "provider request")
         kwargs = {"seed": seed} if seed is not None else {}
         completion = self.provider.complete_with_metadata(messages, **kwargs)
