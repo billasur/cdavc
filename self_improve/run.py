@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 GROQ_CHAT_COMPLETIONS = "https://api.groq.com/openai/v1/chat/completions"
 
 
-def _build_provider(model: str, base_url: str):
+def _build_provider(model: str, base_url: str, *, max_tokens: int | None = None):
     from cdavc.providers import OpenAICompatibleProvider
 
     key_file = os.environ.get("CDAVC_API_KEY_FILE")
@@ -39,14 +39,18 @@ def _build_provider(model: str, base_url: str):
         request.add_header("User-Agent", "cdavc-self-improve/1.0")
         return urlopen(request, timeout=60)
 
-    return OpenAICompatibleProvider(base_url, model=model, api_key=api_key, opener=opener)
+    return OpenAICompatibleProvider(base_url, model=model, api_key=api_key,
+                                    opener=opener, max_tokens=max_tokens)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="CD-AVC harness self-improvement loop")
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument("--evaluator", choices=("simulated", "live"), default="simulated")
-    parser.add_argument("--proposer", choices=("scripted", "model"), default="scripted")
+    parser.add_argument("--proposer", choices=("scripted", "model"), default=None,
+                        help="simulated runs default to scripted; LIVE runs must choose "
+                             "explicitly - the user wants model-driven improvement, so a "
+                             "live scripted run must be a deliberate mechanical smoke")
     parser.add_argument("--model", default="openai/gpt-oss-20b",
                         help="model id for live evaluation and/or model proposer")
     parser.add_argument("--base-url", default=GROQ_CHAT_COMPLETIONS)
@@ -58,24 +62,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--validate", action="store_true",
                         help="re-check every provisional keep on extra seeds before counting it")
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--max-output-tokens", type=int, default=4096,
+                        help="max_tokens sent on every request; bounds the output side "
+                             "of the hard budget cap")
     args = parser.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parent.parent
 
-    needs_model = args.evaluator == "live" or args.proposer == "model"
+    proposer_name = args.proposer
+    if proposer_name is None:
+        if args.evaluator == "live":
+            print("live runs must pass --proposer explicitly: 'model' for the user's "
+                  "model-driven improvement, or 'scripted' for a deliberate mechanical "
+                  "smoke (label it as such)", file=sys.stderr)
+            return 2
+        proposer_name = "scripted"
+
+    needs_model = args.evaluator == "live" or proposer_name == "model"
     if needs_model and (not args.approve_spend or (args.evaluator == "live" and args.token_cap <= 0)):
         print("model use needs --approve-spend (and --token-cap N for live evaluation); "
               "no spend approval is on record by default", file=sys.stderr)
         return 2
 
-    provider = _build_provider(args.model, args.base_url) if needs_model else None
+    provider = _build_provider(args.model, args.base_url,
+                               max_tokens=args.max_output_tokens) if needs_model else None
 
     budget = None
-    if args.evaluator == "live" or args.proposer == "model":
-        from .budget import Budget
+    if needs_model:
+        from .budget import Budget, BudgetedProvider
         budget = Budget(args.token_cap or 1)
+        provider = BudgetedProvider(provider, budget,
+                                    max_output_tokens=args.max_output_tokens)
 
-    if args.proposer == "model":
+    if proposer_name == "model":
         from .proposer import ModelProposer
         proposer = ModelProposer(provider, spend_approved=args.approve_spend, budget=budget)
     else:

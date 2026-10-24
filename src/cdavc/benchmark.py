@@ -362,6 +362,8 @@ class BenchmarkRunner:
                         )
                         failure = ""
                         break
+                    except BenchmarkError:
+                        raise  # runner control flow (e.g. budget stop) is not a candidate failure
                     except Exception as exc:  # bounded candidate failures become data, not runner crashes
                         failure = _safe_failure(exc)
                         attempts.append(

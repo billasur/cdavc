@@ -18,9 +18,10 @@ scope.
   each mapping to an existing BenchmarkRunner argument. Validation rejects
   unknown keys, so the surface cannot widen itself.
 - `self_improve/manifest.py` + `self_improve/protected/MANIFEST.sha256` -
-  pinned SHA-256 hashes over the whole loop code, the protected task list,
-  benchmarks_dev2 and benchmarks_heldout (283 files). The controller verifies
-  the tree before AND after every evaluation.
+  pinned SHA-256 hashes over the whole loop code, the scorer (src/cdavc),
+  the protected task list, benchmarks_dev2 and benchmarks_heldout (296
+  files). The controller verifies the tree before AND after every
+  evaluation.
 - `self_improve/proposer.py` - ScriptedProposer (deterministic one-knob
   walk) and ModelProposer (asks a model for the next config, grounded in
   measured history; output is parsed through HarnessConfig validation so the
@@ -41,9 +42,19 @@ scope.
   validated research result. Validation re-runs spend tokens too.
 - `self_improve/budget.py` - one cumulative token budget per run covering
   EVERYTHING: model-proposer calls, seed-1 evaluations and validation
-  re-runs. No new evaluation starts once 80% of the approved cap is consumed
-  (a single evaluation can overshoot between accounting points); the loop
-  stops with a STOPPED log row and restores the incumbent config.
+  re-runs. Two guards: (1) no new evaluation/proposal starts past 80% of the
+  cap; (2) BudgetedProvider wraps every request, sends max_tokens
+  (--max-output-tokens, default 4096), and REFUSES a request whose estimated
+  prompt tokens + max_tokens would cross the cap. Calls are sequential, so at
+  most one request is in flight. Hard-cap honesty: the prompt estimate
+  assumes >= 3 chars per BPE token (English/code averages ~4, so this
+  overestimates); the cap is hard only while that bound holds - a pathological
+  tokenizer ratio could overshoot by the prompt-side difference on one
+  in-flight request. This is a bounded budget with a stated assumption, not
+  an absolute guarantee. Providers reporting no usage are charged the worst
+  case. BudgetExhausted aborts the benchmark run (it subclasses
+  BenchmarkError; benchmark.py now re-raises those instead of recording them
+  as candidate failures).
 - `pi_extension/cdavc/index.ts` - the pi extension: `cdavc_verify` tool
   (public gates only; hidden tests never run through it), a write/edit/bash
   guard over protected paths, and `/cdavc-improve` (simulated mode only;
@@ -84,7 +95,10 @@ additionally only string-matching and only apply inside pi.
 
 ## Not done / open gaps
 
-- Live measured run: needs a model key and a token-cap approval. The Groq
+- Live measured run: needs a model key and a token-cap approval, and must
+  pass --proposer explicitly: `model` for the user's model-driven
+  improvement, or `scripted` for a deliberate mechanical smoke (labelled as
+  such - a scripted live run is not model-driven improvement). The Groq
   gpt-oss-20b free-tier TPD cap was hit during the 20 Oct runs (per run
   records); whether quota is available now is unverified - check live before
   assuming either way. `scripts/self_improve_quota_probe.py` does that check

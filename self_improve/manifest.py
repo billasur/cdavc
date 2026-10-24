@@ -24,7 +24,7 @@ from pathlib import Path
 # The whole loop (controller, evaluators, proposers, protected task list) is
 # outside the candidate-editable scope; only harness_config.json may change.
 # IMPROVE_LOG.md is append-only runtime output and runs/ holds run records.
-PROTECTED_ROOTS = ("self_improve", "benchmarks_dev2", "benchmarks_heldout")
+PROTECTED_ROOTS = ("self_improve", "src/cdavc", "benchmarks_dev2", "benchmarks_heldout")
 EXCLUDED_NAMES = {"MANIFEST.sha256", "IMPROVE_LOG.md", "harness_config.json"}
 EXCLUDED_DIRS = {"runs", "__pycache__"}
 MANIFEST_PATH = Path(__file__).parent / "protected" / "MANIFEST.sha256"

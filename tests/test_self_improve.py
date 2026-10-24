@@ -21,7 +21,12 @@ from self_improve.controller import (  # noqa: E402
     is_better,
 )
 from self_improve.evaluator import EvalResult, LiveEvaluator, SimulatedEvaluator  # noqa: E402
-from self_improve.budget import Budget, BudgetExhausted  # noqa: E402
+from self_improve.budget import (  # noqa: E402
+    Budget,
+    BudgetedProvider,
+    BudgetExhausted,
+    estimate_prompt_tokens,
+)
 from self_improve.manifest import verify_manifest, write_manifest  # noqa: E402
 from self_improve.proposer import ModelProposer, ScriptedProposer  # noqa: E402
 
@@ -381,3 +386,70 @@ def test_controller_stops_when_budget_exhausted(tmp_path):
     # the exhaustion path restored the KEPT incumbent (retry_cap=2 won round 1)
     assert HarnessConfig.load(repo / "self_improve" / "harness_config.json") == HarnessConfig(retry_cap=2)
     assert state.best_config == HarnessConfig(retry_cap=2)
+
+
+# --- request-level hard cap ---
+
+def test_estimate_prompt_tokens_is_ceil_of_chars_over_3():
+    assert estimate_prompt_tokens("") == 0
+    assert estimate_prompt_tokens("abc") == 1
+    assert estimate_prompt_tokens("abcd") == 2
+
+
+def test_budgeted_provider_refuses_request_that_cannot_fit():
+    budget = Budget(100)
+    provider = MockProvider([{"text": "x", "usage": {"prompt_tokens": 10, "completion_tokens": 5}}])
+    wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
+    budget.charge(60, "prior")  # 60 spent; 30-char prompt ~10 + 50 output = 60 > 40 remaining
+    with pytest.raises(BudgetExhausted, match="does not fit"):
+        wrapped.complete_with_metadata([{"role": "user", "content": "a" * 30}])
+
+
+def test_budgeted_provider_charges_actual_usage():
+    budget = Budget(1000)
+    provider = MockProvider([{"text": "ok", "usage": {"prompt_tokens": 10, "completion_tokens": 5}}])
+    wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
+    wrapped.complete_with_metadata([{"role": "user", "content": "hi"}])
+    assert budget.spent == 15
+
+
+def test_budgeted_provider_charges_worst_case_when_usage_missing():
+    budget = Budget(1000)
+    provider = MockProvider(["plain text, no usage"])
+    wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
+    wrapped.complete_with_metadata([{"role": "user", "content": "a" * 30}])
+    assert budget.spent == 10 + 50  # estimated prompt + max output
+
+
+def test_budgeted_provider_requires_capped_output():
+    budget = Budget(1000)
+
+    class NoCap:
+        max_tokens = None
+
+    with pytest.raises(ValueError, match="hard budget"):
+        BudgetedProvider(NoCap(), budget, max_output_tokens=50)
+
+
+def test_budget_exhaustion_aborts_benchmark_without_fake_failures(tmp_path):
+    """BudgetExhausted subclasses BenchmarkError: the runner aborts the whole
+    evaluation instead of recording the refusal as task failures."""
+    from cdavc.benchmark import BenchmarkError
+    assert issubclass(BudgetExhausted, BenchmarkError)
+    tid = "task_e03_wrap_text"
+    task_dir = Path("benchmarks_dev2/agent10") / tid
+    reference = (REPO_ROOT / task_dir / "reference_solution.py").read_text()
+    response = json.dumps({"files": {(task_dir / "solution_stub.py").as_posix(): reference}})
+    provider = MockProvider([
+        {"text": response, "usage": {"prompt_tokens": 100, "completion_tokens": 50}},
+    ])
+    budget = Budget(10)  # far too small for any request
+    wrapped = BudgetedProvider(provider, budget, max_output_tokens=50)
+    evaluator = LiveEvaluator(REPO_ROOT, wrapped, token_cap=10, results_dir=tmp_path)
+    evaluator.task_ids = [tid]
+    with pytest.raises(BudgetExhausted):
+        evaluator.evaluate(HarnessConfig())
+    # no fake PASS/FAIL records were produced for the task
+    records = list(tmp_path.glob("seed1/*.jsonl"))
+    assert records == [] or all("task_id" not in line
+                                for f in records for line in f.read_text().splitlines())

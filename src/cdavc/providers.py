@@ -129,14 +129,18 @@ class OpenAICompatibleProvider:
         api_key: str | None = None,
         opener: Callable[[Request], Any] = urlopen,
         timeout: float = 30.0,
+        max_tokens: int | None = None,
     ) -> None:
         if timeout <= 0:
             raise ValueError("provider timeout must be greater than zero")
+        if max_tokens is not None and max_tokens <= 0:
+            raise ValueError("max_tokens must be positive when set")
         self.endpoint = endpoint
         self.model = model
         self.api_key = api_key
         self._opener = opener
         self.timeout = timeout
+        self.max_tokens = max_tokens
 
     @property
     def available(self) -> bool:
@@ -157,6 +161,8 @@ class OpenAICompatibleProvider:
         request_payload: dict[str, Any] = {"model": self.model, "messages": list(messages)}
         if seed is not None:
             request_payload["seed"] = seed
+        if self.max_tokens is not None:
+            request_payload["max_tokens"] = self.max_tokens
         payload = json.dumps(request_payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
