@@ -19,3 +19,5 @@ results/*.jsonl
 results/REPORT.md
 .opencode/
 ogcode.json
+self_improve/runs/
+__pycache__/

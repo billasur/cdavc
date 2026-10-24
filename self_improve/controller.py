@@ -14,6 +14,7 @@ Hard rules encoded here (not just documented):
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -108,8 +109,9 @@ class Controller:
                                   "tokens": result.tokens, "kept": keep,
                                   "simulated": result.simulated})
             now = datetime.now(IST).strftime("%H:%M")
+            compact = json.dumps(candidate.to_runner_kwargs(), sort_keys=True)
             self._append_log(
-                f"- {now} - `{candidate.to_json().strip()}` - "
+                f"- {now} - `{compact}` - "
                 f"{result.passed}/{result.total}"
                 + (f", {result.tokens} tokens" if result.tokens is not None else "")
                 + f" - {'KEPT' if keep else 'rolled back'} - {label}"
@@ -120,7 +122,7 @@ class Controller:
                 current = candidate
                 self._git("add", CONFIG_PATH, LOG_PATH)
                 self._git("commit", "-m",
-                          f"self-improve: keep config "
+                          f"self-improve: keep {compact} "
                           f"({result.passed}/{result.total} {label})")
             else:
                 # roll back: restore the incumbent config content
