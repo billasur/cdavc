@@ -51,7 +51,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="model id for live evaluation and/or model proposer")
     parser.add_argument("--base-url", default=GROQ_CHAT_COMPLETIONS)
     parser.add_argument("--token-cap", type=int, default=0,
-                        help="required for --evaluator live; hard token budget per evaluation")
+                        help="required for --evaluator live; TOTAL budget covering "
+                             "proposals, evaluations and validation re-runs")
     parser.add_argument("--approve-spend", action="store_true",
                         help="confirms token spend was approved for this run")
     parser.add_argument("--validate", action="store_true",
@@ -69,9 +70,14 @@ def main(argv: list[str] | None = None) -> int:
 
     provider = _build_provider(args.model, args.base_url) if needs_model else None
 
+    budget = None
+    if args.evaluator == "live" or args.proposer == "model":
+        from .budget import Budget
+        budget = Budget(args.token_cap or 1)
+
     if args.proposer == "model":
         from .proposer import ModelProposer
-        proposer = ModelProposer(provider, spend_approved=args.approve_spend)
+        proposer = ModelProposer(provider, spend_approved=args.approve_spend, budget=budget)
     else:
         from .proposer import ScriptedProposer
         proposer = ScriptedProposer()
@@ -84,7 +90,8 @@ def main(argv: list[str] | None = None) -> int:
         from .evaluator import LiveEvaluator
 
         def make_eval(seed: int) -> "LiveEvaluator":
-            return LiveEvaluator(repo_root, provider, token_cap=args.token_cap, seed=seed)
+            return LiveEvaluator(repo_root, provider, token_cap=args.token_cap,
+                                 seed=seed, budget=budget)
 
         evaluator = make_eval(args.seed)
         evaluator_for_seed = make_eval if args.validate else None
@@ -93,10 +100,12 @@ def main(argv: list[str] | None = None) -> int:
     controller = Controller(repo_root, proposer, evaluator,
                             evaluator_for_seed=evaluator_for_seed)
     state = controller.run(args.iterations)
-    status = "validated gain" if state.validated else (
+    status = "multi-seed observed gain under this protocol" if state.validated else (
         "provisional (single-seed) best" if state.best_result else "no improvement found")
     print(f"done: {len(state.history)} iterations, "
           f"best={state.best_config.to_json().strip()} [{status}]")
+    if budget is not None:
+        print("budget:", budget.summary())
     return 0
 
 

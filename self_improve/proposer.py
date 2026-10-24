@@ -64,17 +64,24 @@ class ModelProposer(Proposer):
     (extra keys, out-of-range values, prose) is rejected. One re-ask on an
     invalid reply, then None (loop stops instead of guessing)."""
 
-    def __init__(self, provider, *, spend_approved: bool = False) -> None:
+    def __init__(self, provider, *, spend_approved: bool = False, budget=None) -> None:
         if not spend_approved:
             raise PermissionError(
                 "ModelProposer spends tokens; construct it only with "
                 "spend_approved=True after explicit approval."
             )
         self.provider = provider
+        self.budget = budget
 
     def _ask(self, prompt: str) -> str:
+        if self.budget is not None:
+            self.budget.check_can_start("model proposal")
         completion = self.provider.complete_with_metadata(
             [{"role": "user", "content": prompt}])
+        if self.budget is not None:
+            self.budget.charge(
+                (completion.prompt_tokens or 0) + (completion.completion_tokens or 0),
+                "model proposal")
         return completion.text if hasattr(completion, "text") else str(completion)
 
     @staticmethod

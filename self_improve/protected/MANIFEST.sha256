@@ -275,11 +275,12 @@
  "benchmarks_heldout/agent6/task_h6_05_job_scheduler/solution_stub.py": "396b0a35f4fda1792221952b9b96335457f9e181253ec673a17a7f5fc826d5f8",
  "benchmarks_heldout/agent6/task_h6_05_job_scheduler/spec.json": "43f77a9e19dd814e6bf4762511b1b033cb34c68ea897a3e8b9665abfeab30254",
  "self_improve/__init__.py": "4a851febe8c9f33a2844fbaa24dcde2265fa84055e185b3455a0894cb81c321d",
+ "self_improve/budget.py": "d019bce9992bcf91095957c54d448aedd0d524a5f58ccf91f5b7173051a87cd0",
  "self_improve/config.py": "c4f90ea55ed99a28a30e6e4860dc2c0763dcaf56f921de97223a663878f0a4cb",
- "self_improve/controller.py": "77620f7ceca05104d23e27fcc8cb8368f93dc9f18ac48f4772378246471927ee",
- "self_improve/evaluator.py": "a61be36b872ba983a2106bef619ec19838318f19b4670c2c8ce4636b339f94ee",
+ "self_improve/controller.py": "cccd34a8608c62947cf7296be73b28dc40eb8cdd5833104a42f5cefb79e30407",
+ "self_improve/evaluator.py": "d313535642cfa2cb653f09732ef6ad47f467edc10720143e11baf8804920ec99",
  "self_improve/manifest.py": "33ad375b95311de2d2cea02fea09a02203f923791336267e8aed28075003f3c4",
- "self_improve/proposer.py": "6d402035c66c99f1142b655ec11e8e1881fc02c58d7d6083a8d84d8bac2201e7",
+ "self_improve/proposer.py": "08761603a83cf089781d4eeb5b8b051368ddf41aff59ea0a0eaa9bb21f512643",
  "self_improve/protected/tasks.json": "fbc9729af2a0b74365ed83be208f372ad887a74dab54ebfad3e82999961d3e6e",
- "self_improve/run.py": "69ba8b792cdf19677d480631f02065e2d66fb0689b19047eab462d953f3eb6d9"
+ "self_improve/run.py": "5b0b594ce7792ee35ed4cfe950d8832dfb064e8d609ea3b4fecb9fd6e26f3073"
 }

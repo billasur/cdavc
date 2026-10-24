@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from .budget import BudgetExhausted
 from .config import HarnessConfig
 from .evaluator import Evaluator, EvalResult
 from .manifest import verify_manifest, ManifestMismatchError
@@ -30,9 +31,12 @@ IST = timezone(timedelta(hours=5, minutes=30))
 CONFIG_PATH = "self_improve/harness_config.json"
 LOG_PATH = "self_improve/IMPROVE_LOG.md"
 
-# A single-seed keep is a MECHANICAL keep, not a validated gain: run-to-run
-# noise at t=0.7 was previously measured to be as large as arm differences.
-# A gain is only "validated" after confirmation on VALIDATION_SEEDS.
+# A single-seed keep is a MECHANICAL keep, nothing more: run-to-run noise at
+# t=0.7 was previously measured to be as large as arm differences. A keep
+# confirmed on VALIDATION_SEEDS is logged as a "multi-seed observed gain
+# under this protocol" - small N, selected on the dev2 set, NOT a validated
+# research result. Validation re-runs cost tokens too; they are charged to
+# the same budget as the search itself.
 VALIDATION_SEEDS = (2, 3)
 
 
@@ -127,19 +131,30 @@ class Controller:
         current = HarnessConfig.load(self.config_file)
         state = LoopState(best_config=current, tried=[current])
         for _ in range(iterations):
-            candidate = self.proposer.propose(current, state.tried, state.history)
+            try:
+                candidate = self.proposer.propose(current, state.tried, state.history)
+            except BudgetExhausted as exc:
+                self._append_log(f"- {datetime.now(IST).strftime('%H:%M')} - STOPPED: {exc}")
+                break
             if candidate is None:
                 break
             check_evaluator_clean(self.repo_root)
             self._write_config(candidate)
-            result = self.evaluator.evaluate(candidate)
+            try:
+                result = self.evaluator.evaluate(candidate)
+            except BudgetExhausted as exc:
+                self._write_config(current)  # restore incumbent
+                self._append_log(f"- {datetime.now(IST).strftime('%H:%M')} - STOPPED: {exc}")
+                break
             check_evaluator_clean(self.repo_root)  # catch mid-run edits
             label = "simulated (mechanics only)" if result.simulated else "measured (single-seed, provisional)"
             keep = (not result.simulated) and is_better(result, state.best_result)
             if keep and result.tokens is not None and self.evaluator_for_seed is not None:
                 keep = self._validate_gain(candidate, result, state, label)
                 if keep:
-                    label = "measured (validated, seeds 1," + ",".join(str(s) for s in VALIDATION_SEEDS) + ")"
+                    label = ("multi-seed observed gain under this protocol, seeds 1,"
+                             + ",".join(str(s) for s in VALIDATION_SEEDS)
+                             + " (small N, dev2-selected, not a validated research result)")
                     state.validated = True
             state.tried.append(candidate)
             state.history.append({"config": candidate.to_runner_kwargs(),

@@ -18,6 +18,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from .budget import Budget
 from .config import HarnessConfig
 
 
@@ -50,7 +51,7 @@ class LiveEvaluator(Evaluator):
     """Runs cdavc.BenchmarkRunner on the protected fixed task list. MEASURED."""
 
     def __init__(self, repo_root: Path, provider, *, token_cap: int, seed: int = 1,
-                 results_dir: Path | None = None) -> None:
+                 results_dir: Path | None = None, budget: Budget | None = None) -> None:
         if token_cap <= 0:
             raise ValueError("LiveEvaluator requires a positive token cap")
         self.repo_root = Path(repo_root)
@@ -58,6 +59,7 @@ class LiveEvaluator(Evaluator):
         # Watchdog threshold well under the cap: a burst can cross between polls.
         self.token_cap = token_cap
         self.seed = seed
+        self.budget = budget
         spec = json.loads((Path(__file__).parent / "protected" / "tasks.json").read_text())
         self.benchmark_root = self.repo_root / spec["benchmark_root"]
         self.arm = spec["arm"]
@@ -66,6 +68,8 @@ class LiveEvaluator(Evaluator):
             self.repo_root / "self_improve" / "runs")
 
     def evaluate(self, config: HarnessConfig) -> EvalResult:
+        if self.budget is not None:
+            self.budget.check_can_start(f"evaluation (seed {self.seed})")
         import sys
         sys.path.insert(0, str(self.repo_root / "src"))
         from cdavc.benchmark import BenchmarkRunner, BenchmarkTask  # noqa: PLC0415
@@ -112,4 +116,6 @@ class LiveEvaluator(Evaluator):
             if record.get("passed"):
                 passed += 1
             tokens += (record.get("token_in") or 0) + (record.get("token_out") or 0)
+        if self.budget is not None:
+            self.budget.charge(tokens, f"evaluation (seed {self.seed})")
         return EvalResult(passed=passed, total=len(tasks), tokens=tokens, simulated=False)

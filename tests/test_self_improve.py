@@ -21,6 +21,7 @@ from self_improve.controller import (  # noqa: E402
     is_better,
 )
 from self_improve.evaluator import EvalResult, LiveEvaluator, SimulatedEvaluator  # noqa: E402
+from self_improve.budget import Budget, BudgetExhausted  # noqa: E402
 from self_improve.manifest import verify_manifest, write_manifest  # noqa: E402
 from self_improve.proposer import ModelProposer, ScriptedProposer  # noqa: E402
 
@@ -307,7 +308,8 @@ def test_validated_gain_requires_all_seeds(tmp_path):
     assert state.validated is True
     assert HarnessConfig.load(repo / "self_improve" / "harness_config.json") == candidate
     log = (repo / "self_improve" / "IMPROVE_LOG.md").read_text()
-    assert "validated, seeds 1,2,3" in log
+    assert "multi-seed observed gain under this protocol" in log
+    assert "not a validated research result" in log
     assert log.count("validation seed") == 2
 
 
@@ -334,3 +336,48 @@ def test_provisional_keep_without_validator(tmp_path):
     assert state.validated is False
     assert state.best_config == candidate
     assert "single-seed, provisional" in (repo / "self_improve" / "IMPROVE_LOG.md").read_text()
+
+
+# --- total budget accounting ---
+
+def test_budget_soft_limit():
+    b = Budget(1000)
+    b.charge(500, "eval")
+    b.check_can_start("next")  # 500 < 800 soft limit
+    b.charge(300, "eval")
+    with pytest.raises(BudgetExhausted):
+        b.check_can_start("next")
+    assert "800/1000" in b.summary()
+
+
+def test_budget_requires_positive_cap():
+    with pytest.raises(ValueError):
+        Budget(0)
+
+
+class _ChargingEvaluator:
+    """Fake measured evaluator that charges a shared budget."""
+
+    def __init__(self, budget, result, cost):
+        self.budget = budget
+        self.result = result
+        self.cost = cost
+
+    def evaluate(self, config):
+        self.budget.check_can_start("evaluation")
+        self.budget.charge(self.cost, "evaluation")
+        return self.result
+
+
+def test_controller_stops_when_budget_exhausted(tmp_path):
+    repo = _make_repo(tmp_path)
+    budget = Budget(100)  # soft limit 80; two evaluations of 50 exhaust it
+    evaluator = _ChargingEvaluator(budget, EvalResult(5, 13, 50, False), cost=50)
+    candidates = [HarnessConfig(retry_cap=2), HarnessConfig(retry_cap=1), HarnessConfig(retry_cap=0)]
+    state = Controller(repo, _FixedOrder(candidates), evaluator).run(5)
+    log = (repo / "self_improve" / "IMPROVE_LOG.md").read_text()
+    assert "STOPPED" in log
+    assert len(state.history) <= 2  # loop stopped early, not after all candidates
+    # the exhaustion path restored the KEPT incumbent (retry_cap=2 won round 1)
+    assert HarnessConfig.load(repo / "self_improve" / "harness_config.json") == HarnessConfig(retry_cap=2)
+    assert state.best_config == HarnessConfig(retry_cap=2)

@@ -36,7 +36,14 @@ scope.
   provisional)"; with `--validate` the candidate is re-run against the
   incumbent on seeds 2 and 3 and only kept if it wins the equal-cost
   comparison on every validation seed - otherwise it is rolled back as
-  single-seed noise. Only a validated keep is logged "validated gain".
+  single-seed noise. Such a keep is logged "multi-seed observed gain under
+  this protocol" with its caveats: small N, selected on the dev2 set, NOT a
+  validated research result. Validation re-runs spend tokens too.
+- `self_improve/budget.py` - one cumulative token budget per run covering
+  EVERYTHING: model-proposer calls, seed-1 evaluations and validation
+  re-runs. No new evaluation starts once 80% of the approved cap is consumed
+  (a single evaluation can overshoot between accounting points); the loop
+  stops with a STOPPED log row and restores the incumbent config.
 - `pi_extension/cdavc/index.ts` - the pi extension: `cdavc_verify` tool
   (public gates only; hidden tests never run through it), a write/edit/bash
   guard over protected paths, and `/cdavc-improve` (simulated mode only;
@@ -53,9 +60,11 @@ It is a GUARD RAIL, not a security boundary. An agent with unrestricted shell
 access in this repo could rewrite both the protected files AND the manifest
 (`test_manifest_rewrite_is_the_documented_limit` pins this). Real isolation
 needs enforcement outside the repo: read-only mount, separate OS user, or
-CI-side evaluation. Do not describe the scorer as "protected" without this
-caveat. The pi extension's tool guards are additionally only string-matching
-and only apply inside pi.
+CI-side evaluation. Until that exists, DO NOT run an unsupervised agent with
+shell access against this loop, and treat manifest writes as a human-only
+step (regenerate + review + commit). Do not describe the scorer as
+"protected" without this caveat. The pi extension's tool guards are
+additionally only string-matching and only apply inside pi.
 
 ## Verified offline (24 Oct)
 
@@ -78,8 +87,11 @@ and only apply inside pi.
 - Live measured run: needs a model key and a token-cap approval. The Groq
   gpt-oss-20b free-tier TPD cap was hit during the 20 Oct runs (per run
   records); whether quota is available now is unverified - check live before
-  assuming either way. `--base-url` and `--model` allow any
-  OpenAI-compatible endpoint the user selects.
+  assuming either way. `scripts/self_improve_quota_probe.py` does that check
+  with one max_tokens=1 call (a few tokens, run only after approval) and
+  prints the rate-limit headers. `--base-url` and `--model` allow any
+  OpenAI-compatible endpoint the user selects. `--token-cap` is the TOTAL
+  budget: proposals, evaluations and validation re-runs all count.
 - Objective is dev2 pass count, cdavc arm, seed 1 (+ seeds 2,3 with
   --validate). dev2 is a dev set; held-out stays frozen and unrun.
 - Widening the editable surface beyond the three knobs (feedback templates,
